@@ -2,8 +2,6 @@ package oci
 
 import (
 	"context"
-	"log/slog"
-	"time"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
@@ -12,47 +10,44 @@ import (
 	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
-type Source[A any] struct {
-	remote *remote.Repository
-	fn     func(v1.Descriptor) (A, error)
+type OCIDerivable interface {
+	ReadFromOCIDescriptor(v1.Descriptor) error
 }
 
-func New[A any](repo string, fn func(v1.Descriptor) (A, error)) (*Source[A], error) {
+type Source[A any, P interface {
+	*A
+	OCIDerivable
+}] struct {
+	remote *remote.Repository
+}
+
+func New[A any, P interface {
+	*A
+	OCIDerivable
+}](repo string, p P) (*Source[A, P], error) {
 	r, err := getRepository(repo)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Source[A]{
+	return &Source[A, P]{
 		remote: r,
-		fn:     fn,
 	}, nil
 }
 
-func (s *Source[A]) Subscribe(ctx context.Context, ch chan<- A) {
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				desc, err := s.remote.Resolve(ctx, s.remote.Reference.Reference)
-				if err != nil {
-					slog.Error("fetching descriptor for remote", "error", err)
-					continue
-				}
+func (s *Source[A, P]) Reconcile(ctx context.Context) (P, error) {
+	desc, err := s.remote.Resolve(ctx, s.remote.Reference.Reference)
+	if err != nil {
+		return nil, err
+	}
 
-				a, err := s.fn(desc)
-				if err != nil {
-					slog.Error("transforming descriptor to target", "error", err)
-					continue
-				}
+	p := P(new(A))
+	if err := p.ReadFromOCIDescriptor(desc); err != nil {
+		return nil, err
+	}
 
-				ch <- a
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	return p, nil
+
 }
 
 func getRepository(repo string) (*remote.Repository, error) {

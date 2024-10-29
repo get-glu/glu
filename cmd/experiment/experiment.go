@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"time"
 
 	"github.com/flipt-io/glu"
 	"github.com/flipt-io/glu/pkg/fs"
@@ -14,24 +16,48 @@ import (
 
 func run(ctx context.Context) error {
 	var (
-		pipeline = glu.NewPipeline(ctx)
-		staging  = pipeline.NewPhase("staging")
-		_        = pipeline.NewPhase("production")
+		pipeline    = glu.NewPipeline(ctx)
+		staging     = pipeline.NewPhase("staging")
+		production  = pipeline.NewPhase("production")
+		checkoutApp = &CheckoutApp{}
 	)
 
-	checkoutAppSource, err := oci.New("ghcr.io/my-org/checkout:latest", func(d v1.Descriptor) (CheckoutApp, error) {
-		return CheckoutApp{
-			Digest: d.Digest.String(),
-		}, nil
-	})
+	// create an OCI source for the checkout app which derives the app
+	// configuration from the latest tags image digest
+	checkoutAppSource, err := oci.New("ghcr.io/my-org/checkout:latest", checkoutApp)
 	if err != nil {
 		return err
 	}
 
-	_ = glu.NewInstance(
+	// create a staging phase checkout app which is dependedent
+	// on the OCI source
+	checkoutStaging := glu.NewInstance(
 		staging,
-		&CheckoutApp{},
-		glu.DerivedFrom(checkoutAppSource),
+		checkoutApp,
+		glu.DependsOn(checkoutAppSource),
+	)
+
+	// force a reconcile of the staging instance every 10 seconds
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+			case <-ticker.C:
+				if _, err := checkoutStaging.Reconcile(ctx); err != nil {
+					slog.Error("reconciling staging checkout app", "error", err)
+					continue
+				}
+			}
+		}
+	}()
+
+	// create a production phase checkout app which is dependedent
+	// on the staging phase instance
+	glu.NewInstance(
+		production,
+		checkoutApp,
+		glu.DependsOn(checkoutStaging),
 	)
 
 	return pipeline.Run(ctx)
@@ -48,6 +74,11 @@ func (c *CheckoutApp) Metadata() glu.Metadata {
 			"team": "ecommerce",
 		},
 	}
+}
+
+func (c *CheckoutApp) ReadFromOCIDescriptor(d v1.Descriptor) error {
+	c.Digest = d.Digest.String()
+	return nil
 }
 
 func (c *CheckoutApp) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesystem) error {

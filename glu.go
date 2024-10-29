@@ -2,7 +2,7 @@ package glu
 
 import (
 	"context"
-	"log/slog"
+	"reflect"
 
 	"github.com/flipt-io/glu/pkg/fs"
 )
@@ -55,8 +55,8 @@ type App interface {
 	WriteTo(_ context.Context, _ *Phase, _ fs.Filesystem) error
 }
 
-type Source[A any] interface {
-	Subscribe(context.Context, chan<- A)
+type Reconciler[A any] interface {
+	Reconcile(context.Context) (A, error)
 }
 
 type Instance[A any, P interface {
@@ -64,7 +64,7 @@ type Instance[A any, P interface {
 	App
 }] struct {
 	phase *Phase
-	src   Source[A]
+	src   Reconciler[P]
 }
 
 type InstanceOption[A any, P interface {
@@ -72,10 +72,10 @@ type InstanceOption[A any, P interface {
 	App
 }] func(*Instance[A, P])
 
-func DerivedFrom[A any, P interface {
+func DependsOn[A any, P interface {
 	*A
 	App
-}](src Source[A]) InstanceOption[A, P] {
+}](src Reconciler[P]) InstanceOption[A, P] {
 	return func(i *Instance[A, P]) {
 		i.src = src
 	}
@@ -90,27 +90,10 @@ func NewInstance[A any, P interface {
 		opt(&inst)
 	}
 
-	if inst.src != nil {
-		ctx := phase.pipeline.ctx
-
-		ch := make(chan A)
-		inst.src.Subscribe(ctx, ch)
-
-		go func() {
-			select {
-			case <-ctx.Done():
-				return
-			case a := <-ch:
-				if err := inst.reconcile(ctx, &a); err != nil {
-					slog.Error("reconciling instance", "error", err)
-				}
-			}
-		}()
-	}
 	return &inst
 }
 
-func (i *Instance[A, P]) Get(ctx context.Context) (*A, error) {
+func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
 	a := P(new(A))
 	if err := i.phase.src.View(ctx, func(f fs.Filesystem) error {
 		return a.ReadFrom(ctx, i.phase, f)
@@ -118,11 +101,24 @@ func (i *Instance[A, P]) Get(ctx context.Context) (*A, error) {
 		return nil, err
 	}
 
-	return a, nil
-}
+	if i.src == nil {
+		return a, nil
+	}
 
-func (i *Instance[A, P]) reconcile(ctx context.Context, p P) error {
-	return i.phase.src.Update(ctx, func(f fs.Filesystem) error {
-		return p.WriteTo(ctx, i.phase, f)
-	})
+	b, err := i.src.Reconcile(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if reflect.DeepEqual(a, b) {
+		return a, nil
+	}
+
+	if err := i.phase.src.Update(ctx, func(f fs.Filesystem) error {
+		return b.WriteTo(ctx, i.phase, f)
+	}); err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
