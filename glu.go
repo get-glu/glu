@@ -2,15 +2,13 @@ package glu
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"math/rand"
 	"reflect"
 
 	"github.com/flipt-io/glu/pkg/fs"
 )
-
-type Repository interface {
-	View(context.Context, func(fs.Filesystem) error) error
-	Update(context.Context, func(fs.Filesystem) error) error
-}
 
 type Pipeline struct {
 	ctx context.Context
@@ -29,18 +27,18 @@ func (p *Pipeline) Run(ctx context.Context) error {
 type Phase struct {
 	pipeline *Pipeline
 	name     string
-	src      Repository
+	repo     Repository
 }
 
 func (p *Phase) Name() string {
 	return p.name
 }
 
-func (p *Pipeline) NewPhase(name string) *Phase {
+func (p *Pipeline) NewPhase(name string, repo Repository) *Phase {
 	return &Phase{
 		pipeline: p,
 		name:     name,
-		src:      p.src,
+		repo:     repo,
 	}
 }
 
@@ -50,7 +48,6 @@ type Metadata struct {
 }
 
 type App interface {
-	Metadata() Metadata
 	ReadFrom(context.Context, *Phase, fs.Filesystem) error
 	WriteTo(_ context.Context, _ *Phase, _ fs.Filesystem) error
 }
@@ -64,6 +61,8 @@ type Instance[A any, P interface {
 	App
 }] struct {
 	phase *Phase
+	meta  Metadata
+	fn    func(Metadata) P
 	src   Reconciler[P]
 }
 
@@ -84,8 +83,8 @@ func DependsOn[A any, P interface {
 func NewInstance[A any, P interface {
 	*A
 	App
-}](phase *Phase, p P, opts ...InstanceOption[A, P]) *Instance[A, P] {
-	inst := Instance[A, P]{phase: phase}
+}](phase *Phase, meta Metadata, fn func(Metadata) P, opts ...InstanceOption[A, P]) *Instance[A, P] {
+	inst := Instance[A, P]{phase: phase, meta: meta, fn: fn}
 	for _, opt := range opts {
 		opt(&inst)
 	}
@@ -94,8 +93,10 @@ func NewInstance[A any, P interface {
 }
 
 func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
-	a := P(new(A))
-	if err := i.phase.src.View(ctx, func(f fs.Filesystem) error {
+	slog.Debug("Reconcile", "type", "instance", "name", i.meta.Name)
+
+	a := i.fn(i.meta)
+	if err := i.phase.repo.View(ctx, func(f fs.Filesystem) error {
 		return a.ReadFrom(ctx, i.phase, f)
 	}); err != nil {
 		return nil, err
@@ -111,11 +112,14 @@ func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
 	}
 
 	if reflect.DeepEqual(a, b) {
+		slog.Debug("skipping reconcile", "reason", "UpToDate")
 		return a, nil
 	}
 
-	if err := i.phase.src.Update(ctx, func(f fs.Filesystem) error {
-		return b.WriteTo(ctx, i.phase, f)
+	branch := fmt.Sprintf("glu/reconcile/%s/%s/%x", i.meta.Name, i.phase.name, rand.Int63())
+
+	if err := i.phase.repo.Update(ctx, branch, func(f fs.Filesystem) (string, error) {
+		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.phase.name), b.WriteTo(ctx, i.phase, f)
 	}); err != nil {
 		return nil, err
 	}

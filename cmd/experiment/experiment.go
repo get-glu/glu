@@ -15,16 +15,26 @@ import (
 )
 
 func run(ctx context.Context) error {
+	pipeline := glu.NewPipeline(ctx)
+	repository, err := glu.NewGitRepository("configuration")
+	if err != nil {
+		return err
+	}
+
 	var (
-		pipeline    = glu.NewPipeline(ctx)
-		staging     = pipeline.NewPhase("staging")
-		production  = pipeline.NewPhase("production")
-		checkoutApp = &CheckoutApp{}
+		staging         = pipeline.NewPhase("staging", repository)
+		production      = pipeline.NewPhase("production", repository)
+		checkoutAppMeta = glu.Metadata{
+			Name: "checkout",
+			Labels: map[string]string{
+				"team": "ecommerce",
+			},
+		}
 	)
 
 	// create an OCI source for the checkout app which derives the app
 	// configuration from the latest tags image digest
-	checkoutAppSource, err := oci.New("ghcr.io/my-org/checkout:latest", checkoutApp)
+	checkoutAppSource, err := oci.New(checkoutAppMeta, NewCheckoutApp)
 	if err != nil {
 		return err
 	}
@@ -33,7 +43,8 @@ func run(ctx context.Context) error {
 	// on the OCI source
 	checkoutStaging := glu.NewInstance(
 		staging,
-		checkoutApp,
+		checkoutAppMeta,
+		NewCheckoutApp,
 		glu.DependsOn(checkoutAppSource),
 	)
 
@@ -56,7 +67,8 @@ func run(ctx context.Context) error {
 	// on the staging phase instance
 	glu.NewInstance(
 		production,
-		checkoutApp,
+		checkoutAppMeta,
+		NewCheckoutApp,
 		glu.DependsOn(checkoutStaging),
 	)
 
@@ -64,16 +76,17 @@ func run(ctx context.Context) error {
 }
 
 type CheckoutApp struct {
+	meta glu.Metadata
+
 	Digest string
 }
 
+func NewCheckoutApp(meta glu.Metadata) *CheckoutApp {
+	return &CheckoutApp{meta: meta}
+}
+
 func (c *CheckoutApp) Metadata() glu.Metadata {
-	return glu.Metadata{
-		Name: "checkout",
-		Labels: map[string]string{
-			"team": "ecommerce",
-		},
-	}
+	return c.meta
 }
 
 func (c *CheckoutApp) ReadFromOCIDescriptor(d v1.Descriptor) error {
