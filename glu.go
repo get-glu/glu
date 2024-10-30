@@ -4,19 +4,33 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"math/rand"
 	"reflect"
 
+	"github.com/flipt-io/glu/pkg/config"
+	"github.com/flipt-io/glu/pkg/credentials"
 	"github.com/flipt-io/glu/pkg/fs"
 )
 
 type Pipeline struct {
-	ctx context.Context
-	src Repository
+	ctx   context.Context
+	name  string
+	conf  *config.Config
+	creds *credentials.CredentialSource
 }
 
-func NewPipeline(ctx context.Context) *Pipeline {
-	return &Pipeline{ctx: ctx}
+func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
+	// TODO(georgemac): make glu config path optionally configurable
+	conf, err := config.ReadFromPath("glu.yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Pipeline{
+		ctx:   ctx,
+		name:  name,
+		conf:  conf,
+		creds: credentials.New(conf.Credentials),
+	}, nil
 }
 
 func (p *Pipeline) Run(ctx context.Context) error {
@@ -27,17 +41,24 @@ func (p *Pipeline) Run(ctx context.Context) error {
 type Phase struct {
 	pipeline *Pipeline
 	name     string
-	repo     Repository
+	// TODO(georgemac): make optionall configurable
+	branch string
+	repo   Repository
 }
 
 func (p *Phase) Name() string {
 	return p.name
 }
 
+func (p *Phase) Branch() string {
+	return p.branch
+}
+
 func (p *Pipeline) NewPhase(name string, repo Repository) *Phase {
 	return &Phase{
 		pipeline: p,
 		name:     name,
+		branch:   "main",
 		repo:     repo,
 	}
 }
@@ -93,10 +114,10 @@ func NewInstance[A any, P interface {
 }
 
 func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
-	slog.Debug("Reconcile", "type", "instance", "name", i.meta.Name)
+	slog.Debug("reconcile started", "type", "instance", "phase", i.phase.name, "name", i.meta.Name)
 
 	a := i.fn(i.meta)
-	if err := i.phase.repo.View(ctx, func(f fs.Filesystem) error {
+	if err := i.phase.repo.View(ctx, i.phase, func(f fs.Filesystem) error {
 		return a.ReadFrom(ctx, i.phase, f)
 	}); err != nil {
 		return nil, err
@@ -116,9 +137,7 @@ func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
 		return a, nil
 	}
 
-	branch := fmt.Sprintf("glu/reconcile/%s/%s/%x", i.meta.Name, i.phase.name, rand.Int63())
-
-	if err := i.phase.repo.Update(ctx, branch, func(f fs.Filesystem) (string, error) {
+	if err := i.phase.repo.Update(ctx, i.phase, &i.meta, func(f fs.Filesystem) (string, error) {
 		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.phase.name), b.WriteTo(ctx, i.phase, f)
 	}); err != nil {
 		return nil, err

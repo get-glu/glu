@@ -15,8 +15,12 @@ import (
 )
 
 func run(ctx context.Context) error {
-	pipeline := glu.NewPipeline(ctx)
-	repository, err := glu.NewGitRepository("configuration")
+	pipeline, err := glu.NewPipeline(ctx, "myorgpipeline")
+	if err != nil {
+		return err
+	}
+
+	repository, err := pipeline.NewGitRepository("configuration")
 	if err != nil {
 		return err
 	}

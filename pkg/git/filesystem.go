@@ -15,14 +15,16 @@ import (
 	"strings"
 	"time"
 
-	reprisefs "github.com/flipt-io/glu/pkg/fs"
+	glufs "github.com/flipt-io/glu/pkg/fs"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gitstorage "github.com/go-git/go-git/v5/storage"
 )
 
-var _ reprisefs.Filesystem = (*filesystem)(nil)
+var _ glufs.Filesystem = (*filesystem)(nil)
+
+var ErrEmptyCommit = errors.New("empty commit")
 
 type filesystem struct {
 	logger  *slog.Logger
@@ -100,7 +102,7 @@ func (f *filesystem) MkdirAll(filename string, perm os.FileMode) error {
 // instead. It opens the named file with specified flag (O_RDONLY etc.) and
 // perm, (0666 etc.) if applicable. If successful, methods on the returned
 // File can be used for I/O.
-func (f *filesystem) OpenFile(filename string, flag int, perm os.FileMode) (reprisefs.File, error) {
+func (f *filesystem) OpenFile(filename string, flag int, perm os.FileMode) (glufs.File, error) {
 	f.logger.Debug("OpenFile",
 		slog.String("path", filename),
 		slog.Bool("create", flag&os.O_CREATE == os.O_CREATE))
@@ -437,6 +439,10 @@ func updatePath(logger *slog.Logger, storage gitstorage.Storer, node *object.Tre
 }
 
 func (f *filesystem) commit(_ context.Context, msg string) (*object.Commit, error) {
+	if f.base.Hash == f.tree.Hash {
+		return nil, ErrEmptyCommit
+	}
+
 	signature := object.Signature{
 		Name:  f.sigName,
 		Email: f.sigEmail,
