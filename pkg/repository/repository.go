@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"sync"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/google/go-github/v64/github"
+	giturls "github.com/whilp/git-urls"
 )
 
 type Proposer interface {
@@ -72,7 +72,7 @@ func NewGitRepository(ctx context.Context, conf config.Repository, creds *creden
 	}
 
 	if conf.SCM != nil {
-		repoURL, err := url.Parse(conf.Remote.URL)
+		repoURL, err := giturls.Parse(conf.Remote.URL)
 		if err != nil {
 			return nil, err
 		}
@@ -83,12 +83,12 @@ func NewGitRepository(ctx context.Context, conf config.Repository, creds *creden
 		}
 
 		var (
-			ghClient  = github.NewClient(nil)
 			repoOwner = parts[0]
 			repoName  = strings.TrimSuffix(parts[1], ".git")
 		)
 
-		if conf.SCM.Credential != "" {
+		var proposalsEnabled bool
+		if proposalsEnabled = conf.SCM.Credential != ""; proposalsEnabled {
 			creds, err := creds.Get(conf.SCM.Credential)
 			if err != nil {
 				return nil, fmt.Errorf("repository %q: %w", name, err)
@@ -99,9 +99,18 @@ func NewGitRepository(ctx context.Context, conf config.Repository, creds *creden
 				return nil, fmt.Errorf("repository %q: %w", name, err)
 			}
 
-			ghClient = github.NewClient(client)
-			proposer = githubscm.New(ghClient.PullRequests, repoOwner, repoName)
+			proposer = githubscm.New(
+				github.NewClient(client).PullRequests,
+				repoOwner,
+				repoName,
+			)
 		}
+
+		slog.Debug("configured scm proposer",
+			slog.String("owner", repoOwner),
+			slog.String("name", repoName),
+			slog.Bool("proposals_enabled", proposalsEnabled),
+		)
 	}
 
 	opts = append(opts, git.WithAuth(method))
@@ -123,6 +132,12 @@ func (g *GitRepository) View(ctx context.Context, phase *core.Phase, fn func(fs.
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
+	// perform an initial fetch to ensure we're up to date
+	// TODO(georgmac): scope to phase branch and proposal prefix
+	if err := g.source.Fetch(ctx); err != nil {
+		return err
+	}
+
 	return g.source.View(ctx, phase.Branch(), func(hash plumbing.Hash, fs fs.Filesystem) error {
 		return fn(fs)
 	})
@@ -131,6 +146,8 @@ func (g *GitRepository) View(ctx context.Context, phase *core.Phase, fn func(fs.
 func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *core.Metadata, fn func(fs.Filesystem) (string, error)) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	slog := slog.With("phase", phase.Name(), "name", meta.Name)
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
@@ -146,7 +163,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 
 		if _, err := g.source.UpdateAndPush(ctx, phase.Branch(), nil, fn); err != nil {
 			if errors.Is(err, git.ErrEmptyCommit) {
-				slog.Info("reconcile produced no changes", "phase", phase.Name(), "name", meta.Name)
+				slog.Info("reconcile produced no changes")
 
 				return nil
 			}
@@ -167,6 +184,10 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 	proposal, err := g.proposer.GetCurrentProposal(ctx, phase, meta)
 	if err != nil && !errors.Is(err, githubscm.ErrProposalNotFound) {
 		return err
+	}
+
+	if errors.Is(err, githubscm.ErrProposalNotFound) {
+		slog.Debug("proposal not found")
 	}
 
 	if proposal != nil {
@@ -208,7 +229,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 
 	if _, err := g.source.UpdateAndPush(ctx, branch, nil, fn); err != nil {
 		if errors.Is(err, git.ErrEmptyCommit) {
-			slog.Info("reconcile produced no changes", "phase", phase.Name(), "name", meta.Name)
+			slog.Info("reconcile produced no changes")
 
 			return nil
 		}

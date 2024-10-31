@@ -53,7 +53,7 @@ func (c *Credential) HTTPClient(ctx context.Context) (*http.Client, error) {
 		return nil, fmt.Errorf("credential type %q not supported for HTTP", c.config.Type)
 	}
 
-	return nil, fmt.Errorf("unxpected credential type: %q", c.config.Type)
+	return nil, fmt.Errorf("unexpected credential type: %q", c.config.Type)
 }
 
 func (c *Credential) GitAuthentication() (auth transport.AuthMethod, err error) {

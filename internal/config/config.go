@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -32,20 +33,25 @@ func (d *Decoder[C]) Decode(c *C) error {
 
 	m := map[string]any{}
 	if err := d.enc(data, m); err != nil {
-		return err
+		return fmt.Errorf("unmarshalling configuration: %w", err)
 	}
 
 	d.parseEnvInto(m)
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		TagName: d.tagName,
+		Result:  c,
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("creating decoder: %w", err)
 	}
 
-	return decoder.Decode(c)
+	if err := decoder.Decode(m); err != nil {
+		return fmt.Errorf("decoding configuration: %w", err)
+	}
+
+	return nil
 }
 
 func (d *Decoder[C]) parseEnvInto(m map[string]any) {

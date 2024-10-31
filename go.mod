@@ -9,6 +9,7 @@ require (
 	github.com/google/go-github/v64 v64.0.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/opencontainers/image-spec v1.1.0
+	github.com/whilp/git-urls v1.0.0
 	go.flipt.io/flipt/errors v1.45.0
 	golang.org/x/crypto v0.26.0
 	golang.org/x/oauth2 v0.22.0

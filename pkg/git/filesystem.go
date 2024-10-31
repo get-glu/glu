@@ -108,7 +108,7 @@ func (f *filesystem) OpenFile(filename string, flag int, perm os.FileMode) (gluf
 		slog.Bool("create", flag&os.O_CREATE == os.O_CREATE))
 
 	fi, err := f.tree.File(filename)
-	if flag&os.O_RDONLY > 0 {
+	if flag == os.O_RDONLY {
 		if err != nil {
 			if errorIsNotFound(err) {
 				return nil, fmt.Errorf("path %q: %w", filename, os.ErrNotExist)
@@ -439,7 +439,7 @@ func updatePath(logger *slog.Logger, storage gitstorage.Storer, node *object.Tre
 }
 
 func (f *filesystem) commit(_ context.Context, msg string) (*object.Commit, error) {
-	if f.base.Hash == f.tree.Hash {
+	if f.base.TreeHash == f.tree.Hash {
 		return nil, ErrEmptyCommit
 	}
 
