@@ -20,7 +20,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	repository, err := pipeline.NewGitRepository("configuration")
+	repository, err := pipeline.NewRepository("configuration")
 	if err != nil {
 		return err
 	}
