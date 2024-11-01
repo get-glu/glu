@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"reflect"
 
 	"github.com/flipt-io/glu/pkg/config"
+	"github.com/flipt-io/glu/pkg/containers"
 	"github.com/flipt-io/glu/pkg/core"
 	"github.com/flipt-io/glu/pkg/credentials"
 	"github.com/flipt-io/glu/pkg/fs"
@@ -39,13 +39,24 @@ func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
 	}, nil
 }
 
-func (p *Pipeline) NewRepository(name string) (core.Repository, error) {
+type RepositoryOptions struct {
+	enableProposals bool
+}
+
+func EnableProposals(o *RepositoryOptions) {
+	o.enableProposals = true
+}
+
+func (p *Pipeline) NewRepository(name string, opts ...containers.Option[RepositoryOptions]) (core.Repository, error) {
+	var options RepositoryOptions
+	containers.ApplyAll(&options, opts...)
+
 	conf, ok := p.conf.Repositories[name]
 	if !ok {
 		return nil, fmt.Errorf("repository %q: configuration not found", name)
 	}
 
-	return repository.NewGitRepository(p.ctx, conf, p.creds, name)
+	return repository.NewGitRepository(p.ctx, conf, p.creds, name, options.enableProposals)
 }
 
 type Reconciler[A any] interface {
@@ -54,7 +65,7 @@ type Reconciler[A any] interface {
 
 type Instance[A any, P interface {
 	*A
-	core.App
+	core.Resource
 }] struct {
 	phase *core.Phase
 	meta  core.Metadata
@@ -64,12 +75,12 @@ type Instance[A any, P interface {
 
 type InstanceOption[A any, P interface {
 	*A
-	core.App
+	core.Resource
 }] func(*Instance[A, P])
 
 func DependsOn[A any, P interface {
 	*A
-	core.App
+	core.Resource
 }](src Reconciler[P]) InstanceOption[A, P] {
 	return func(i *Instance[A, P]) {
 		i.src = src
@@ -78,7 +89,7 @@ func DependsOn[A any, P interface {
 
 func NewInstance[A any, P interface {
 	*A
-	core.App
+	core.Resource
 }](phase *core.Phase, meta core.Metadata, fn func(core.Metadata) P, opts ...InstanceOption[A, P]) *Instance[A, P] {
 	inst := Instance[A, P]{phase: phase, meta: meta, fn: fn}
 	for _, opt := range opts {
@@ -109,12 +120,23 @@ func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
 		return nil, err
 	}
 
-	if reflect.DeepEqual(a, b) {
+	aDigest, err := a.Digest()
+	if err != nil {
+		return nil, err
+	}
+
+	bDigest, err := b.Digest()
+	if err != nil {
+		return nil, err
+	}
+
+	if aDigest == bDigest {
 		slog.Debug("skipping reconcile", "reason", "UpToDate")
+
 		return a, nil
 	}
 
-	if err := repo.Update(ctx, i.phase, &i.meta, func(f fs.Filesystem) (string, error) {
+	if err := repo.Update(ctx, i.phase, a, b, func(f fs.Filesystem) (string, error) {
 		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.phase.Name()), b.WriteTo(ctx, i.phase, f)
 	}); err != nil {
 		return nil, err

@@ -42,9 +42,13 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, phase *core.Phase, metadat
 		parts := strings.Split(pr.Head.GetRef(), "/")
 		if strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
 			proposal = &core.Proposal{
-				BaseRevision: parts[len(parts)-1],
+				BaseRevision: pr.Base.GetSHA(),
 				BaseBranch:   pr.Base.GetRef(),
 				Branch:       pr.Head.GetRef(),
+				Digest:       parts[len(parts)-1],
+				ExternalMetadata: map[string]any{
+					GitHubPRNumberField: pr.GetNumber(),
+				},
 			}
 			break
 		}
@@ -120,7 +124,7 @@ func (p *prs) All() iter.Seq[*github.PullRequest] {
 			ListOptions: github.ListOptions{
 				PerPage: 100,
 			},
-			State: "all",
+			State: "open",
 		}
 
 		for {

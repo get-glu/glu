@@ -82,19 +82,23 @@ func run(ctx context.Context) error {
 type CheckoutApp struct {
 	meta glu.Metadata
 
-	Digest string
+	ImageDigest string `json:"digest"`
 }
 
 func NewCheckoutApp(meta glu.Metadata) *CheckoutApp {
 	return &CheckoutApp{meta: meta}
 }
 
-func (c *CheckoutApp) Metadata() glu.Metadata {
-	return c.meta
+func (c *CheckoutApp) Metadata() *glu.Metadata {
+	return &c.meta
+}
+
+func (c *CheckoutApp) Digest() (string, error) {
+	return c.ImageDigest, nil
 }
 
 func (c *CheckoutApp) ReadFromOCIDescriptor(d v1.Descriptor) error {
-	c.Digest = d.Digest.String()
+	c.ImageDigest = d.Digest.String()
 	return nil
 }
 
@@ -117,11 +121,22 @@ func (c *CheckoutApp) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesy
 		return err
 	}
 
-	c.Digest = manifest.Digest
+	c.ImageDigest = manifest.Digest
 
 	return nil
 }
 
-func (c *CheckoutApp) WriteTo(_ context.Context, _ *glu.Phase, _ fs.Filesystem) error {
-	panic("not implemented") // TODO: Implement
+func (c *CheckoutApp) WriteTo(ctx context.Context, phase *glu.Phase, fs fs.Filesystem) error {
+	fi, err := fs.OpenFile(
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Name()),
+		os.O_RDONLY,
+		0644,
+	)
+	if err != nil {
+		return err
+	}
+
+	defer fi.Close()
+
+	return yaml.NewEncoder(fi).Encode(c)
 }

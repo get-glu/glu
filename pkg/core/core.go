@@ -10,6 +10,7 @@ type Proposal struct {
 	BaseRevision string
 	BaseBranch   string
 	Branch       string
+	Digest       string
 	Title        string
 	Body         string
 
@@ -18,7 +19,7 @@ type Proposal struct {
 
 type Repository interface {
 	View(context.Context, *Phase, func(fs.Filesystem) error) error
-	Update(context.Context, *Phase, *Metadata, func(fs.Filesystem) (string, error)) error
+	Update(_ context.Context, _ *Phase, from, to Resource, _ func(fs.Filesystem) (string, error)) error
 }
 
 type Pipeline struct {
@@ -72,7 +73,9 @@ type Metadata struct {
 	Labels map[string]string
 }
 
-type App interface {
+type Resource interface {
+	Metadata() *Metadata
+	Digest() (string, error)
 	ReadFrom(context.Context, *Phase, fs.Filesystem) error
-	WriteTo(_ context.Context, _ *Phase, _ fs.Filesystem) error
+	WriteTo(context.Context, *Phase, fs.Filesystem) error
 }

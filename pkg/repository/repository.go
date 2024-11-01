@@ -22,6 +22,8 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
+var _ core.Repository = (*GitRepository)(nil)
+
 type Proposer interface {
 	GetCurrentProposal(context.Context, *core.Phase, *core.Metadata) (*core.Proposal, error)
 	CreateProposal(context.Context, *core.Proposal) error
@@ -29,15 +31,17 @@ type Proposer interface {
 }
 
 type GitRepository struct {
-	name string
 	conf config.Repository
+
+	name            string
+	enableProposals bool
 
 	mu       sync.RWMutex
 	source   *git.Source
 	proposer Proposer
 }
 
-func NewGitRepository(ctx context.Context, conf config.Repository, creds *credentials.CredentialSource, name string) (_ *GitRepository, err error) {
+func NewGitRepository(ctx context.Context, conf config.Repository, creds *credentials.CredentialSource, name string, enableProposals bool) (_ *GitRepository, err error) {
 	var method transport.AuthMethod
 	method, err = ssh.DefaultAuthBuilder("git")
 	if err != nil {
@@ -121,10 +125,11 @@ func NewGitRepository(ctx context.Context, conf config.Repository, creds *creden
 	}
 
 	return &GitRepository{
-		name:     name,
-		source:   source,
-		conf:     conf,
-		proposer: proposer,
+		conf:            conf,
+		name:            name,
+		enableProposals: enableProposals,
+		source:          source,
+		proposer:        proposer,
 	}, nil
 }
 
@@ -143,9 +148,11 @@ func (g *GitRepository) View(ctx context.Context, phase *core.Phase, fn func(fs.
 	})
 }
 
-func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *core.Metadata, fn func(fs.Filesystem) (string, error)) error {
+func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to core.Resource, fn func(fs.Filesystem) (string, error)) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	meta := to.Metadata()
 
 	slog := slog.With("phase", phase.Name(), "name", meta.Name)
 
@@ -155,7 +162,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 		return err
 	}
 
-	if g.proposer == nil {
+	if !g.enableProposals {
 		// direct to phase branch without attempting proposals
 		if err := g.source.CreateBranchIfNotExists(phase.Branch()); err != nil {
 			return err
@@ -174,35 +181,46 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 		return nil
 	}
 
-	rev, err := g.source.Resolve(phase.Branch())
+	baseRev, err := g.source.Resolve(phase.Branch())
 	if err != nil {
 		return err
 	}
 
-	branch := fmt.Sprintf("glu/%s/%s/%s", phase.Name(), meta.Name, rev)
-
-	proposal, err := g.proposer.GetCurrentProposal(ctx, phase, meta)
-	if err != nil && !errors.Is(err, githubscm.ErrProposalNotFound) {
+	digest, err := to.Digest()
+	if err != nil {
 		return err
 	}
 
-	if errors.Is(err, githubscm.ErrProposalNotFound) {
+	// create branch name and check if this phase, resource and state has previously been observed
+	branch := fmt.Sprintf("glu/%s/%s/%s", phase.Name(), meta.Name, digest)
+	if _, err := g.source.Resolve(branch); err != nil {
+		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return err
+		}
+	}
+
+	proposal, err := g.proposer.GetCurrentProposal(ctx, phase, meta)
+	if err != nil {
+		if !errors.Is(err, githubscm.ErrProposalNotFound) {
+			return err
+		}
+
 		slog.Debug("proposal not found")
 	}
 
 	if proposal != nil {
 		// there is an existing proposal
-		if proposal.BaseRevision == rev.String() {
-			// the base revision for the proposal has not changed so
-			// we attempt to update the existing proposal with any observed
-			// differences
-			if err := g.source.CreateBranchIfNotExists(branch, git.WithBase(phase.Branch())); err != nil {
-				return err
+		if proposal.BaseRevision == baseRev.String() {
+			if proposal.Digest == digest {
+				// nothing has changed since the last reconciliation and proposals
+				slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
+
+				return nil
 			}
 
 			if _, err := g.source.UpdateAndPush(ctx, branch, nil, fn); err != nil {
 				if errors.Is(err, git.ErrEmptyCommit) {
-					slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
+					slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
 
 					return nil
 				}
@@ -237,12 +255,24 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, meta *cor
 		return err
 	}
 
+	fromDigest, err := from.Digest()
+	if err != nil {
+		return err
+	}
+
+	title := fmt.Sprintf("Update %s in %s", meta.Name, phase.Name())
+	body := fmt.Sprintf(`%s:
+| app | from | to |
+| --- | ---- | -- |
+| %s | %s | %s |
+`, title, meta.Name, fromDigest, digest)
+
 	if err := g.proposer.CreateProposal(ctx, &core.Proposal{
-		BaseRevision: rev.String(),
+		BaseRevision: baseRev.String(),
 		BaseBranch:   phase.Branch(),
 		Branch:       branch,
-		Title:        "Some experimental title",
-		Body:         "Some experimental body",
+		Title:        title,
+		Body:         body,
 	}); err != nil {
 		return err
 	}
