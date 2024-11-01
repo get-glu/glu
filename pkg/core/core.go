@@ -18,8 +18,8 @@ type Proposal struct {
 }
 
 type Repository interface {
-	View(context.Context, *Phase, func(fs.Filesystem) error) error
-	Update(_ context.Context, _ *Phase, from, to Resource, _ func(fs.Filesystem) (string, error)) error
+	View(context.Context, Resource, func(fs.Filesystem) error) error
+	Update(_ context.Context, from, to Resource, _ func(fs.Filesystem) (string, error)) error
 }
 
 type Pipeline struct {
@@ -39,43 +39,15 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-type Phase struct {
-	pipeline *Pipeline
-	name     string
-	// TODO(georgemac): make optionally configurable
-	branch string
-	repo   Repository
-}
-
-func (p *Phase) Name() string {
-	return p.name
-}
-
-func (p *Phase) Branch() string {
-	return p.branch
-}
-
-func (p *Phase) Repository() Repository {
-	return p.repo
-}
-
-func (p *Pipeline) NewPhase(name string, repo Repository) *Phase {
-	return &Phase{
-		pipeline: p,
-		name:     name,
-		branch:   "main",
-		repo:     repo,
-	}
-}
-
 type Metadata struct {
 	Name   string
+	Phase  string
 	Labels map[string]string
 }
 
 type Resource interface {
 	Metadata() *Metadata
 	Digest() (string, error)
-	ReadFrom(context.Context, *Phase, fs.Filesystem) error
-	WriteTo(context.Context, *Phase, fs.Filesystem) error
+	ReadFrom(context.Context, fs.Filesystem) error
+	WriteTo(context.Context, fs.Filesystem) error
 }

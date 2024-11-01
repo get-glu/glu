@@ -1,10 +1,22 @@
 package config
 
-type Repositories map[string]Repository
+import "log/slog"
+
+type Repositories map[string]*Repository
 
 func (r Repositories) validate() error {
 	for _, repo := range r {
 		if err := repo.validate(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r Repositories) setDefaults() error {
+	for _, repo := range r {
+		if err := repo.setDefaults(); err != nil {
 			return err
 		}
 	}
@@ -20,6 +32,24 @@ type Repository struct {
 }
 
 func (r *Repository) validate() error {
+	return nil
+}
+
+func (r *Repository) setDefaults() error {
+	if r.DefaultBranch == "" {
+		slog.Debug("setting missing default", "repository.default_branch", "main")
+
+		r.DefaultBranch = "main"
+	}
+
+	if remote := r.Remote; remote != nil {
+		if remote.Name == "" {
+			slog.Debug("setting missing default", "repository.remote.name", "origin")
+
+			remote.Name = "origin"
+		}
+	}
+
 	return nil
 }
 

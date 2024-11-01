@@ -17,6 +17,14 @@ type Config struct {
 	Credentials  Credentials  `glu:"credentials"`
 }
 
+func (c *Config) setDefaults() error {
+	if err := c.Repositories.setDefaults(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Config) Validate() error {
 	return c.Credentials.validate()
 }
@@ -46,6 +54,14 @@ func ReadFromPath(configPath string) (_ *Config, err error) {
 
 	var conf Config
 	if err := decoder.Decode(&conf); err != nil {
+		return nil, err
+	}
+
+	if err := conf.setDefaults(); err != nil {
+		return nil, err
+	}
+
+	if err := conf.Validate(); err != nil {
 		return nil, err
 	}
 

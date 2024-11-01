@@ -30,13 +30,13 @@ func New(client *github.PullRequestsService, repoOwner, repoName string) *SCM {
 	return &SCM{client: client, repoOwner: repoOwner, repoName: repoName}
 }
 
-func (s *SCM) GetCurrentProposal(ctx context.Context, phase *core.Phase, metadata *core.Metadata) (*core.Proposal, error) {
+func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadata *core.Metadata) (*core.Proposal, error) {
 	var (
-		prs      = s.listPRs(ctx, phase.Branch())
+		prs      = s.listPRs(ctx, baseBranch)
 		proposal *core.Proposal
 	)
 
-	branchPrefix := fmt.Sprintf("glu/%s/%s", phase.Name(), metadata.Name)
+	branchPrefix := fmt.Sprintf("glu/%s/%s", metadata.Phase, metadata.Name)
 
 	for pr := range prs.All() {
 		parts := strings.Split(pr.Head.GetRef(), "/")
@@ -59,7 +59,7 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, phase *core.Phase, metadat
 	}
 
 	if proposal == nil {
-		return nil, fmt.Errorf("phase %q app %q: %w", phase.Name(), metadata.Name, ErrProposalNotFound)
+		return nil, fmt.Errorf("phase %q resource %q: %w", metadata.Phase, metadata.Name, ErrProposalNotFound)
 	}
 
 	return proposal, nil

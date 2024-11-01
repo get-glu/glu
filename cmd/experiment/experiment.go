@@ -25,20 +25,19 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	var (
-		staging         = pipeline.NewPhase("staging", repository)
-		production      = pipeline.NewPhase("production", repository)
-		checkoutAppMeta = glu.Metadata{
-			Name: "checkout",
+	checkoutAppMeta := func(phase string) glu.Metadata {
+		return glu.Metadata{
+			Name:  "checkout",
+			Phase: phase,
 			Labels: map[string]string{
 				"team": "ecommerce",
 			},
 		}
-	)
+	}
 
 	// create an OCI source for the checkout app which derives the app
 	// configuration from the latest tags image digest
-	checkoutAppSource, err := oci.New(checkoutAppMeta, NewCheckoutApp)
+	checkoutAppSource, err := oci.New(checkoutAppMeta("source"), "ghcr.io/myorg/checkout", NewCheckoutApp)
 	if err != nil {
 		return err
 	}
@@ -46,8 +45,9 @@ func run(ctx context.Context) error {
 	// create a staging phase checkout app which is dependedent
 	// on the OCI source
 	checkoutStaging := glu.NewInstance(
-		staging,
-		checkoutAppMeta,
+		pipeline,
+		repository,
+		checkoutAppMeta("staging"),
 		NewCheckoutApp,
 		glu.DependsOn(checkoutAppSource),
 	)
@@ -59,7 +59,7 @@ func run(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 			case <-ticker.C:
-				if _, err := checkoutStaging.Reconcile(ctx); err != nil {
+				if err := checkoutStaging.Reconcile(ctx); err != nil {
 					slog.Error("reconciling staging checkout app", "error", err)
 					continue
 				}
@@ -70,8 +70,9 @@ func run(ctx context.Context) error {
 	// create a production phase checkout app which is dependedent
 	// on the staging phase instance
 	glu.NewInstance(
-		production,
-		checkoutAppMeta,
+		pipeline,
+		repository,
+		checkoutAppMeta("production"),
 		NewCheckoutApp,
 		glu.DependsOn(checkoutStaging),
 	)
@@ -102,9 +103,9 @@ func (c *CheckoutApp) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	return nil
 }
 
-func (c *CheckoutApp) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesystem) error {
+func (c *CheckoutApp) ReadFrom(_ context.Context, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Name()),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
 		os.O_RDONLY,
 		0644,
 	)
@@ -126,9 +127,9 @@ func (c *CheckoutApp) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesy
 	return nil
 }
 
-func (c *CheckoutApp) WriteTo(ctx context.Context, phase *glu.Phase, fs fs.Filesystem) error {
+func (c *CheckoutApp) WriteTo(ctx context.Context, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Name()),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
 		os.O_RDONLY,
 		0644,
 	)

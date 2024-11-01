@@ -25,13 +25,13 @@ import (
 var _ core.Repository = (*GitRepository)(nil)
 
 type Proposer interface {
-	GetCurrentProposal(context.Context, *core.Phase, *core.Metadata) (*core.Proposal, error)
+	GetCurrentProposal(_ context.Context, baseBranch string, _ *core.Metadata) (*core.Proposal, error)
 	CreateProposal(context.Context, *core.Proposal) error
 	CloseProposal(context.Context, *core.Proposal) error
 }
 
 type GitRepository struct {
-	conf config.Repository
+	conf *config.Repository
 
 	name            string
 	enableProposals bool
@@ -41,7 +41,7 @@ type GitRepository struct {
 	proposer Proposer
 }
 
-func NewGitRepository(ctx context.Context, conf config.Repository, creds *credentials.CredentialSource, name string, enableProposals bool) (_ *GitRepository, err error) {
+func NewGitRepository(ctx context.Context, conf *config.Repository, creds *credentials.CredentialSource, name string, enableProposals bool) (_ *GitRepository, err error) {
 	var method transport.AuthMethod
 	method, err = ssh.DefaultAuthBuilder("git")
 	if err != nil {
@@ -133,7 +133,20 @@ func NewGitRepository(ctx context.Context, conf config.Repository, creds *creden
 	}, nil
 }
 
-func (g *GitRepository) View(ctx context.Context, phase *core.Phase, fn func(fs.Filesystem) error) error {
+type Branched interface {
+	Branch() string
+}
+
+func (g *GitRepository) getBranch(r core.Resource) string {
+	branch := g.conf.DefaultBranch
+	if branched, ok := r.(Branched); ok {
+		branch = branched.Branch()
+	}
+
+	return branch
+}
+
+func (g *GitRepository) View(ctx context.Context, r core.Resource, fn func(fs.Filesystem) error) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -143,18 +156,18 @@ func (g *GitRepository) View(ctx context.Context, phase *core.Phase, fn func(fs.
 		return err
 	}
 
-	return g.source.View(ctx, phase.Branch(), func(hash plumbing.Hash, fs fs.Filesystem) error {
+	return g.source.View(ctx, g.getBranch(r), func(hash plumbing.Hash, fs fs.Filesystem) error {
 		return fn(fs)
 	})
 }
 
-func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to core.Resource, fn func(fs.Filesystem) (string, error)) error {
+func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn func(fs.Filesystem) (string, error)) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	meta := to.Metadata()
 
-	slog := slog.With("phase", phase.Name(), "name", meta.Name)
+	slog := slog.With("phase", meta.Phase, "name", meta.Name)
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
@@ -162,13 +175,14 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 		return err
 	}
 
+	baseBranch := g.getBranch(to)
 	if !g.enableProposals {
 		// direct to phase branch without attempting proposals
-		if err := g.source.CreateBranchIfNotExists(phase.Branch()); err != nil {
+		if err := g.source.CreateBranchIfNotExists(baseBranch); err != nil {
 			return err
 		}
 
-		if _, err := g.source.UpdateAndPush(ctx, phase.Branch(), nil, fn); err != nil {
+		if _, err := g.source.UpdateAndPush(ctx, baseBranch, nil, fn); err != nil {
 			if errors.Is(err, git.ErrEmptyCommit) {
 				slog.Info("reconcile produced no changes")
 
@@ -181,7 +195,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 		return nil
 	}
 
-	baseRev, err := g.source.Resolve(phase.Branch())
+	baseRev, err := g.source.Resolve(baseBranch)
 	if err != nil {
 		return err
 	}
@@ -192,14 +206,14 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 	}
 
 	// create branch name and check if this phase, resource and state has previously been observed
-	branch := fmt.Sprintf("glu/%s/%s/%s", phase.Name(), meta.Name, digest)
+	branch := fmt.Sprintf("glu/%s/%s/%s", meta.Phase, meta.Name, digest)
 	if _, err := g.source.Resolve(branch); err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return err
 		}
 	}
 
-	proposal, err := g.proposer.GetCurrentProposal(ctx, phase, meta)
+	proposal, err := g.proposer.GetCurrentProposal(ctx, baseBranch, meta)
 	if err != nil {
 		if !errors.Is(err, githubscm.ErrProposalNotFound) {
 			return err
@@ -241,7 +255,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 		}
 	}
 
-	if err := g.source.CreateBranchIfNotExists(branch, git.WithBase(phase.Branch())); err != nil {
+	if err := g.source.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
 		return err
 	}
 
@@ -260,7 +274,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 		return err
 	}
 
-	title := fmt.Sprintf("Update %s in %s", meta.Name, phase.Name())
+	title := fmt.Sprintf("Update %s in %s", meta.Name, meta.Phase)
 	body := fmt.Sprintf(`%s:
 | app | from | to |
 | --- | ---- | -- |
@@ -269,7 +283,7 @@ func (g *GitRepository) Update(ctx context.Context, phase *core.Phase, from, to 
 
 	if err := g.proposer.CreateProposal(ctx, &core.Proposal{
 		BaseRevision: baseRev.String(),
-		BaseBranch:   phase.Branch(),
+		BaseBranch:   baseBranch,
 		Branch:       branch,
 		Title:        title,
 		Body:         body,

@@ -15,14 +15,19 @@ import (
 
 type Metadata = core.Metadata
 
-type Phase = core.Phase
-
 type Pipeline struct {
 	*core.Pipeline
 
 	ctx   context.Context
 	conf  *config.Config
 	creds *credentials.CredentialSource
+
+	reconcilers []reconciler
+}
+
+type reconciler interface {
+	metadata() core.Metadata
+	Reconcile(context.Context) error
 }
 
 func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
@@ -60,17 +65,18 @@ func (p *Pipeline) NewRepository(name string, opts ...containers.Option[Reposito
 }
 
 type Reconciler[A any] interface {
-	Reconcile(context.Context) (A, error)
+	Get(context.Context) (A, error)
+	Reconcile(context.Context) error
 }
 
 type Instance[A any, P interface {
 	*A
 	core.Resource
 }] struct {
-	phase *core.Phase
-	meta  core.Metadata
-	fn    func(core.Metadata) P
-	src   Reconciler[P]
+	repo core.Repository
+	meta core.Metadata
+	fn   func(core.Metadata) P
+	src  Reconciler[P]
 }
 
 type InstanceOption[A any, P interface {
@@ -90,57 +96,83 @@ func DependsOn[A any, P interface {
 func NewInstance[A any, P interface {
 	*A
 	core.Resource
-}](phase *core.Phase, meta core.Metadata, fn func(core.Metadata) P, opts ...InstanceOption[A, P]) *Instance[A, P] {
-	inst := Instance[A, P]{phase: phase, meta: meta, fn: fn}
+}](
+	pipeline *Pipeline,
+	repo core.Repository,
+	meta core.Metadata,
+	fn func(core.Metadata) P,
+	opts ...InstanceOption[A, P]) *Instance[A, P] {
+
+	inst := &Instance[A, P]{repo: repo, meta: meta, fn: fn}
 	for _, opt := range opts {
-		opt(&inst)
+		opt(inst)
 	}
 
-	return &inst
+	pipeline.reconcilers = append(pipeline.reconcilers, inst)
+
+	return inst
 }
 
-func (i *Instance[A, P]) Reconcile(ctx context.Context) (P, error) {
-	slog.Debug("reconcile started", "type", "instance", "phase", i.phase.Name(), "name", i.meta.Name)
+func (i *Instance[A, P]) metadata() core.Metadata {
+	return i.meta
+}
 
-	repo := i.phase.Repository()
-
-	a := i.fn(i.meta)
-	if err := repo.View(ctx, i.phase, func(f fs.Filesystem) error {
-		return a.ReadFrom(ctx, i.phase, f)
+func (i *Instance[A, P]) Get(ctx context.Context) (P, error) {
+	p := i.fn(i.meta)
+	if err := i.repo.View(ctx, p, func(f fs.Filesystem) error {
+		return p.ReadFrom(ctx, f)
 	}); err != nil {
 		return nil, err
+	}
+
+	return p, nil
+}
+
+func (i *Instance[A, P]) Reconcile(ctx context.Context) error {
+	slog.Debug("reconcile started", "type", "instance", "phase", i.meta.Phase, "name", i.meta.Name)
+
+	from := i.fn(i.meta)
+	if err := i.repo.View(ctx, from, func(f fs.Filesystem) error {
+		return from.ReadFrom(ctx, f)
+	}); err != nil {
+		return err
 	}
 
 	if i.src == nil {
-		return a, nil
+		// nothing to reconcile from
+		return nil
 	}
 
-	b, err := i.src.Reconcile(ctx)
+	if err := i.src.Reconcile(ctx); err != nil {
+		return err
+	}
+
+	to, err := i.src.Get(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	aDigest, err := a.Digest()
+	fromDigest, err := from.Digest()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	bDigest, err := b.Digest()
+	toDigest, err := to.Digest()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if aDigest == bDigest {
+	if fromDigest == toDigest {
 		slog.Debug("skipping reconcile", "reason", "UpToDate")
 
-		return a, nil
+		return nil
 	}
 
-	if err := repo.Update(ctx, i.phase, a, b, func(f fs.Filesystem) (string, error) {
-		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.phase.Name()), b.WriteTo(ctx, i.phase, f)
+	if err := i.repo.Update(ctx, from, to, func(f fs.Filesystem) (string, error) {
+		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.meta.Phase), to.WriteTo(ctx, f)
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	return b, nil
+	return nil
 }
