@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
@@ -25,7 +24,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	checkoutAppMeta := func(phase string) glu.Metadata {
+	checkoutResourceMeta := func(phase string) glu.Metadata {
 		return glu.Metadata{
 			Name:  "checkout",
 			Phase: phase,
@@ -37,7 +36,7 @@ func run(ctx context.Context) error {
 
 	// create an OCI source for the checkout app which derives the app
 	// configuration from the latest tags image digest
-	checkoutAppSource, err := oci.New(checkoutAppMeta("source"), "ghcr.io/myorg/checkout", NewCheckoutApp)
+	checkoutResourceSource, err := oci.New(checkoutResourceMeta("source"), "ghcr.io/myorg/checkout", NewCheckoutResource)
 	if err != nil {
 		return err
 	}
@@ -47,63 +46,51 @@ func run(ctx context.Context) error {
 	checkoutStaging := glu.NewInstance(
 		pipeline,
 		repository,
-		checkoutAppMeta("staging"),
-		NewCheckoutApp,
-		glu.DependsOn(checkoutAppSource),
+		checkoutResourceMeta("staging"),
+		NewCheckoutResource,
+		glu.DependsOn(checkoutResourceSource),
 	)
 
 	// force a reconcile of the staging instance every 10 seconds
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		for {
-			select {
-			case <-ctx.Done():
-			case <-ticker.C:
-				if err := checkoutStaging.Reconcile(ctx); err != nil {
-					slog.Error("reconciling staging checkout app", "error", err)
-					continue
-				}
-			}
-		}
-	}()
+	pipeline.ScheduleReconcile(checkoutStaging, 10*time.Second)
 
 	// create a production phase checkout app which is dependedent
 	// on the staging phase instance
 	glu.NewInstance(
 		pipeline,
 		repository,
-		checkoutAppMeta("production"),
-		NewCheckoutApp,
+		checkoutResourceMeta("production"),
+		NewCheckoutResource,
 		glu.DependsOn(checkoutStaging),
 	)
 
 	return pipeline.Run(ctx)
 }
 
-type CheckoutApp struct {
+type CheckoutResource struct {
 	meta glu.Metadata
 
 	ImageDigest string `json:"digest"`
 }
 
-func NewCheckoutApp(meta glu.Metadata) *CheckoutApp {
-	return &CheckoutApp{meta: meta}
+func NewCheckoutResource(meta glu.Metadata) *CheckoutResource {
+	return &CheckoutResource{meta: meta}
 }
 
-func (c *CheckoutApp) Metadata() *glu.Metadata {
+func (c *CheckoutResource) Metadata() *glu.Metadata {
 	return &c.meta
 }
 
-func (c *CheckoutApp) Digest() (string, error) {
+func (c *CheckoutResource) Digest() (string, error) {
 	return c.ImageDigest, nil
 }
 
-func (c *CheckoutApp) ReadFromOCIDescriptor(d v1.Descriptor) error {
+func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	c.ImageDigest = d.Digest.String()
 	return nil
 }
 
-func (c *CheckoutApp) ReadFrom(_ context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) ReadFrom(_ context.Context, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
 		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
 		os.O_RDONLY,
@@ -127,7 +114,7 @@ func (c *CheckoutApp) ReadFrom(_ context.Context, fs fs.Filesystem) error {
 	return nil
 }
 
-func (c *CheckoutApp) WriteTo(ctx context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) WriteTo(ctx context.Context, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
 		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
 		os.O_RDONLY,

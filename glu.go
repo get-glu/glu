@@ -2,8 +2,14 @@ package glu
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/flipt-io/glu/pkg/config"
 	"github.com/flipt-io/glu/pkg/containers"
@@ -21,12 +27,19 @@ type Pipeline struct {
 	conf  *config.Config
 	creds *credentials.CredentialSource
 
-	reconcilers []reconciler
+	reconcilers []Reconciler
+	scheduled   []scheduled
 }
 
-type reconciler interface {
-	metadata() core.Metadata
+type Reconciler interface {
+	Metadata() core.Metadata
 	Reconcile(context.Context) error
+}
+
+type scheduled struct {
+	Reconciler
+
+	interval time.Duration
 }
 
 func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
@@ -41,6 +54,51 @@ func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
 		conf:     conf,
 		creds:    credentials.New(conf.Credentials),
 	}, nil
+}
+
+func (p *Pipeline) Run(ctx context.Context) error {
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	for _, sch := range p.scheduled {
+		wg.Add(1)
+		go func(sch scheduled) {
+			defer wg.Done()
+
+			ticker := time.NewTicker(sch.interval)
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := sch.Reconcile(ctx); err != nil {
+						meta := sch.Metadata()
+						slog.Error("reconciling resource", "phase", meta.Phase, "name", meta.Name, "error", err)
+					}
+				}
+			}
+		}(sch)
+	}
+
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		wg.Wait()
+	}()
+
+	<-ctx.Done()
+
+	select {
+	case <-time.After(15 * time.Second):
+		return errors.New("timedout waiting on shutdown of schedules")
+	case <-finished:
+		return ctx.Err()
+	}
+}
+
+func (p *Pipeline) ScheduleReconcile(r Reconciler, interval time.Duration) {
+	p.scheduled = append(p.scheduled, scheduled{r, interval})
 }
 
 type RepositoryOptions struct {
@@ -63,7 +121,7 @@ func (p *Pipeline) NewRepository(name string, opts ...containers.Option[Reposito
 	return repository.NewGitRepository(p.ctx, conf, p.creds, name, options.enableProposals)
 }
 
-type Reconciler[A any] interface {
+type GetReconciler[A any] interface {
 	Get(context.Context) (A, error)
 	Reconcile(context.Context) error
 }
@@ -75,7 +133,7 @@ type Instance[A any, P interface {
 	repo core.Repository
 	meta core.Metadata
 	fn   func(core.Metadata) P
-	src  Reconciler[P]
+	src  GetReconciler[P]
 }
 
 type InstanceOption[A any, P interface {
@@ -86,7 +144,7 @@ type InstanceOption[A any, P interface {
 func DependsOn[A any, P interface {
 	*A
 	core.Resource
-}](src Reconciler[P]) InstanceOption[A, P] {
+}](src GetReconciler[P]) InstanceOption[A, P] {
 	return func(i *Instance[A, P]) {
 		i.src = src
 	}
@@ -112,7 +170,7 @@ func NewInstance[A any, P interface {
 	return inst
 }
 
-func (i *Instance[A, P]) metadata() core.Metadata {
+func (i *Instance[A, P]) Metadata() core.Metadata {
 	return i.meta
 }
 

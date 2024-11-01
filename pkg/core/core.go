@@ -6,17 +6,6 @@ import (
 	"github.com/flipt-io/glu/pkg/fs"
 )
 
-type Proposal struct {
-	BaseRevision string
-	BaseBranch   string
-	Branch       string
-	Digest       string
-	Title        string
-	Body         string
-
-	ExternalMetadata map[string]any
-}
-
 type Repository interface {
 	View(context.Context, Resource) error
 	Update(_ context.Context, from, to Resource) error
@@ -34,11 +23,6 @@ func NewPipeline(ctx context.Context, name string) *Pipeline {
 	}
 }
 
-func (p *Pipeline) Run(ctx context.Context) error {
-	<-ctx.Done()
-	return ctx.Err()
-}
-
 type Metadata struct {
 	Name   string
 	Phase  string
@@ -50,4 +34,15 @@ type Resource interface {
 	Digest() (string, error)
 	ReadFrom(context.Context, fs.Filesystem) error
 	WriteTo(context.Context, fs.Filesystem) error
+}
+
+type Proposal struct {
+	BaseRevision string
+	BaseBranch   string
+	Branch       string
+	Digest       string
+	Title        string
+	Body         string
+
+	ExternalMetadata map[string]any
 }
