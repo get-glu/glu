@@ -146,7 +146,7 @@ func (g *GitRepository) getBranch(r core.Resource) string {
 	return branch
 }
 
-func (g *GitRepository) View(ctx context.Context, r core.Resource, fn func(fs.Filesystem) error) error {
+func (g *GitRepository) View(ctx context.Context, r core.Resource) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -157,11 +157,11 @@ func (g *GitRepository) View(ctx context.Context, r core.Resource, fn func(fs.Fi
 	}
 
 	return g.source.View(ctx, g.getBranch(r), func(hash plumbing.Hash, fs fs.Filesystem) error {
-		return fn(fs)
+		return r.ReadFrom(ctx, fs)
 	})
 }
 
-func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn func(fs.Filesystem) (string, error)) error {
+func (g *GitRepository) Update(ctx context.Context, from, to core.Resource) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -175,6 +175,15 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn f
 		return err
 	}
 
+	message := fmt.Sprintf("Update %s in %s", meta.Name, meta.Phase)
+	update := func(fs fs.Filesystem) (string, error) {
+		if err := to.WriteTo(ctx, fs); err != nil {
+			return "", err
+		}
+
+		return message, nil
+	}
+
 	baseBranch := g.getBranch(to)
 	if !g.enableProposals {
 		// direct to phase branch without attempting proposals
@@ -182,7 +191,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn f
 			return err
 		}
 
-		if _, err := g.source.UpdateAndPush(ctx, baseBranch, nil, fn); err != nil {
+		if _, err := g.source.UpdateAndPush(ctx, baseBranch, nil, update); err != nil {
 			if errors.Is(err, git.ErrEmptyCommit) {
 				slog.Info("reconcile produced no changes")
 
@@ -232,7 +241,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn f
 				return nil
 			}
 
-			if _, err := g.source.UpdateAndPush(ctx, branch, nil, fn); err != nil {
+			if _, err := g.source.UpdateAndPush(ctx, branch, nil, update); err != nil {
 				if errors.Is(err, git.ErrEmptyCommit) {
 					slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
 
@@ -259,7 +268,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn f
 		return err
 	}
 
-	if _, err := g.source.UpdateAndPush(ctx, branch, nil, fn); err != nil {
+	if _, err := g.source.UpdateAndPush(ctx, branch, nil, update); err != nil {
 		if errors.Is(err, git.ErrEmptyCommit) {
 			slog.Info("reconcile produced no changes")
 
@@ -274,18 +283,17 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource, fn f
 		return err
 	}
 
-	title := fmt.Sprintf("Update %s in %s", meta.Name, meta.Phase)
 	body := fmt.Sprintf(`%s:
 | app | from | to |
 | --- | ---- | -- |
 | %s | %s | %s |
-`, title, meta.Name, fromDigest, digest)
+`, message, meta.Name, fromDigest, digest)
 
 	if err := g.proposer.CreateProposal(ctx, &core.Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
-		Title:        title,
+		Title:        message,
 		Body:         body,
 	}); err != nil {
 		return err

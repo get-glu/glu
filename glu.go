@@ -9,7 +9,6 @@ import (
 	"github.com/flipt-io/glu/pkg/containers"
 	"github.com/flipt-io/glu/pkg/core"
 	"github.com/flipt-io/glu/pkg/credentials"
-	"github.com/flipt-io/glu/pkg/fs"
 	"github.com/flipt-io/glu/pkg/repository"
 )
 
@@ -119,9 +118,7 @@ func (i *Instance[A, P]) metadata() core.Metadata {
 
 func (i *Instance[A, P]) Get(ctx context.Context) (P, error) {
 	p := i.fn(i.meta)
-	if err := i.repo.View(ctx, p, func(f fs.Filesystem) error {
-		return p.ReadFrom(ctx, f)
-	}); err != nil {
+	if err := i.repo.View(ctx, p); err != nil {
 		return nil, err
 	}
 
@@ -132,9 +129,7 @@ func (i *Instance[A, P]) Reconcile(ctx context.Context) error {
 	slog.Debug("reconcile started", "type", "instance", "phase", i.meta.Phase, "name", i.meta.Name)
 
 	from := i.fn(i.meta)
-	if err := i.repo.View(ctx, from, func(f fs.Filesystem) error {
-		return from.ReadFrom(ctx, f)
-	}); err != nil {
+	if err := i.repo.View(ctx, from); err != nil {
 		return err
 	}
 
@@ -168,9 +163,7 @@ func (i *Instance[A, P]) Reconcile(ctx context.Context) error {
 		return nil
 	}
 
-	if err := i.repo.Update(ctx, from, to, func(f fs.Filesystem) (string, error) {
-		return fmt.Sprintf("Update %s in %s", i.meta.Name, i.meta.Phase), to.WriteTo(ctx, f)
-	}); err != nil {
+	if err := i.repo.Update(ctx, from, to); err != nil {
 		return err
 	}
 

@@ -18,8 +18,8 @@ type Proposal struct {
 }
 
 type Repository interface {
-	View(context.Context, Resource, func(fs.Filesystem) error) error
-	Update(_ context.Context, from, to Resource, _ func(fs.Filesystem) (string, error)) error
+	View(context.Context, Resource) error
+	Update(_ context.Context, from, to Resource) error
 }
 
 type Pipeline struct {
