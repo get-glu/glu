@@ -27,17 +27,11 @@ type Pipeline struct {
 	conf  *config.Config
 	creds *credentials.CredentialSource
 
-	reconcilers []Reconciler
-	scheduled   []scheduled
-}
-
-type Reconciler interface {
-	Metadata() core.Metadata
-	Reconcile(context.Context) error
+	scheduled []scheduled
 }
 
 type scheduled struct {
-	Reconciler
+	core.Reconciler
 
 	interval time.Duration
 }
@@ -97,7 +91,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 	}
 }
 
-func (p *Pipeline) ScheduleReconcile(r Reconciler, interval time.Duration) {
+func (p *Pipeline) ScheduleReconcile(r core.Reconciler, interval time.Duration) {
 	p.scheduled = append(p.scheduled, scheduled{r, interval})
 }
 
@@ -119,111 +113,4 @@ func (p *Pipeline) NewRepository(name string, opts ...containers.Option[Reposito
 	}
 
 	return repository.NewGitRepository(p.ctx, conf, p.creds, name, options.enableProposals)
-}
-
-type GetReconciler[A any] interface {
-	Get(context.Context) (A, error)
-	Reconcile(context.Context) error
-}
-
-type Instance[A any, P interface {
-	*A
-	core.Resource
-}] struct {
-	repo core.Repository
-	meta core.Metadata
-	fn   func(core.Metadata) P
-	src  GetReconciler[P]
-}
-
-type InstanceOption[A any, P interface {
-	*A
-	core.Resource
-}] func(*Instance[A, P])
-
-func DependsOn[A any, P interface {
-	*A
-	core.Resource
-}](src GetReconciler[P]) InstanceOption[A, P] {
-	return func(i *Instance[A, P]) {
-		i.src = src
-	}
-}
-
-func NewInstance[A any, P interface {
-	*A
-	core.Resource
-}](
-	pipeline *Pipeline,
-	repo core.Repository,
-	meta core.Metadata,
-	fn func(core.Metadata) P,
-	opts ...InstanceOption[A, P]) *Instance[A, P] {
-
-	inst := &Instance[A, P]{repo: repo, meta: meta, fn: fn}
-	for _, opt := range opts {
-		opt(inst)
-	}
-
-	pipeline.reconcilers = append(pipeline.reconcilers, inst)
-
-	return inst
-}
-
-func (i *Instance[A, P]) Metadata() core.Metadata {
-	return i.meta
-}
-
-func (i *Instance[A, P]) Get(ctx context.Context) (P, error) {
-	p := i.fn(i.meta)
-	if err := i.repo.View(ctx, p); err != nil {
-		return nil, err
-	}
-
-	return p, nil
-}
-
-func (i *Instance[A, P]) Reconcile(ctx context.Context) error {
-	slog.Debug("reconcile started", "type", "instance", "phase", i.meta.Phase, "name", i.meta.Name)
-
-	from := i.fn(i.meta)
-	if err := i.repo.View(ctx, from); err != nil {
-		return err
-	}
-
-	if i.src == nil {
-		// nothing to reconcile from
-		return nil
-	}
-
-	if err := i.src.Reconcile(ctx); err != nil {
-		return err
-	}
-
-	to, err := i.src.Get(ctx)
-	if err != nil {
-		return err
-	}
-
-	fromDigest, err := from.Digest()
-	if err != nil {
-		return err
-	}
-
-	toDigest, err := to.Digest()
-	if err != nil {
-		return err
-	}
-
-	if fromDigest == toDigest {
-		slog.Debug("skipping reconcile", "reason", "UpToDate")
-
-		return nil
-	}
-
-	if err := i.repo.Update(ctx, from, to); err != nil {
-		return err
-	}
-
-	return nil
 }

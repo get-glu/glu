@@ -6,6 +6,11 @@ import (
 	"github.com/flipt-io/glu/pkg/fs"
 )
 
+type Reconciler interface {
+	Metadata() Metadata
+	Reconcile(context.Context) error
+}
+
 type Repository interface {
 	View(context.Context, Resource) error
 	Update(_ context.Context, from, to Resource) error
@@ -14,6 +19,8 @@ type Repository interface {
 type Pipeline struct {
 	ctx  context.Context
 	name string
+
+	reconcilers []Reconciler
 }
 
 func NewPipeline(ctx context.Context, name string) *Pipeline {
@@ -21,6 +28,10 @@ func NewPipeline(ctx context.Context, name string) *Pipeline {
 		ctx:  ctx,
 		name: name,
 	}
+}
+
+func (p *Pipeline) Register(r Reconciler) {
+	p.reconcilers = append(p.reconcilers, r)
 }
 
 type Metadata struct {

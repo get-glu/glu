@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/flipt-io/glu"
+	"github.com/flipt-io/glu/pkg/core"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
@@ -26,20 +27,37 @@ type Source[A any, P interface {
 	last   P
 }
 
+type Registry interface {
+	Register(core.Reconciler)
+}
+
 func New[A any, P interface {
 	*A
 	Derivable
-}](meta glu.Metadata, image string, fn func(glu.Metadata) P) (*Source[A, P], error) {
+}](
+	pipeline Registry,
+	image string,
+	meta glu.Metadata,
+	fn func(glu.Metadata) P,
+) (*Source[A, P], error) {
 	r, err := getRepository(image)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Source[A, P]{
+	src := &Source[A, P]{
 		remote: r,
 		meta:   meta,
 		fn:     fn,
-	}, nil
+	}
+
+	pipeline.Register(src)
+
+	return src, nil
+}
+
+func (s *Source[A, P]) Metadata() glu.Metadata {
+	return s.meta
 }
 
 func (s *Source[A, P]) Get(ctx context.Context) (P, error) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/flipt-io/glu"
 	"github.com/flipt-io/glu/pkg/fs"
+	"github.com/flipt-io/glu/pkg/sources/git"
 	"github.com/flipt-io/glu/pkg/sources/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
@@ -36,33 +37,35 @@ func run(ctx context.Context) error {
 
 	// create an OCI source for the checkout app which derives the app
 	// configuration from the latest tags image digest
-	checkoutResourceSource, err := oci.New(checkoutResourceMeta("source"), "ghcr.io/myorg/checkout", NewCheckoutResource)
+	checkoutResourceSource, err := oci.New(
+		pipeline,
+		"ghcr.io/myorg/checkout",
+		checkoutResourceMeta("source"),
+		NewCheckoutResource)
 	if err != nil {
 		return err
 	}
 
 	// create a staging phase checkout app which is dependedent
 	// on the OCI source
-	checkoutStaging := glu.NewInstance(
+	checkoutStaging := git.New(
 		pipeline,
 		repository,
 		checkoutResourceMeta("staging"),
 		NewCheckoutResource,
-		glu.DependsOn(checkoutResourceSource),
-	)
+		git.DependsOn(checkoutResourceSource))
 
 	// force a reconcile of the staging instance every 10 seconds
 	pipeline.ScheduleReconcile(checkoutStaging, 10*time.Second)
 
 	// create a production phase checkout app which is dependedent
 	// on the staging phase instance
-	glu.NewInstance(
+	git.New(
 		pipeline,
 		repository,
 		checkoutResourceMeta("production"),
 		NewCheckoutResource,
-		glu.DependsOn(checkoutStaging),
-	)
+		git.DependsOn(checkoutStaging))
 
 	return pipeline.Run(ctx)
 }
