@@ -8,6 +8,7 @@ import (
 
 type Reconciler interface {
 	Metadata() Metadata
+	GetAny(context.Context) (any, error)
 	Reconcile(context.Context) error
 }
 
@@ -30,8 +31,28 @@ func NewPipeline(ctx context.Context, name string) *Pipeline {
 	}
 }
 
+func (p *Pipeline) Name() string {
+	return p.name
+}
+
 func (p *Pipeline) Register(r Reconciler) {
 	p.reconcilers = append(p.reconcilers, r)
+}
+
+func (p *Pipeline) Phases() map[string]map[string]Reconciler {
+	phases := map[string]map[string]Reconciler{}
+	for _, r := range p.reconcilers {
+		meta := r.Metadata()
+		phase, ok := phases[meta.Phase]
+		if !ok {
+			phase = map[string]Reconciler{}
+		}
+
+		phase[meta.Name] = r
+
+		phases[meta.Phase] = phase
+	}
+	return phases
 }
 
 type Metadata struct {

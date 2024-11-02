@@ -67,7 +67,7 @@ func run(ctx context.Context) error {
 		NewCheckoutResource,
 		git.DependsOn(checkoutStaging))
 
-	return pipeline.Run(ctx)
+	return glu.Run(ctx)
 }
 
 type CheckoutResource struct {

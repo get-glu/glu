@@ -64,6 +64,10 @@ func (i *Instance[A, P]) Metadata() core.Metadata {
 	return i.meta
 }
 
+func (i *Instance[A, P]) GetAny(ctx context.Context) (any, error) {
+	return i.Get(ctx)
+}
+
 func (i *Instance[A, P]) Get(ctx context.Context) (P, error) {
 	p := i.fn(i.meta)
 	if err := i.repo.View(ctx, p); err != nil {
