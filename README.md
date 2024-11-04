@@ -4,6 +4,8 @@ Glu - Progressive delivery that sticks
 Glu is the missing piece in your CI/CD toolbelt.
 It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
 
+![Glu Illustration Diagram](./glu.svg)
+
 ## Use Cases
 
 Use it to implement anything that involes automating updates to Git repositories via commits and pull-requests.

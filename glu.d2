@@ -1,0 +1,92 @@
+direction: left
+classes: {
+  invisible: {
+    style.opacity: 0
+    label: a
+  }
+}
+
+grid-columns: 1
+
+definition: |go
+  type MyApp struct {
+    ImageName   string
+    ImageDigest digest.Digest
+  }
+|
+
+
+glu: {
+  label: ""
+  grid-columns: 2
+
+  oci: {
+    grid-columns: 1
+    grid-rows: 1
+
+    label: "ghcr.io/my-org/myapp:latest"
+    label.near: outside-bottom-right
+    icon: "https://raw.githubusercontent.com/opencontainers/artwork/main/oci/icon/color/oci-icon-color.png"
+    icon.near: outside-top-left
+    repository: {
+      icon: "https://icons.terrastruct.com/essentials%2F033-repeat.svg"
+    }
+  }
+
+  git: {
+    grid-rows: 2
+    grid-columns: 3
+
+    label: git@github.com/my-org/infrastructure.git
+    label.near: outside-bottom-right
+    icon: "https://icons.terrastruct.com/dev%2Fgit.svg"
+    icon.near: outside-top-left
+
+    staging: {
+      icon: "https://icons.terrastruct.com/essentials%2F033-repeat.svg"
+    }
+
+    pad1.class: invisible
+
+    production: {
+      icon: "https://icons.terrastruct.com/essentials%2F033-repeat.svg"
+    }
+
+    pull1: "" {
+      style: {
+        stroke: "#EDF0FD"
+        fill: "#EDF0FD"
+      }
+      image: "" {
+        shape: image
+        icon: "https://www.svgrepo.com/show/327287/git-pull-request.svg"
+        width: 50
+        height: 50
+      }
+    }
+
+    github: "" {
+      shape: image
+      icon: "https://icons.terrastruct.com/dev%2Fgithub.svg"
+    }
+
+    pull2: "" {
+      style: {
+        stroke: "#EDF0FD"
+        fill: "#EDF0FD"
+      }
+      image: "" {
+        shape: image
+        icon: "https://www.svgrepo.com/show/327287/git-pull-request.svg"
+        width: 50
+        height: 50
+      }
+    }
+
+    staging -> pull1.image
+    production -> pull2.image
+    pull*.image -> github
+  }
+
+  git.production -> git.staging -> oci.repository: reconcile
+}
