@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	glufs "github.com/flipt-io/glu/pkg/fs"
+	glufs "github.com/get-glu/glu/pkg/fs"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"

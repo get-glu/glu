@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/flipt-io/glu/pkg/core"
-	"github.com/flipt-io/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/fs"
 )
 
 // Reconciler is a type which expose a Get and Reconcile method

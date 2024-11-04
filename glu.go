@@ -12,12 +12,12 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/flipt-io/glu/pkg/config"
-	"github.com/flipt-io/glu/pkg/containers"
-	"github.com/flipt-io/glu/pkg/core"
-	"github.com/flipt-io/glu/pkg/credentials"
-	"github.com/flipt-io/glu/pkg/repository"
-	"github.com/flipt-io/glu/pkg/sources/git"
+	"github.com/get-glu/glu/pkg/config"
+	"github.com/get-glu/glu/pkg/containers"
+	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/credentials"
+	"github.com/get-glu/glu/pkg/repository"
+	"github.com/get-glu/glu/pkg/sources/git"
 	"golang.org/x/sync/errgroup"
 )
 

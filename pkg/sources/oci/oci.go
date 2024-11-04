@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/flipt-io/glu"
-	"github.com/flipt-io/glu/pkg/core"
+	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/core"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"

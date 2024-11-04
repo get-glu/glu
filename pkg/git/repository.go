@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flipt-io/glu/pkg/containers"
-	"github.com/flipt-io/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/containers"
+	"github.com/get-glu/glu/pkg/fs"
 	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"

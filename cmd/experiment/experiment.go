@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/flipt-io/glu"
-	"github.com/flipt-io/glu/pkg/fs"
-	"github.com/flipt-io/glu/pkg/sources/git"
-	"github.com/flipt-io/glu/pkg/sources/oci"
+	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/sources/git"
+	"github.com/get-glu/glu/pkg/sources/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
 )

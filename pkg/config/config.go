@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/flipt-io/glu/internal/config"
+	"github.com/get-glu/glu/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
