@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -30,12 +31,17 @@ var DefaultRegistry = NewRegistry()
 type Registry struct {
 	conf      *config.Config
 	pipelines map[string]*Pipeline
+
+	server *Server
 }
 
 func NewRegistry() *Registry {
-	return &Registry{
+	r := &Registry{
 		pipelines: map[string]*Pipeline{},
 	}
+
+	r.server = newServer(r)
+	return r
 }
 
 func (r *Registry) getConf() (_ *config.Config, err error) {
@@ -60,6 +66,11 @@ func (r *Registry) Run(ctx context.Context) error {
 	}
 
 	var group errgroup.Group
+	group.Go(func() error {
+		slog.Info("starting server", "addr", ":8080")
+		return http.ListenAndServe(":8080", r.server)
+	})
+
 	for _, p := range r.pipelines {
 		group.Go(func() error {
 			return p.run(ctx)
@@ -172,8 +183,25 @@ func (r *Registry) reconcile(ctx context.Context, args ...string) error {
 	return errors.New("not implemented")
 }
 
-func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
-	return DefaultRegistry.NewPipeline(ctx, name)
+type PipelineOptions struct {
+	registry *Registry
+}
+
+func ForRegistry(r *Registry) containers.Option[PipelineOptions] {
+	return func(o *PipelineOptions) {
+		o.registry = r
+	}
+}
+
+func NewPipeline(ctx context.Context, name string, opts ...containers.Option[PipelineOptions]) (*Pipeline, error) {
+	var options PipelineOptions
+	containers.ApplyAll(&options, opts...)
+
+	if options.registry == nil {
+		options.registry = DefaultRegistry
+	}
+
+	return options.registry.NewPipeline(ctx, name)
 }
 
 func (r *Registry) NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
