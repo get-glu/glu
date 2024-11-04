@@ -40,8 +40,8 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/{phase}", s.getPhase)
-		r.Get("/pipelines/{pipeline}/{phase}/{resource}", s.getResource)
+		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
+		r.Get("/pipelines/{pipeline}/phases/{phase}/resources/{resource}", s.getResource)
 	})
 }
 
@@ -67,9 +67,11 @@ type resourceResponse struct {
 }
 
 func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
-	pipelines := s.registry.pipelines
+	var (
+		pipelines         = s.registry.pipelines
+		pipelineResponses = []pipelineResponse{}
+	)
 
-	pipelineResponses := []pipelineResponse{}
 	for name, pipeline := range pipelines {
 		phases := []phaseResponse{}
 		for phase, reconcilers := range pipeline.Phases() {
@@ -124,8 +126,10 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
-	pipelineName := chi.URLParam(r, "pipeline")
-	phaseName := chi.URLParam(r, "phase")
+	var (
+		pipelineName = chi.URLParam(r, "pipeline")
+		phaseName    = chi.URLParam(r, "phase")
+	)
 
 	pipeline, ok := s.registry.pipelines[pipelineName]
 	if !ok {
@@ -152,9 +156,11 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getResource(w http.ResponseWriter, r *http.Request) {
-	pipelineName := chi.URLParam(r, "pipeline")
-	phaseName := chi.URLParam(r, "phase")
-	resourceName := chi.URLParam(r, "resource")
+	var (
+		pipelineName = chi.URLParam(r, "pipeline")
+		phaseName    = chi.URLParam(r, "phase")
+		resourceName = chi.URLParam(r, "resource")
+	)
 
 	pipeline, ok := s.registry.pipelines[pipelineName]
 	if !ok {
