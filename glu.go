@@ -17,6 +17,7 @@ import (
 	"github.com/flipt-io/glu/pkg/core"
 	"github.com/flipt-io/glu/pkg/credentials"
 	"github.com/flipt-io/glu/pkg/repository"
+	"github.com/flipt-io/glu/pkg/sources/git"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -136,7 +137,7 @@ func (r *Registry) inspect(ctx context.Context, args ...string) (err error) {
 		return fmt.Errorf(`resource "%q/%q/%q": %w`, args[0], args[1], args[2], ErrNotFound)
 	}
 
-	inst, err := reconciler.GetAny(ctx)
+	inst, err := reconciler.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -272,7 +273,7 @@ func EnableProposals(o *RepositoryOptions) {
 	o.enableProposals = true
 }
 
-func (p *Pipeline) NewRepository(name string, opts ...containers.Option[RepositoryOptions]) (core.Repository, error) {
+func (p *Pipeline) NewRepository(name string, opts ...containers.Option[RepositoryOptions]) (git.Repository, error) {
 	var options RepositoryOptions
 	containers.ApplyAll(&options, opts...)
 

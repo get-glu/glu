@@ -60,11 +60,11 @@ func (s *Source[A, P]) Metadata() glu.Metadata {
 	return s.meta
 }
 
-func (s *Source[A, P]) GetAny(ctx context.Context) (any, error) {
-	return s.Get(ctx)
+func (s *Source[A, P]) Get(ctx context.Context) (any, error) {
+	return s.GetResource(ctx)
 }
 
-func (s *Source[A, P]) Get(ctx context.Context) (P, error) {
+func (s *Source[A, P]) GetResource(ctx context.Context) (P, error) {
 	if s.last == nil {
 		if err := s.Reconcile(ctx); err != nil {
 			return nil, err

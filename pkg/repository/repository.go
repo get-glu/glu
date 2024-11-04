@@ -15,6 +15,7 @@ import (
 	"github.com/flipt-io/glu/pkg/fs"
 	"github.com/flipt-io/glu/pkg/git"
 	githubscm "github.com/flipt-io/glu/pkg/scm/github"
+	gitsource "github.com/flipt-io/glu/pkg/sources/git"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
@@ -22,12 +23,12 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
-var _ core.Repository = (*GitRepository)(nil)
+var _ gitsource.Repository = (*GitRepository)(nil)
 
 type Proposer interface {
-	GetCurrentProposal(_ context.Context, baseBranch string, _ *core.Metadata) (*core.Proposal, error)
-	CreateProposal(context.Context, *core.Proposal) error
-	CloseProposal(context.Context, *core.Proposal) error
+	GetCurrentProposal(_ context.Context, baseBranch string, _ *core.Metadata) (*gitsource.Proposal, error)
+	CreateProposal(context.Context, *gitsource.Proposal) error
+	CloseProposal(context.Context, *gitsource.Proposal) error
 }
 
 type GitRepository struct {
@@ -146,7 +147,7 @@ func (g *GitRepository) getBranch(r core.Resource) string {
 	return branch
 }
 
-func (g *GitRepository) View(ctx context.Context, r core.Resource) error {
+func (g *GitRepository) View(ctx context.Context, r gitsource.Resource) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -161,7 +162,7 @@ func (g *GitRepository) View(ctx context.Context, r core.Resource) error {
 	})
 }
 
-func (g *GitRepository) Update(ctx context.Context, from, to core.Resource) error {
+func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -289,7 +290,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to core.Resource) erro
 | %s | %s | %s |
 `, message, meta.Name, fromDigest, digest)
 
-	if err := g.proposer.CreateProposal(ctx, &core.Proposal{
+	if err := g.proposer.CreateProposal(ctx, &gitsource.Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,

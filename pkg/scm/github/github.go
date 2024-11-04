@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/flipt-io/glu/pkg/core"
+	"github.com/flipt-io/glu/pkg/sources/git"
 	"github.com/google/go-github/v64/github"
 )
 
@@ -30,10 +31,10 @@ func New(client *github.PullRequestsService, repoOwner, repoName string) *SCM {
 	return &SCM{client: client, repoOwner: repoOwner, repoName: repoName}
 }
 
-func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadata *core.Metadata) (*core.Proposal, error) {
+func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadata *core.Metadata) (*git.Proposal, error) {
 	var (
 		prs      = s.listPRs(ctx, baseBranch)
-		proposal *core.Proposal
+		proposal *git.Proposal
 	)
 
 	branchPrefix := fmt.Sprintf("glu/%s/%s", metadata.Phase, metadata.Name)
@@ -41,7 +42,7 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadat
 	for pr := range prs.All() {
 		parts := strings.Split(pr.Head.GetRef(), "/")
 		if strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
-			proposal = &core.Proposal{
+			proposal = &git.Proposal{
 				BaseRevision: pr.Base.GetSHA(),
 				BaseBranch:   pr.Base.GetRef(),
 				Branch:       pr.Head.GetRef(),
@@ -65,7 +66,7 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadat
 	return proposal, nil
 }
 
-func (s *SCM) CreateProposal(ctx context.Context, proposal *core.Proposal) error {
+func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal) error {
 	pr, _, err := s.client.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
 		Base:  github.String(proposal.BaseBranch),
 		Head:  github.String(proposal.Branch),
@@ -85,7 +86,7 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *core.Proposal) error
 	return nil
 }
 
-func (s *SCM) CloseProposal(ctx context.Context, proposal *core.Proposal) error {
+func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
 	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
 	if !ok {
 		slog.Warn("could not close pr", "reason", "missing PR number on proposal")
