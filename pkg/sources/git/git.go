@@ -195,6 +195,9 @@ func (i *Source[A, P]) Reconcile(ctx context.Context) error {
 		return nil
 	}
 
+	// move source phase into destination phase
+	to.Metadata().Phase = from.Metadata().Phase
+
 	if err := i.repo.Update(ctx, from, to, i.opts); err != nil {
 		return err
 	}
