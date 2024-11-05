@@ -14,6 +14,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// func main() {
+// 	ctx := context.Background()
+// 	if err := run(ctx); err != nil {
+// 		fmt.Fprintln(os.Stderr, err)
+// 		os.Exit(1)
+// 	}
+// }
+
 func run(ctx context.Context) error {
 	pipeline, err := glu.NewPipeline(ctx, "myorgpipeline")
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -33,12 +34,17 @@ var DefaultRegistry = NewRegistry()
 type Registry struct {
 	conf      *config.Config
 	pipelines map[string]*Pipeline
+
+	server *Server
 }
 
 func NewRegistry() *Registry {
-	return &Registry{
+	r := &Registry{
 		pipelines: map[string]*Pipeline{},
 	}
+
+	r.server = newServer(r)
+	return r
 }
 
 func (r *Registry) getConf() (_ *config.Config, err error) {
@@ -75,7 +81,30 @@ func (r *Registry) Run(ctx context.Context) error {
 		return r.runOnce(ctx)
 	}
 
-	var group errgroup.Group
+	var (
+		group errgroup.Group
+		srv   = http.Server{
+			Addr:    ":8080", // TODO: make configurable
+			Handler: r.server,
+		}
+	)
+
+	group.Go(func() error {
+		<-ctx.Done()
+		
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	})
+
+	group.Go(func() error {
+		slog.Info("starting server", "addr", ":8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+
 	for _, p := range r.pipelines {
 		group.Go(func() error {
 			return p.run(ctx)
