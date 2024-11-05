@@ -186,8 +186,8 @@ type fields interface {
 }
 
 func (r *Registry) reconcile(ctx context.Context, args ...string) error {
-	if len(args) < 3 {
-		return fmt.Errorf("reconcile <pipeline> <phase> <resource>")
+	if len(args) < 2 {
+		return fmt.Errorf("reconcile <pipeline> <phase> [resource]")
 	}
 
 	pipeline, err := r.getPipeline(args[0])
@@ -198,6 +198,17 @@ func (r *Registry) reconcile(ctx context.Context, args ...string) error {
 	phase, err := pipeline.getPhase(args[1])
 	if err != nil {
 		return err
+	}
+
+	if len(args) < 3 {
+		// attempt to reconcile everything in the current phase
+		for _, reconciler := range phase {
+			if err := reconciler.Reconcile(ctx); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	resource, err := getResource(phase, args[2])
