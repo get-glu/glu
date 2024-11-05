@@ -59,6 +59,8 @@ func NewGitRepository(
 		srcOpts = []containers.Option[git.Source]{}
 	)
 
+	containers.ApplyAll(repo, opts...)
+
 	if conf.Path != "" {
 		srcOpts = append(srcOpts, git.WithFilesystemStorage(conf.Path))
 	}
@@ -166,6 +168,10 @@ func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource,
 		}
 
 		return nil
+	}
+
+	if g.proposer == nil {
+		return errors.New("proposal requested but not configured")
 	}
 
 	baseRev, err := g.source.Resolve(baseBranch)
