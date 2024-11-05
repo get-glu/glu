@@ -78,6 +78,7 @@ func (r *Registry) runOnce(ctx context.Context) error {
 		// inspect [pipeline] [phase] [resource]
 		return r.inspect(ctx, os.Args[2:]...)
 	case "reconcile":
+		// reconcile <pipeline> <phase> <resource>
 		return r.reconcile(ctx, os.Args[2:]...)
 	default:
 		return fmt.Errorf("unexpected command %q (expected one of [inspect reconcile])", os.Args[1])
@@ -135,9 +136,9 @@ func (r *Registry) inspect(ctx context.Context, args ...string) (err error) {
 		return nil
 	}
 
-	reconciler, ok := phase[args[2]]
-	if !ok {
-		return fmt.Errorf(`resource "%q/%q/%q": %w`, args[0], args[1], args[2], ErrNotFound)
+	reconciler, err := getResource(phase, args[2])
+	if err != nil {
+		return err
 	}
 
 	inst, err := reconciler.Get(ctx)
@@ -172,7 +173,26 @@ type fields interface {
 }
 
 func (r *Registry) reconcile(ctx context.Context, args ...string) error {
-	return errors.New("not implemented")
+	if len(args) < 3 {
+		return fmt.Errorf("reconcile <pipeline> <phase> <resource>")
+	}
+
+	pipeline, err := r.getPipeline(args[0])
+	if err != nil {
+		return err
+	}
+
+	phase, err := pipeline.getPhase(args[1])
+	if err != nil {
+		return err
+	}
+
+	resource, err := getResource(phase, args[2])
+	if err != nil {
+		return err
+	}
+
+	return resource.Reconcile(ctx)
 }
 
 func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
@@ -224,6 +244,15 @@ func (p *Pipeline) getPhase(name string) (map[string]core.Reconciler, error) {
 	}
 
 	return m, nil
+}
+
+func getResource(phase map[string]core.Reconciler, name string) (core.Reconciler, error) {
+	reconciler, ok := phase[name]
+	if !ok {
+		return nil, fmt.Errorf(`resource %q: %w`, name, ErrNotFound)
+	}
+
+	return reconciler, nil
 }
 
 func (p *Pipeline) run(ctx context.Context) error {
