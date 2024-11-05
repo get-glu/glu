@@ -13,11 +13,16 @@ import (
 )
 
 type Config struct {
+	Log          Log          `glu:"log"`
 	Repositories Repositories `glu:"repositories"`
 	Credentials  Credentials  `glu:"credentials"`
 }
 
 func (c *Config) setDefaults() error {
+	if err := c.Log.setDefaults(); err != nil {
+		return err
+	}
+
 	if err := c.Repositories.setDefaults(); err != nil {
 		return err
 	}
@@ -26,6 +31,14 @@ func (c *Config) setDefaults() error {
 }
 
 func (c *Config) Validate() error {
+	if err := c.Log.validate(); err != nil {
+		return err
+	}
+
+	if err := c.Repositories.validate(); err != nil {
+		return err
+	}
+
 	return c.Credentials.validate()
 }
 

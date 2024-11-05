@@ -47,7 +47,20 @@ func (r *Registry) getConf() (_ *config.Config, err error) {
 	}
 
 	r.conf, err = config.ReadFromPath("glu.yaml")
-	return r.conf, err
+	if err != nil {
+		return nil, err
+	}
+
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(r.conf.Log.Level)); err != nil {
+		return nil, err
+	}
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})))
+
+	return r.conf, nil
 }
 
 func Run(ctx context.Context) error {
