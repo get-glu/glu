@@ -74,10 +74,10 @@ func (r *Registry) Run(ctx context.Context) error {
 	)
 
 	group.Go(func() error {
+		<-ctx.Done()
+		
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-
-		<-ctx.Done()
 		return srv.Shutdown(shutdownCtx)
 	})
 
