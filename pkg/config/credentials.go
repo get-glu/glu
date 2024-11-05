@@ -23,6 +23,7 @@ const (
 	CredentialTypeBasic       = CredentialType("basic")
 	CredentialTypeSSH         = CredentialType("ssh")
 	CredentialTypeAccessToken = CredentialType("access_token")
+	CredentialTypeGitHubApp   = CredentialType("github_app")
 )
 
 type Credential struct {
@@ -30,22 +31,21 @@ type Credential struct {
 	Basic       *BasicAuthConfig `glu:"basic"`
 	SSH         *SSHAuthConfig   `glu:"ssh"`
 	AccessToken *string          `glu:"access_token"`
+	GitHubApp   *GitHubAppConfig `glu:"github_app"`
 }
 
 func (c *Credential) validate() error {
 	switch c.Type {
 	case CredentialTypeBasic:
-		if err := c.Basic.validate(); err != nil {
-			return err
-		}
+		return c.Basic.validate()
 	case CredentialTypeSSH:
-		if err := c.SSH.validate(); err != nil {
-			return err
-		}
+		return c.SSH.validate()
 	case CredentialTypeAccessToken:
 		if c.AccessToken == nil || *c.AccessToken == "" {
 			return errors.New("field required: access_token")
 		}
+	case CredentialTypeGitHubApp:
+		return c.GitHubApp.validate()
 	default:
 		return fmt.Errorf("unexpected credential type %q", c.Type)
 	}
@@ -94,6 +94,35 @@ func (a *SSHAuthConfig) validate() (err error) {
 	}
 
 	if (a.PrivateKeyBytes == "" && a.PrivateKeyPath == "") || (a.PrivateKeyBytes != "" && a.PrivateKeyPath != "") {
+		return errors.New("please provide exclusively one of private_key_bytes or private_key_path")
+	}
+
+	return nil
+}
+
+type GitHubAppConfig struct {
+	AppID           int64
+	InstallationID  int64
+	PrivateKeyBytes string
+	PrivateKeyPath  string
+}
+
+func (c *GitHubAppConfig) validate() (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("github_app: %w", err)
+		}
+	}()
+
+	if c.AppID <= 0 {
+		return errors.New("app_id must not be empty")
+	}
+
+	if c.InstallationID <= 0 {
+		return errors.New("installation_id must not be empty")
+	}
+
+	if (c.PrivateKeyBytes == "" && c.PrivateKeyPath == "") || (c.PrivateKeyBytes != "" && c.PrivateKeyPath != "") {
 		return errors.New("please provide exclusively one of private_key_bytes or private_key_path")
 	}
 

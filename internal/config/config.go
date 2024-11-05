@@ -41,6 +41,13 @@ func (d *Decoder[C]) Decode(c *C) error {
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		TagName: d.tagName,
 		Result:  c,
+		MatchName: func(mapKey, fieldName string) bool {
+			stripUnderscore := func(s string) string {
+				return strings.ReplaceAll(s, "_", "")
+			}
+
+			return strings.EqualFold(stripUnderscore(mapKey), stripUnderscore(fieldName))
+		},
 	})
 
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -36,7 +37,23 @@ type Credential struct {
 	config *config.Credential
 }
 
-func (c *Credential) GitHubClient(ctx context.Context) (*github.Client, error) {
+func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err error) {
+	if c.config.Type == config.CredentialTypeGitHubApp {
+		conf := c.config.GitHubApp
+
+		var transport *ghinstallation.Transport
+		if len(conf.PrivateKeyBytes) > 0 {
+			transport, err = ghinstallation.New(http.DefaultTransport, conf.AppID, conf.InstallationID, []byte(conf.PrivateKeyBytes))
+		} else if conf.PrivateKeyPath != "" {
+			transport, err = ghinstallation.NewKeyFromFile(http.DefaultTransport, conf.AppID, conf.InstallationID, conf.PrivateKeyPath)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		return github.NewClient(&http.Client{Transport: transport}), nil
+	}
+
 	client, err := c.HTTPClient(ctx)
 	if err != nil {
 		return nil, err
