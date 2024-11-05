@@ -183,25 +183,8 @@ func (r *Registry) reconcile(ctx context.Context, args ...string) error {
 	return errors.New("not implemented")
 }
 
-type PipelineOptions struct {
-	registry *Registry
-}
-
-func ForRegistry(r *Registry) containers.Option[PipelineOptions] {
-	return func(o *PipelineOptions) {
-		o.registry = r
-	}
-}
-
-func NewPipeline(ctx context.Context, name string, opts ...containers.Option[PipelineOptions]) (*Pipeline, error) {
-	var options PipelineOptions
-	containers.ApplyAll(&options, opts...)
-
-	if options.registry == nil {
-		options.registry = DefaultRegistry
-	}
-
-	return options.registry.NewPipeline(ctx, name)
+func NewPipeline(ctx context.Context, name string) (*Pipeline, error) {
+	return DefaultRegistry.NewPipeline(ctx, name)
 }
 
 func (r *Registry) NewPipeline(ctx context.Context, name string) (*Pipeline, error) {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -64,6 +63,7 @@ type pipelineResponse struct {
 type resourceResponse struct {
 	Name   string            `json:"name"`
 	Labels map[string]string `json:"labels"`
+	Value  interface{}       `json:"value"`
 }
 
 func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
@@ -175,22 +175,22 @@ func (s *Server) getResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var targetResource core.Reconciler
-	for _, reconciler := range reconcilers {
-		if reconciler.Metadata().Name == resourceName {
-			targetResource = reconciler
-			break
-		}
-	}
-
-	if targetResource == nil {
+	resource, ok := reconcilers[resourceName]
+	if !ok {
 		http.Error(w, "resource not found", http.StatusNotFound)
 		return
 	}
 
-	metadata := targetResource.Metadata()
+	payload, err := resource.Get(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	metadata := resource.Metadata()
 	json.NewEncoder(w).Encode(resourceResponse{
 		Name:   metadata.Name,
 		Labels: metadata.Labels,
+		Value:  payload,
 	})
 }
