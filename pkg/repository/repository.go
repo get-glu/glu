@@ -50,14 +50,9 @@ func NewGitRepository(
 	name string,
 	opts ...containers.Option[GitRepository],
 ) (_ *GitRepository, err error) {
-	var method transport.AuthMethod
-	method, err = ssh.DefaultAuthBuilder("git")
-	if err != nil {
-		return nil, err
-	}
-
 	var (
-		repo = &GitRepository{
+		method transport.AuthMethod
+		repo   = &GitRepository{
 			conf: conf,
 			name: name,
 		}
@@ -86,9 +81,15 @@ func NewGitRepository(
 		}
 	}
 
-	srcOpts = append(srcOpts, git.WithAuth(method))
+	if method == nil {
+		method, err = ssh.DefaultAuthBuilder("git")
+		if err != nil {
+			return nil, err
+		}
 
-	repo.source, err = git.NewSource(context.Background(), slog.Default(), srcOpts...)
+	}
+
+	repo.source, err = git.NewSource(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
 	if err != nil {
 		return nil, err
 	}
