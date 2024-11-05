@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/google/go-github/v64/github"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
@@ -33,6 +34,15 @@ func (s *CredentialSource) Get(name string) (*Credential, error) {
 
 type Credential struct {
 	config *config.Credential
+}
+
+func (c *Credential) GitHubClient(ctx context.Context) (*github.Client, error) {
+	client, err := c.HTTPClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return github.NewClient(client), nil
 }
 
 func (c *Credential) HTTPClient(ctx context.Context) (*http.Client, error) {

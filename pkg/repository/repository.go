@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/get-glu/glu/pkg/config"
@@ -14,13 +13,10 @@ import (
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/get-glu/glu/pkg/git"
-	githubscm "github.com/get-glu/glu/pkg/scm/github"
 	gitsource "github.com/get-glu/glu/pkg/sources/git"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	"github.com/google/go-github/v64/github"
-	giturls "github.com/whilp/git-urls"
 )
 
 var _ gitsource.Repository = (*GitRepository)(nil)
@@ -28,21 +24,32 @@ var _ gitsource.Repository = (*GitRepository)(nil)
 type Proposer interface {
 	GetCurrentProposal(_ context.Context, baseBranch string, _ *core.Metadata) (*gitsource.Proposal, error)
 	CreateProposal(context.Context, *gitsource.Proposal) error
+	MergeProposal(context.Context, *gitsource.Proposal) error
 	CloseProposal(context.Context, *gitsource.Proposal) error
 }
 
 type GitRepository struct {
 	conf *config.Repository
-
-	name            string
-	enableProposals bool
+	name string
 
 	mu       sync.RWMutex
 	source   *git.Source
 	proposer Proposer
 }
 
-func NewGitRepository(ctx context.Context, conf *config.Repository, creds *credentials.CredentialSource, name string, enableProposals bool) (_ *GitRepository, err error) {
+func WithProposer(proposer Proposer) containers.Option[GitRepository] {
+	return func(gr *GitRepository) {
+		gr.proposer = proposer
+	}
+}
+
+func NewGitRepository(
+	ctx context.Context,
+	conf *config.Repository,
+	creds *credentials.CredentialSource,
+	name string,
+	opts ...containers.Option[GitRepository],
+) (_ *GitRepository, err error) {
 	var method transport.AuthMethod
 	method, err = ssh.DefaultAuthBuilder("git")
 	if err != nil {
@@ -50,18 +57,21 @@ func NewGitRepository(ctx context.Context, conf *config.Repository, creds *crede
 	}
 
 	var (
-		opts     = []containers.Option[git.Source]{}
-		proposer Proposer
+		repo = &GitRepository{
+			conf: conf,
+			name: name,
+		}
+		srcOpts = []containers.Option[git.Source]{}
 	)
 
 	if conf.Path != "" {
-		opts = append(opts, git.WithFilesystemStorage(conf.Path))
+		srcOpts = append(srcOpts, git.WithFilesystemStorage(conf.Path))
 	}
 
 	if conf.Remote != nil {
 		slog.Debug("configuring remote", "remote", conf.Remote.Name)
 
-		opts = append(opts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
+		srcOpts = append(srcOpts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
 
 		if conf.Remote.Credential != "" {
 			creds, err := creds.Get(conf.Remote.Credential)
@@ -76,62 +86,14 @@ func NewGitRepository(ctx context.Context, conf *config.Repository, creds *crede
 		}
 	}
 
-	if conf.SCM != nil {
-		repoURL, err := giturls.Parse(conf.Remote.URL)
-		if err != nil {
-			return nil, err
-		}
+	srcOpts = append(srcOpts, git.WithAuth(method))
 
-		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
-		if len(parts) < 2 {
-			return nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
-		}
-
-		var (
-			repoOwner = parts[0]
-			repoName  = strings.TrimSuffix(parts[1], ".git")
-		)
-
-		var proposalsEnabled bool
-		if proposalsEnabled = conf.SCM.Credential != ""; proposalsEnabled {
-			creds, err := creds.Get(conf.SCM.Credential)
-			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-
-			client, err := creds.HTTPClient(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-
-			proposer = githubscm.New(
-				github.NewClient(client).PullRequests,
-				repoOwner,
-				repoName,
-			)
-		}
-
-		slog.Debug("configured scm proposer",
-			slog.String("owner", repoOwner),
-			slog.String("name", repoName),
-			slog.Bool("proposals_enabled", proposalsEnabled),
-		)
-	}
-
-	opts = append(opts, git.WithAuth(method))
-
-	source, err := git.NewSource(context.Background(), slog.Default(), opts...)
+	repo.source, err = git.NewSource(context.Background(), slog.Default(), srcOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return &GitRepository{
-		conf:            conf,
-		name:            name,
-		enableProposals: enableProposals,
-		source:          source,
-		proposer:        proposer,
-	}, nil
+	return repo, nil
 }
 
 type Branched interface {
@@ -162,7 +124,7 @@ func (g *GitRepository) View(ctx context.Context, r gitsource.Resource) error {
 	})
 }
 
-func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource) error {
+func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource, opts gitsource.UpdateOptions) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -186,7 +148,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource)
 	}
 
 	baseBranch := g.getBranch(to)
-	if !g.enableProposals {
+	if !opts.ProposeChange {
 		// direct to phase branch without attempting proposals
 		if err := g.source.CreateBranchIfNotExists(baseBranch); err != nil {
 			return err
@@ -225,7 +187,7 @@ func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource)
 
 	proposal, err := g.proposer.GetCurrentProposal(ctx, baseBranch, meta)
 	if err != nil {
-		if !errors.Is(err, githubscm.ErrProposalNotFound) {
+		if !errors.Is(err, gitsource.ErrProposalNotFound) {
 			return err
 		}
 
@@ -290,14 +252,20 @@ func (g *GitRepository) Update(ctx context.Context, from, to gitsource.Resource)
 | %s | %s | %s |
 `, message, meta.Name, fromDigest, digest)
 
-	if err := g.proposer.CreateProposal(ctx, &gitsource.Proposal{
+	proposal = &gitsource.Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
 		Title:        message,
 		Body:         body,
-	}); err != nil {
+	}
+
+	if err := g.proposer.CreateProposal(ctx, proposal); err != nil {
 		return err
+	}
+
+	if opts.AutoMerge {
+		return g.proposer.MergeProposal(ctx, proposal)
 	}
 
 	return nil

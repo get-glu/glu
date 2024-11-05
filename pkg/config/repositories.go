@@ -25,10 +25,10 @@ func (r Repositories) setDefaults() error {
 }
 
 type Repository struct {
-	Path          string  `glu:"path"`
-	DefaultBranch string  `glu:"default_branch"`
-	Remote        *Remote `glu:"remote"`
-	SCM           *SCM    `glu:"scm"`
+	Path          string     `glu:"path"`
+	DefaultBranch string     `glu:"default_branch"`
+	Remote        *Remote    `glu:"remote"`
+	Proposals     *Proposals `glu:"proposals"`
 }
 
 func (r *Repository) validate() error {
@@ -59,6 +59,6 @@ type Remote struct {
 	Credential string `glu:"credential"`
 }
 
-type SCM struct {
+type Proposals struct {
 	Credential string `glu:"credential"`
 }

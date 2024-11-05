@@ -53,7 +53,13 @@ func run(ctx context.Context) error {
 		repository,
 		checkoutResourceMeta("staging"),
 		NewCheckoutResource,
-		git.DependsOn(checkoutResourceSource))
+		// depends on the state of the OCI source reconciler
+		git.DependsOn(checkoutResourceSource),
+		// proposes changes and marks them to merge once
+		// status checks have passed
+		git.ProposeChanges,
+		git.AutoMerge,
+	)
 
 	// force a reconcile of the staging instance every 10 seconds
 	pipeline.ScheduleReconcile(checkoutStaging, 10*time.Second)
@@ -65,7 +71,11 @@ func run(ctx context.Context) error {
 		repository,
 		checkoutResourceMeta("production"),
 		NewCheckoutResource,
-		git.DependsOn(checkoutStaging))
+		// depends on the state of the staging reconciler
+		git.DependsOn(checkoutStaging),
+		// proposes changes but does not auto-merge
+		git.ProposeChanges,
+	)
 
 	return glu.Run(ctx)
 }

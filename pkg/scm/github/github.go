@@ -2,13 +2,13 @@ package github
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"iter"
 	"log/slog"
 	"strings"
 
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/repository"
 	"github.com/get-glu/glu/pkg/sources/git"
 	"github.com/google/go-github/v64/github"
 )
@@ -17,9 +17,7 @@ const (
 	GitHubPRNumberField = "github.pr.number"
 )
 
-var (
-	ErrProposalNotFound = errors.New("proposal not found")
-)
+var _ repository.Proposer = (*SCM)(nil)
 
 type SCM struct {
 	client    *github.PullRequestsService
@@ -60,7 +58,7 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadat
 	}
 
 	if proposal == nil {
-		return nil, fmt.Errorf("phase %q resource %q: %w", metadata.Phase, metadata.Name, ErrProposalNotFound)
+		return nil, fmt.Errorf("phase %q resource %q: %w", metadata.Phase, metadata.Name, git.ErrProposalNotFound)
 	}
 
 	return proposal, nil
@@ -84,6 +82,20 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal) error 
 	}
 
 	return nil
+}
+
+func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
+	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
+	if !ok {
+		slog.Warn("could not close pr", "reason", "missing PR number on proposal")
+		return nil
+	}
+
+	_, _, err := s.client.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
+		MergeMethod: "merge",
+	})
+
+	return err
 }
 
 func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {

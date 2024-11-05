@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"text/tabwriter"
@@ -17,7 +18,9 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/repository"
+	githubscm "github.com/get-glu/glu/pkg/scm/github"
 	"github.com/get-glu/glu/pkg/sources/git"
+	giturls "github.com/whilp/git-urls"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -282,5 +285,54 @@ func (p *Pipeline) NewRepository(name string, opts ...containers.Option[Reposito
 		return nil, fmt.Errorf("repository %q: configuration not found", name)
 	}
 
-	return repository.NewGitRepository(p.ctx, conf, p.creds, name, options.enableProposals)
+	repoOpts := []containers.Option[repository.GitRepository]{}
+	if conf.Proposals != nil {
+		repoURL, err := giturls.Parse(conf.Remote.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
+		}
+
+		var (
+			repoOwner = parts[0]
+			repoName  = strings.TrimSuffix(parts[1], ".git")
+		)
+
+		var proposalsEnabled bool
+		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
+			creds, err := p.creds.Get(conf.Proposals.Credential)
+			if err != nil {
+				return nil, fmt.Errorf("repository %q: %w", name, err)
+			}
+
+			client, err := creds.GitHubClient(p.ctx)
+			if err != nil {
+				return nil, fmt.Errorf("repository %q: %w", name, err)
+			}
+
+			repoOpts = append(repoOpts, repository.WithProposer(githubscm.New(
+				client.PullRequests,
+				repoOwner,
+				repoName,
+			)))
+		}
+
+		slog.Debug("configured scm proposer",
+			slog.String("owner", repoOwner),
+			slog.String("name", repoName),
+			slog.Bool("proposals_enabled", proposalsEnabled),
+		)
+	}
+
+	return repository.NewGitRepository(
+		p.ctx,
+		conf,
+		p.creds,
+		name,
+		repoOpts...,
+	)
 }
