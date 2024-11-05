@@ -65,10 +65,28 @@ func (r *Registry) Run(ctx context.Context) error {
 		return r.runOnce(ctx)
 	}
 
-	var group errgroup.Group
+	var (
+		group errgroup.Group
+		srv   = http.Server{
+			Addr:    ":8080", // TODO: make configurable
+			Handler: r.server,
+		}
+	)
+
+	group.Go(func() error {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		<-ctx.Done()
+		return srv.Shutdown(shutdownCtx)
+	})
+
 	group.Go(func() error {
 		slog.Info("starting server", "addr", ":8080")
-		return http.ListenAndServe(":8080", r.server)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+		return nil
 	})
 
 	for _, p := range r.pipelines {
