@@ -60,8 +60,8 @@ type BasicAuthConfig struct {
 	Password string `glu:"password"`
 }
 
-func (b BasicAuthConfig) validate() error {
-	if (b.Username != "" && b.Password == "") || (b.Username == "" && b.Password != "") {
+func (b *BasicAuthConfig) validate() error {
+	if b == nil || ((b.Username != "" && b.Password == "") || (b.Username == "" && b.Password != "")) {
 		return errors.New("both username and password need to be provided for basic auth")
 	}
 
