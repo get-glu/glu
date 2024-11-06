@@ -1,22 +1,24 @@
 // Server-side pipeline types
 export interface Pipeline {
+  id: string;
   name: string;
   phases: Phase[];
 }
 
 export interface Phase {
+  id: string;
   name: string;
-  resources: string[];
+  type: 'oci' | 'staging' | 'production';
+  dependsOn?: string;
+  pipelineId: string;
 }
 
 export interface PhaseData extends Record<string, unknown> {
   label: string;
-  resources: string[];
-  environment: string;
-  color: string;
+  type: 'oci' | 'staging' | 'production';
 }
 
-export interface ResourceData extends Record<string, unknown> {
-  label: string;
-  type: 'git' | 'artifact' | 'image'; // Add other resource types as needed
+export interface PipelineGroup {
+  id: string;
+  name: string;
 }

@@ -5,37 +5,31 @@ import '@xyflow/react/dist/style.css';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useTheme } from '@/components/theme-provider';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchPipeline } from '@/store/pipelineSlice';
-import { setFlow, updateNodes, updateEdges, addEdge } from '@/store/flowSlice';
-import { PhaseNode, ResourceNode } from '@/components/node';
+import { setFlow, updateNodes, updateEdges } from '@/store/flowSlice';
+import { PhaseNode } from '@/components/node';
 import { Pipeline } from '@/types/pipeline';
 import { FlowPipeline, PipelineNode, PipelineEdge } from '@/types/flow';
+import { getMockPipelines } from '@/services/mockData';
+import { GroupNode } from '@/components/group-node';
 
 const nodeTypes = {
   phase: PhaseNode,
-  resource: ResourceNode
+  group: GroupNode
 };
 
 export default function Workflow() {
   const dispatch = useAppDispatch();
   const { theme } = useTheme();
-  const { data: pipeline, loading, error } = useAppSelector((state) => state.pipeline);
   const { nodes, edges } = useAppSelector((state) => state.flow);
 
   useEffect(() => {
-    dispatch(fetchPipeline('foundation'));
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (pipeline) {
-      const flow = transformPipeline(pipeline);
+    const fetchData = async () => {
+      const pipelines = await getMockPipelines();
+      const flow = transformPipelines(pipelines);
       dispatch(setFlow({ nodes: flow.nodes, edges: flow.edges }));
-    }
-  }, [pipeline, dispatch]);
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!pipeline) return null;
+    };
+    fetchData();
+  }, [dispatch]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -44,8 +38,8 @@ export default function Workflow() {
           <div className="flex items-center gap-4">
             <Package className="h-8 w-8" />
             <div>
-              <h1 className="text-xl font-bold">{pipeline.name}</h1>
-              <p className="text-sm text-muted-foreground">{pipeline.name}</p>
+              <h1 className="text-xl font-bold">Frontdoor Pipeline</h1>
+              <p className="text-sm text-muted-foreground">https://github.com/flipt-io/frontdoor</p>
             </div>
           </div>
           <ThemeToggle />
@@ -59,9 +53,12 @@ export default function Workflow() {
           nodeTypes={nodeTypes}
           onNodesChange={(changes) => dispatch(updateNodes(changes))}
           onEdgesChange={(changes) => dispatch(updateEdges(changes))}
-          onConnect={(connection) => dispatch(addEdge(connection))}
           fitView
           colorMode={theme}
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{
+            type: 'smoothstep'
+          }}
         >
           <Background />
           <Controls />
@@ -71,59 +68,49 @@ export default function Workflow() {
   );
 }
 
-export function transformPipeline(serverPipeline: Pipeline): FlowPipeline {
+export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
   const nodes: PipelineNode[] = [];
   const edges: PipelineEdge[] = [];
+  const PIPELINE_SPACING = 300;
+  const PHASE_SPACING = 250;
 
-  let xOffset = 0;
-  const PHASE_SPACING = 500; // Horizontal spacing between phase groups
-  const RESOURCE_SPACING = 100; // Vertical spacing between resources
-  const PHASE_TO_RESOURCE_SPACING = 200; // Horizontal spacing between phase and its resources
-
-  serverPipeline.phases.forEach((phase, phaseIndex) => {
-    // Add phase node
-    const phaseNode: PipelineNode = {
-      id: `phase-${phase.name}`,
-      type: 'phase',
-      position: { x: xOffset, y: 0 },
-      data: {
-        label: phase.name,
-        resources: phase.resources,
-        environment: phase.name,
-        color: 'bg-primary/10'
+  pipelines.forEach((pipeline, pipelineIndex) => {
+    // Add group node
+    const groupNode: PipelineNode = {
+      id: pipeline.id,
+      type: 'group',
+      position: { x: 0, y: pipelineIndex * PIPELINE_SPACING },
+      data: { label: pipeline.name },
+      style: {
+        width: pipeline.phases.length * PHASE_SPACING + 100,
+        height: 200
       }
     };
-    nodes.push(phaseNode);
+    nodes.push(groupNode);
 
-    // Add resource nodes and edges to the right of each phase
-    phase.resources.forEach((resourceName, resourceIndex) => {
-      const resourceNode: PipelineNode = {
-        id: `resource-${resourceName}-${phase.name}`,
-        type: 'resource',
-        position: {
-          x: xOffset + PHASE_TO_RESOURCE_SPACING, // Position resources to the right of phase
-          y: resourceIndex * RESOURCE_SPACING // Stack resources vertically
-        },
+    // Add phase nodes
+    pipeline.phases.forEach((phase, phaseIndex) => {
+      const node: PipelineNode = {
+        id: phase.id,
+        type: 'phase',
+        position: { x: phaseIndex * PHASE_SPACING + 50, y: 80 },
+        parentId: pipeline.id,
         data: {
-          label: resourceName,
-          type: 'git'
+          label: phase.name,
+          type: phase.type
         }
       };
-      nodes.push(resourceNode);
+      nodes.push(node);
 
-      edges.push({
-        id: `edge-${phaseNode.id}-${resourceNode.id}`,
-        source: phaseNode.id,
-        target: resourceNode.id
-      });
+      if (phase.dependsOn) {
+        edges.push({
+          id: `edge-${phase.dependsOn}-${phase.id}`,
+          source: phase.dependsOn,
+          target: phase.id
+        });
+      }
     });
-
-    // Move to next phase group, accounting for phase width and resources
-    xOffset += PHASE_SPACING;
   });
 
-  return {
-    nodes,
-    edges
-  };
+  return { nodes, edges };
 }
