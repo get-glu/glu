@@ -1,16 +1,13 @@
 import { Handle, Position } from '@xyflow/react';
-import { Package, GitBranch, ImageIcon } from 'lucide-react';
+import { Package, GitBranch } from 'lucide-react';
 
 const PhaseNode = ({ data }: { data: any }) => {
   const getIcon = () => {
     switch (data.type) {
       case 'oci':
-        return <ImageIcon className="h-4 w-4" />;
-      case 'staging':
-      case 'production':
-        return <GitBranch className="h-4 w-4" />;
-      default:
         return <Package className="h-4 w-4" />;
+      default:
+        return <GitBranch className="h-4 w-4" />;
     }
   };
 

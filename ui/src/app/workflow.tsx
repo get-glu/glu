@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { ReactFlow, Controls, Background } from '@xyflow/react';
-import { Package } from 'lucide-react';
+import { WorkflowIcon } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useTheme } from '@/components/theme-provider';
@@ -36,9 +36,9 @@ export default function Workflow() {
       <div className="h-18 border-b p-4">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-4">
-            <Package className="h-8 w-8" />
+            <WorkflowIcon className="h-8 w-8" />
             <div>
-              <h1 className="text-xl font-bold">Frontdoor Pipeline</h1>
+              <h1 className="text-xl font-bold">Frontdoor</h1>
               <p className="text-sm text-muted-foreground">https://github.com/flipt-io/frontdoor</p>
             </div>
           </div>
