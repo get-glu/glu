@@ -28,7 +28,12 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	repository, err := pipeline.NewRepository("configuration")
+	ociRepository, err := pipeline.NewOCIRepository("checkout")
+	if err != nil {
+		return err
+	}
+
+	gitRepository, err := pipeline.NewGitRepository("configuration")
 	if err != nil {
 		return err
 	}
@@ -47,8 +52,8 @@ func run(ctx context.Context) error {
 	// configuration from the latest tags image digest
 	checkoutResourceSource, err := oci.New(
 		pipeline,
-		"ghcr.io/myorg/checkout",
-		checkoutResourceMeta("source"),
+		ociRepository,
+		checkoutResourceMeta("oci"),
 		NewCheckoutResource)
 	if err != nil {
 		return err
@@ -58,7 +63,7 @@ func run(ctx context.Context) error {
 	// on the OCI source
 	checkoutStaging := git.New(
 		pipeline,
-		repository,
+		gitRepository,
 		checkoutResourceMeta("staging"),
 		NewCheckoutResource,
 		// depends on the state of the OCI source reconciler
@@ -76,7 +81,7 @@ func run(ctx context.Context) error {
 	// on the staging phase instance
 	git.New(
 		pipeline,
-		repository,
+		gitRepository,
 		checkoutResourceMeta("production"),
 		NewCheckoutResource,
 		// depends on the state of the staging reconciler

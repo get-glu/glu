@@ -24,6 +24,7 @@ const (
 	CredentialTypeSSH         = CredentialType("ssh")
 	CredentialTypeAccessToken = CredentialType("access_token")
 	CredentialTypeGitHubApp   = CredentialType("github_app")
+	CredentialTypeDockerLocal = CredentialType("docker_local")
 )
 
 type Credential struct {

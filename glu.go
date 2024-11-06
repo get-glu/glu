@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/get-glu/glu/internal/oci"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
@@ -21,6 +22,7 @@ import (
 	"github.com/get-glu/glu/pkg/repository"
 	githubscm "github.com/get-glu/glu/pkg/scm/github"
 	"github.com/get-glu/glu/pkg/sources/git"
+	ocisource "github.com/get-glu/glu/pkg/sources/oci"
 	giturls "github.com/whilp/git-urls"
 	"golang.org/x/sync/errgroup"
 )
@@ -91,7 +93,7 @@ func (r *Registry) Run(ctx context.Context) error {
 
 	group.Go(func() error {
 		<-ctx.Done()
-		
+
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
@@ -350,21 +352,42 @@ func (p *Pipeline) ScheduleReconcile(r core.Reconciler, interval time.Duration) 
 	p.scheduled = append(p.scheduled, scheduled{r, interval})
 }
 
-type RepositoryOptions struct {
+func (p *Pipeline) NewOCIRepository(name string) (_ ocisource.Resolver, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("oci %q: %w", name, err)
+		}
+	}()
+
+	conf, ok := p.conf.Sources.OCI[name]
+	if !ok {
+		return nil, errors.New("configuration not found")
+	}
+
+	return oci.New(conf, p.creds)
+}
+
+type GitRepositoryOptions struct {
 	enableProposals bool
 }
 
-func EnableProposals(o *RepositoryOptions) {
+func EnableProposals(o *GitRepositoryOptions) {
 	o.enableProposals = true
 }
 
-func (p *Pipeline) NewRepository(name string, opts ...containers.Option[RepositoryOptions]) (git.Repository, error) {
-	var options RepositoryOptions
+func (p *Pipeline) NewGitRepository(name string, opts ...containers.Option[GitRepositoryOptions]) (_ git.Repository, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("git %q: %w", name, err)
+		}
+	}()
+
+	var options GitRepositoryOptions
 	containers.ApplyAll(&options, opts...)
 
-	conf, ok := p.conf.Repositories[name]
+	conf, ok := p.conf.Sources.Git[name]
 	if !ok {
-		return nil, fmt.Errorf("repository %q: configuration not found", name)
+		return nil, errors.New("configuration not found")
 	}
 
 	repoOpts := []containers.Option[repository.GitRepository]{}
@@ -388,12 +411,12 @@ func (p *Pipeline) NewRepository(name string, opts ...containers.Option[Reposito
 		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
 			creds, err := p.creds.Get(conf.Proposals.Credential)
 			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
+				return nil, err
 			}
 
 			client, err := creds.GitHubClient(p.ctx)
 			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
+				return nil, err
 			}
 
 			repoOpts = append(repoOpts, repository.WithProposer(githubscm.New(
