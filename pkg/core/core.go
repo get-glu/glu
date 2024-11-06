@@ -4,9 +4,9 @@ import (
 	"context"
 )
 
-// Reconciler is the core interface for a reconcilable resource.
+// Controller is the core interface for a resource reconciler.
 // These types can be registered on pipelines and dependend upon on another.
-type Reconciler interface {
+type Controller interface {
 	Metadata() Metadata
 	Get(context.Context) (any, error)
 	Reconcile(context.Context) error
@@ -25,7 +25,7 @@ type Pipeline struct {
 	ctx  context.Context
 	name string
 
-	reconcilers []Reconciler
+	reconcilers []Controller
 }
 
 // NewPipeline constructs a new, empty named pipeline .
@@ -42,19 +42,19 @@ func (p *Pipeline) Name() string {
 }
 
 // Register adds a reconciler to the pipeline.
-func (p *Pipeline) Register(r Reconciler) {
+func (p *Pipeline) Register(r Controller) {
 	p.reconcilers = append(p.reconcilers, r)
 }
 
 // Phases returns all reconcilers as a map indexed by phase
 // and then reconciler resource name.
-func (p *Pipeline) Phases() map[string]map[string]Reconciler {
-	phases := map[string]map[string]Reconciler{}
+func (p *Pipeline) Phases() map[string]map[string]Controller {
+	phases := map[string]map[string]Controller{}
 	for _, r := range p.reconcilers {
 		meta := r.Metadata()
 		phase, ok := phases[meta.Phase]
 		if !ok {
-			phase = map[string]Reconciler{}
+			phase = map[string]Controller{}
 		}
 
 		phase[meta.Name] = r

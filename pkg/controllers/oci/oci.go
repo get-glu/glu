@@ -20,7 +20,7 @@ type Resolver interface {
 	Resolve(_ context.Context) (v1.Descriptor, error)
 }
 
-type Source[A any, P interface {
+type Controller[A any, P interface {
 	*A
 	Derivable
 }] struct {
@@ -31,7 +31,7 @@ type Source[A any, P interface {
 }
 
 type Registry interface {
-	Register(core.Reconciler)
+	Register(core.Controller)
 }
 
 func New[A any, P interface {
@@ -42,8 +42,8 @@ func New[A any, P interface {
 	resolver Resolver,
 	meta core.Metadata,
 	fn func(core.Metadata) P,
-) (*Source[A, P], error) {
-	src := &Source[A, P]{
+) (*Controller[A, P], error) {
+	src := &Controller[A, P]{
 		resolver: resolver,
 		meta:     meta,
 		fn:       fn,
@@ -54,15 +54,15 @@ func New[A any, P interface {
 	return src, nil
 }
 
-func (s *Source[A, P]) Metadata() core.Metadata {
+func (s *Controller[A, P]) Metadata() core.Metadata {
 	return s.meta
 }
 
-func (s *Source[A, P]) Get(ctx context.Context) (any, error) {
+func (s *Controller[A, P]) Get(ctx context.Context) (any, error) {
 	return s.GetResource(ctx)
 }
 
-func (s *Source[A, P]) GetResource(ctx context.Context) (P, error) {
+func (s *Controller[A, P]) GetResource(ctx context.Context) (P, error) {
 	if s.last == nil {
 		if err := s.Reconcile(ctx); err != nil {
 			return nil, err
@@ -72,7 +72,7 @@ func (s *Source[A, P]) GetResource(ctx context.Context) (P, error) {
 	return s.last, nil
 }
 
-func (s *Source[A, P]) Reconcile(ctx context.Context) error {
+func (s *Controller[A, P]) Reconcile(ctx context.Context) error {
 	slog.Debug("Reconcile", "type", "oci", "name", s.meta.Name)
 
 	desc, err := s.resolver.Resolve(ctx)

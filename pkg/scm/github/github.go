@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/get-glu/glu/pkg/controllers/git"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/repository"
-	"github.com/get-glu/glu/pkg/sources/git"
 	"github.com/google/go-github/v64/github"
 )
 

@@ -17,12 +17,12 @@ import (
 	"github.com/get-glu/glu/internal/oci"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
+	gitcontroller "github.com/get-glu/glu/pkg/controllers/git"
+	ocicontroller "github.com/get-glu/glu/pkg/controllers/oci"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/repository"
 	githubscm "github.com/get-glu/glu/pkg/scm/github"
-	"github.com/get-glu/glu/pkg/sources/git"
-	ocisource "github.com/get-glu/glu/pkg/sources/oci"
 	giturls "github.com/whilp/git-urls"
 	"golang.org/x/sync/errgroup"
 )
@@ -278,7 +278,7 @@ type Pipeline struct {
 }
 
 type scheduled struct {
-	core.Reconciler
+	core.Controller
 
 	interval time.Duration
 }
@@ -292,7 +292,7 @@ func newPipeline(ctx context.Context, conf *config.Config, name string) *Pipelin
 	}
 }
 
-func (p *Pipeline) getPhase(name string) (map[string]core.Reconciler, error) {
+func (p *Pipeline) getPhase(name string) (map[string]core.Controller, error) {
 	m, ok := p.Phases()[name]
 	if !ok {
 		return nil, fmt.Errorf(`phase "%q/%q": %w`, p.Name(), name, ErrNotFound)
@@ -301,7 +301,7 @@ func (p *Pipeline) getPhase(name string) (map[string]core.Reconciler, error) {
 	return m, nil
 }
 
-func getResource(phase map[string]core.Reconciler, name string) (core.Reconciler, error) {
+func getResource(phase map[string]core.Controller, name string) (core.Controller, error) {
 	reconciler, ok := phase[name]
 	if !ok {
 		return nil, fmt.Errorf(`resource %q: %w`, name, ErrNotFound)
@@ -348,11 +348,11 @@ func (p *Pipeline) run(ctx context.Context) error {
 	}
 }
 
-func (p *Pipeline) ScheduleReconcile(r core.Reconciler, interval time.Duration) {
+func (p *Pipeline) ScheduleReconcile(r core.Controller, interval time.Duration) {
 	p.scheduled = append(p.scheduled, scheduled{r, interval})
 }
 
-func (p *Pipeline) NewOCIRepository(name string) (_ ocisource.Resolver, err error) {
+func (p *Pipeline) NewOCIRepository(name string) (_ ocicontroller.Resolver, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("oci %q: %w", name, err)
@@ -375,7 +375,7 @@ func EnableProposals(o *GitRepositoryOptions) {
 	o.enableProposals = true
 }
 
-func (p *Pipeline) NewGitRepository(name string, opts ...containers.Option[GitRepositoryOptions]) (_ git.Repository, err error) {
+func (p *Pipeline) NewGitRepository(name string, opts ...containers.Option[GitRepositoryOptions]) (_ gitcontroller.Repository, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("git %q: %w", name, err)
