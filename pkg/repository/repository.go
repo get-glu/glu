@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/fs"
-	"github.com/get-glu/glu/pkg/git"
 	gitsource "github.com/get-glu/glu/pkg/sources/git"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
