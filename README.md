@@ -10,14 +10,30 @@ It is a framework for orchestrating, manipulating and introspecting the state of
 
 Use it to implement anything that involes automating updates to Git repositories via commits and pull-requests.
 
-### Automated dependency updates (think Dependabot / Renovate)
-
-TODO(georgemac): Give demonstration (potentially implement re-usable package).
-
 ### Docker and OCI image version updates (think Renovate / Kargo)
 
 TODO(georgemac): Give demonstration (e.g. with FluxCD for the delivery component).
 Demonstrate how the API can be used for introspection of pipeline state.
+
+## Development
+
+### Glu Framework
+
+The core framework is implemented in Go and is designed to be embedded in your own application.
+
+// TODO(mark): more details.
+
+### Glu UI
+
+The Glu UI is a React application that allows you to view and interact with the state of your pipelines.
+
+```
+cd ui
+npm install
+npm start
+```
+
+This will start a local server which can be viewed in your browser at http://localhost:1234.
 
 ## Roadmap
 
