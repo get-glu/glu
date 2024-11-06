@@ -56,9 +56,9 @@ type Proposal struct {
 	ExternalMetadata map[string]any
 }
 
-// Source is a git backed source for accessing resources.
+// Controller is a git backed controller for managing resources.
 // It supports reading, writing and proposing changes to Git and any supporting SCM.
-type Source[A any, P interface {
+type Controller[A any, P interface {
 	*A
 	Resource
 }] struct {
@@ -69,31 +69,31 @@ type Source[A any, P interface {
 	opts UpdateOptions
 }
 
-// SourceOption is a functional option for configuring a git Source.
-type SourceOption[A any, P interface {
+// ControllerOptions is a functional option for configuring a git Source.
+type ControllerOptions[A any, P interface {
 	*A
 	Resource
-}] func(*Source[A, P])
+}] func(*Controller[A, P])
 
-// DependsOn provides the source with a dependent source.
-// One Reconcile the source configured as requiring the dependency
-// will first reconcile the dependency. If the target dependency has
-// updated, then it attempts to update itself to match this target source.
+// DependsOn provides the Controller with a dependent Controller.
+// On Reconcile the controller will first reconcile the dependency.
+// If the target dependency has updated, then it attempts to update
+// itself to match this target controller.
 func DependsOn[A any, P interface {
 	*A
 	Resource
-}](src Reconciler[P]) SourceOption[A, P] {
-	return func(i *Source[A, P]) {
+}](src Reconciler[P]) ControllerOptions[A, P] {
+	return func(i *Controller[A, P]) {
 		i.src = src
 	}
 }
 
-// ProposeChanges configures the source to propose the change (via PR or MR)
+// ProposeChanges configures the controller to propose the change (via PR or MR)
 // as opposed to directly integrating it into the target trunk branch.
 func ProposeChanges[A any, P interface {
 	*A
 	Resource
-}](i *Source[A, P]) {
+}](i *Controller[A, P]) {
 	i.opts.ProposeChange = true
 }
 
@@ -101,13 +101,13 @@ func ProposeChanges[A any, P interface {
 func AutoMerge[A any, P interface {
 	*A
 	Resource
-}](i *Source[A, P]) {
+}](i *Controller[A, P]) {
 	i.opts.AutoMerge = true
 }
 
 // Registry is a type which supports the registry of reconciler types.
 type Registry interface {
-	Register(core.Reconciler)
+	Register(core.Controller)
 }
 
 // New constructs and configures a new git Source which can be used
@@ -121,9 +121,9 @@ func New[A any, P interface {
 	repo Repository,
 	meta core.Metadata,
 	fn func(core.Metadata) P,
-	opts ...SourceOption[A, P]) *Source[A, P] {
+	opts ...ControllerOptions[A, P]) *Controller[A, P] {
 
-	inst := &Source[A, P]{repo: repo, meta: meta, fn: fn}
+	inst := &Controller[A, P]{repo: repo, meta: meta, fn: fn}
 	for _, opt := range opts {
 		opt(inst)
 	}
@@ -134,17 +134,17 @@ func New[A any, P interface {
 }
 
 // Metadata returns the underlying metadata for the resource in the current phase.
-func (i *Source[A, P]) Metadata() core.Metadata {
+func (i *Controller[A, P]) Metadata() core.Metadata {
 	return i.meta
 }
 
 // Get returns the underlying resource without specific type information.
-func (i *Source[A, P]) Get(ctx context.Context) (any, error) {
+func (i *Controller[A, P]) Get(ctx context.Context) (any, error) {
 	return i.GetResource(ctx)
 }
 
 // GetResource returns the identified resource as its concrete pointer type.
-func (i *Source[A, P]) GetResource(ctx context.Context) (P, error) {
+func (i *Controller[A, P]) GetResource(ctx context.Context) (P, error) {
 	p := i.fn(i.meta)
 	if err := i.repo.View(ctx, p); err != nil {
 		return nil, err
@@ -153,11 +153,11 @@ func (i *Source[A, P]) GetResource(ctx context.Context) (P, error) {
 	return p, nil
 }
 
-// Reconcile forces the source to retrieve the latest version of the resouce from the underlying repository.
-// If a dependent source has been defined, then this source is also reconciled.
-// If the dependent source resource differs from this sources view of the world, then the source attempts
+// Reconcile forces the controller to retrieve the latest version of the resouce from the underlying repository.
+// If a dependent controller has been defined, then it is also reconciled.
+// If the dependent controller resource differs, then the controller attempts
 // to update its underlying repository to match the new desired state.
-func (i *Source[A, P]) Reconcile(ctx context.Context) error {
+func (i *Controller[A, P]) Reconcile(ctx context.Context) error {
 	slog.Debug("reconcile started", "type", "instance", "phase", i.meta.Phase, "name", i.meta.Name)
 
 	from := i.fn(i.meta)
