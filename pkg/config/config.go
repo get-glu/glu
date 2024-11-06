@@ -13,9 +13,12 @@ import (
 )
 
 type Config struct {
-	Log          Log          `glu:"log"`
-	Repositories Repositories `glu:"repositories"`
-	Credentials  Credentials  `glu:"credentials"`
+	Log         Log         `glu:"log"`
+	Credentials Credentials `glu:"credentials"`
+	Sources     struct {
+		Git GitRepositories `glu:"git"`
+		OCI OCIRepositories `glu:"oci"`
+	} `glu:"sources"`
 }
 
 func (c *Config) setDefaults() error {
@@ -23,7 +26,11 @@ func (c *Config) setDefaults() error {
 		return err
 	}
 
-	if err := c.Repositories.setDefaults(); err != nil {
+	if err := c.Sources.Git.setDefaults(); err != nil {
+		return err
+	}
+
+	if err := c.Sources.OCI.setDefaults(); err != nil {
 		return err
 	}
 
@@ -35,7 +42,11 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	if err := c.Repositories.validate(); err != nil {
+	if err := c.Sources.Git.validate(); err != nil {
+		return err
+	}
+
+	if err := c.Sources.OCI.validate(); err != nil {
 		return err
 	}
 

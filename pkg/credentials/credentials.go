@@ -14,6 +14,9 @@ import (
 	"github.com/google/go-github/v64/github"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/credentials"
+	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 type CredentialSource struct {
@@ -77,10 +80,10 @@ func (c *Credential) HTTPClient(ctx context.Context) (*http.Client, error) {
 			AccessToken: *c.config.AccessToken,
 		})), nil
 	case config.CredentialTypeSSH:
-		return nil, fmt.Errorf("credential type %q not supported for HTTP", c.config.Type)
+		return nil, fmt.Errorf("http: credential type %q not supported", c.config.Type)
 	}
 
-	return nil, fmt.Errorf("unexpected credential type: %q", c.config.Type)
+	return nil, fmt.Errorf("http: unexpected credential type: %q", c.config.Type)
 }
 
 func (c *Credential) GitAuthentication() (auth transport.AuthMethod, err error) {
@@ -128,5 +131,31 @@ func (c *Credential) GitAuthentication() (auth transport.AuthMethod, err error) 
 		return &githttp.TokenAuth{Token: *c.config.AccessToken}, nil
 	}
 
-	return nil, fmt.Errorf("unxpected credential type: %q", c.config.Type)
+	return nil, fmt.Errorf("git: unxpected credential type: %q", c.config.Type)
+}
+
+func (c *Credential) OCIClient(registry string) (_ *auth.Client, err error) {
+	var creds auth.CredentialFunc
+	switch c.config.Type {
+	case config.CredentialTypeBasic:
+		creds = auth.StaticCredential(registry, auth.Credential{
+			Username: c.config.Basic.Username,
+			Password: c.config.Basic.Password,
+		})
+	case config.CredentialTypeDockerLocal:
+		store, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		creds = credentials.Credential(store)
+	default:
+		return nil, fmt.Errorf("oci: unxpected credential type: %q", c.config.Type)
+	}
+
+	return &auth.Client{
+		Client:     retry.DefaultClient,
+		Cache:      auth.NewCache(),
+		Credential: creds,
+	}, nil
 }

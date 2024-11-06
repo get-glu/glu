@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/core"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
@@ -17,14 +16,18 @@ type Derivable interface {
 	ReadFromOCIDescriptor(v1.Descriptor) error
 }
 
+type Resolver interface {
+	Resolve(_ context.Context) (v1.Descriptor, error)
+}
+
 type Source[A any, P interface {
 	*A
 	Derivable
 }] struct {
-	remote *remote.Repository
-	meta   glu.Metadata
-	fn     func(glu.Metadata) P
-	last   P
+	resolver Resolver
+	meta     core.Metadata
+	fn       func(core.Metadata) P
+	last     P
 }
 
 type Registry interface {
@@ -36,19 +39,14 @@ func New[A any, P interface {
 	Derivable
 }](
 	pipeline Registry,
-	image string,
-	meta glu.Metadata,
-	fn func(glu.Metadata) P,
+	resolver Resolver,
+	meta core.Metadata,
+	fn func(core.Metadata) P,
 ) (*Source[A, P], error) {
-	r, err := getRepository(image)
-	if err != nil {
-		return nil, err
-	}
-
 	src := &Source[A, P]{
-		remote: r,
-		meta:   meta,
-		fn:     fn,
+		resolver: resolver,
+		meta:     meta,
+		fn:       fn,
 	}
 
 	pipeline.Register(src)
@@ -56,7 +54,7 @@ func New[A any, P interface {
 	return src, nil
 }
 
-func (s *Source[A, P]) Metadata() glu.Metadata {
+func (s *Source[A, P]) Metadata() core.Metadata {
 	return s.meta
 }
 
@@ -77,7 +75,7 @@ func (s *Source[A, P]) GetResource(ctx context.Context) (P, error) {
 func (s *Source[A, P]) Reconcile(ctx context.Context) error {
 	slog.Debug("Reconcile", "type", "oci", "name", s.meta.Name)
 
-	desc, err := s.remote.Resolve(ctx, s.remote.Reference.Reference)
+	desc, err := s.resolver.Resolve(ctx)
 	if err != nil {
 		return err
 	}
