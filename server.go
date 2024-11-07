@@ -9,11 +9,11 @@ import (
 )
 
 type Server struct {
-	registry *Registry
+	registry *System
 	router   *chi.Mux
 }
 
-func newServer(registry *Registry) *Server {
+func newServer(registry *System) *Server {
 	s := &Server{
 		registry: registry,
 		router:   chi.NewRouter(),

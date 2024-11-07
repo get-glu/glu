@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/get-glu/glu"
-	"github.com/get-glu/glu/pkg/controllers/git"
-	"github.com/get-glu/glu/pkg/controllers/oci"
+	"github.com/get-glu/glu/pkg/controllers"
+	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/src/git"
+	"github.com/get-glu/glu/pkg/src/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
 )
@@ -23,74 +25,53 @@ import (
 // }
 
 func run(ctx context.Context) error {
-	pipeline, err := glu.NewPipeline(ctx, "myorgpipeline")
+	system := glu.NewSystem()
+	config, err := system.Configuration()
 	if err != nil {
 		return err
 	}
 
-	ociRepository, err := pipeline.NewOCIRepository("checkout")
+	ociSource, err := oci.New[*CheckoutResource]("checkout", config)
 	if err != nil {
 		return err
 	}
 
-	gitRepository, err := pipeline.NewGitRepository("configuration")
+	gitSource, err := git.NewSource[*CheckoutResource](ctx, "checkout", config, git.ProposeChanges, git.AutoMerge)
 	if err != nil {
 		return err
 	}
 
-	checkoutResourceMeta := func(phase string) glu.Metadata {
-		return glu.Metadata{
-			Name:  "checkout",
-			Phase: phase,
-			Labels: map[string]string{
-				"team": "ecommerce",
-			},
-		}
-	}
+	var (
+		pipeline = glu.NewPipeline(glu.Metadata{
+			Name: "checkout",
+		},
+			NewCheckoutResource,
+		)
 
-	// create an OCI source for the checkout app which derives the app
-	// configuration from the latest tags image digest
-	checkoutResourceSource, err := oci.New(
-		pipeline,
-		ociRepository,
-		checkoutResourceMeta("oci"),
-		NewCheckoutResource)
-	if err != nil {
-		return err
-	}
-
-	// create a staging phase checkout app which is dependedent
-	// on the OCI source
-	checkoutStaging := git.New(
-		pipeline,
-		gitRepository,
-		checkoutResourceMeta("staging"),
-		NewCheckoutResource,
-		// depends on the state of the OCI source reconciler
-		git.DependsOn(checkoutResourceSource),
-		// proposes changes and marks them to merge once
-		// status checks have passed
-		git.ProposeChanges,
-		git.AutoMerge,
+		upstream   = glu.NewPhase("upstream")
+		staging    = glu.NewPhase("staging")
+		production = glu.NewPhase("production")
 	)
+
+	// oci controller
+	ociController := controllers.New(pipeline, upstream, ociSource)
+
+	// staging git controller
+	gitStaging := controllers.New(pipeline, staging, gitSource,
+		// depends on oci upstream controller
+		core.DependsOn(ociController))
 
 	// force a reconcile of the staging instance every 10 seconds
-	pipeline.ScheduleReconcile(checkoutStaging, 10*time.Second)
+	system.ScheduleReconcile(gitStaging, 10*time.Second)
 
-	// create a production phase checkout app which is dependedent
-	// on the staging phase instance
-	git.New(
-		pipeline,
-		gitRepository,
-		checkoutResourceMeta("production"),
-		NewCheckoutResource,
-		// depends on the state of the staging reconciler
-		git.DependsOn(checkoutStaging),
-		// proposes changes but does not auto-merge
-		git.ProposeChanges,
-	)
+	// construct and register production phase controller
+	controllers.New(pipeline, production, gitSource,
+		core.DependsOn(gitStaging))
 
-	return glu.Run(ctx)
+	// register pipeline on system
+	system.AddPipeline(pipeline)
+
+	return system.Run(ctx)
 }
 
 type CheckoutResource struct {
@@ -116,9 +97,9 @@ func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	return nil
 }
 
-func (c *CheckoutResource) ReadFrom(_ context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
 		os.O_RDONLY,
 		0644,
 	)
@@ -140,9 +121,9 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, fs fs.Filesystem) error {
 	return nil
 }
 
-func (c *CheckoutResource) WriteTo(ctx context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) WriteTo(ctx context.Context, phase *glu.Phase, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
 		os.O_RDONLY,
 		0644,
 	)

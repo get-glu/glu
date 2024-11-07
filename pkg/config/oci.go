@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-type OCIRepositories map[string]OCIRepository
+type OCIRepositories map[string]*OCIRepository
 
 func (o OCIRepositories) setDefaults() error {
 	for name, repo := range o {

@@ -14,19 +14,14 @@ type Repository struct {
 	conf config.OCIRepository
 }
 
-func New(conf config.OCIRepository, creds *credentials.CredentialSource) (*Repository, error) {
-	repo, err := remote.NewRepository(conf.Reference)
+func New(reference string, cred *credentials.Credential) (_ *Repository, err error) {
+	repo, err := remote.NewRepository(reference)
 	if err != nil {
 		return nil, err
 	}
 
-	if conf.Credential != "" {
-		creds, err := creds.Get(conf.Credential)
-		if err != nil {
-			return nil, err
-		}
-
-		repo.Client, err = creds.OCIClient(repo.Reference.Repository)
+	if cred != nil {
+		repo.Client, err = cred.OCIClient(repo.Reference.Repository)
 		if err != nil {
 			return nil, err
 		}
