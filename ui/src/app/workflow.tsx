@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ReactFlow, Controls, Background } from '@xyflow/react';
+import { ReactFlow, Controls, Background, MarkerType } from '@xyflow/react';
 import { WorkflowIcon } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -57,7 +57,16 @@ export default function Workflow() {
           colorMode={theme}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{
-            type: 'smoothstep'
+            markerEnd: {
+              type: MarkerType.Arrow,
+              width: 20,
+              height: 20,
+              color: 'currentColor'
+            },
+            selectable: false,
+            style: {
+              strokeWidth: 2
+            }
           }}
         >
           <Background />
@@ -71,33 +80,62 @@ export default function Workflow() {
 export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
   const nodes: PipelineNode[] = [];
   const edges: PipelineEdge[] = [];
-  const PIPELINE_SPACING = 300;
-  const PHASE_SPACING = 250;
+  const PIPELINE_VERTICAL_PADDING = 100;
+  const PIPELINE_SPACING = 100;
+  const PHASE_SPACING_X = 350;
+  const PHASE_SPACING_Y = 200;
+  const NODE_WIDTH = 200; // Base width of a node
+
+  let currentY = 0;
 
   pipelines.forEach((pipeline, pipelineIndex) => {
+    // First pass: calculate max depth and count phases per column
+    const phasesByColumn: { [key: number]: number } = {};
+    let maxDepth = 0;
+
+    pipeline.phases.forEach((phase) => {
+      const depth = getPhaseDepth(phase, pipeline.phases);
+      maxDepth = Math.max(maxDepth, depth);
+      const xPosition = depth * PHASE_SPACING_X;
+      phasesByColumn[xPosition] = (phasesByColumn[xPosition] || 0) + 1;
+    });
+
+    const maxPhasesInColumn = Math.max(...Object.values(phasesByColumn), 1);
+    const pipelineHeight = maxPhasesInColumn * PHASE_SPACING_Y + PIPELINE_VERTICAL_PADDING;
+
+    // Calculate required width based on deepest node plus padding
+    const requiredWidth = maxDepth * PHASE_SPACING_X + NODE_WIDTH + 125; // 125px for padding
+
     // Add group node
     const groupNode: PipelineNode = {
       id: pipeline.id,
       type: 'group',
-      position: { x: 0, y: pipelineIndex * PIPELINE_SPACING },
-      data: { label: pipeline.name },
+      position: { x: 0, y: currentY },
+      data: { labels: { name: pipeline.name } },
       style: {
-        width: pipeline.phases.length * PHASE_SPACING + 100,
-        height: 200
+        width: requiredWidth,
+        height: pipelineHeight
       }
     };
     nodes.push(groupNode);
 
-    // Add phase nodes
-    pipeline.phases.forEach((phase, phaseIndex) => {
+    const columnCount: { [key: number]: number } = {};
+
+    pipeline.phases.forEach((phase) => {
+      const xPosition = getPhaseDepth(phase, pipeline.phases) * PHASE_SPACING_X + 50;
+      columnCount[xPosition] = (columnCount[xPosition] || 0) + 1;
+      const yPosition =
+        PIPELINE_VERTICAL_PADDING / 2 + (columnCount[xPosition] - 1) * PHASE_SPACING_Y;
+
       const node: PipelineNode = {
         id: phase.id,
         type: 'phase',
-        position: { x: phaseIndex * PHASE_SPACING + 50, y: 80 },
+        position: { x: xPosition, y: yPosition },
         parentId: pipeline.id,
         data: {
           label: phase.name,
-          type: phase.type
+          type: phase.type,
+          labels: phase.labels
         }
       };
       nodes.push(node);
@@ -105,12 +143,29 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
       if (phase.dependsOn) {
         edges.push({
           id: `edge-${phase.dependsOn}-${phase.id}`,
-          source: phase.dependsOn,
-          target: phase.id
+          target: phase.dependsOn,
+          source: phase.id
         });
       }
     });
+
+    // Only add spacing if this isn't the last pipeline
+    if (pipelineIndex < pipelines.length - 1) {
+      currentY += pipelineHeight + PIPELINE_SPACING;
+    } else {
+      currentY += pipelineHeight;
+    }
   });
 
   return { nodes, edges };
+}
+
+// Helper function to calculate the depth of a phase based on its dependencies
+function getPhaseDepth(phase: Pipeline['phases'][0], allPhases: Pipeline['phases']): number {
+  if (!phase.dependsOn) return 0;
+
+  const parentPhase = allPhases.find((p) => p.id === phase.dependsOn);
+  if (!parentPhase) return 0;
+
+  return 1 + getPhaseDepth(parentPhase, allPhases);
 }
