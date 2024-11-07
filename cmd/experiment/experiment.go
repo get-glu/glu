@@ -47,17 +47,18 @@ func run(ctx context.Context) error {
 		},
 			NewCheckoutResource,
 		)
-
-		upstream   = glu.NewPhase("upstream")
-		staging    = glu.NewPhase("staging")
-		production = glu.NewPhase("production")
 	)
 
 	// oci controller
-	ociController := controllers.New(pipeline, upstream, ociSource)
+	ociController := controllers.New(core.Metadata{
+		Name: "oci",
+	}, pipeline, ociSource)
 
 	// staging git controller
-	gitStaging := controllers.New(pipeline, staging, gitSource,
+	gitStaging := controllers.New(core.Metadata{
+		Name:   "git-staging",
+		Labels: map[string]string{"env": "staging"},
+	}, pipeline, gitSource,
 		// depends on oci upstream controller
 		core.DependsOn(ociController))
 
@@ -65,7 +66,10 @@ func run(ctx context.Context) error {
 	system.ScheduleReconcile(gitStaging, 10*time.Second)
 
 	// construct and register production phase controller
-	controllers.New(pipeline, production, gitSource,
+	controllers.New(core.Metadata{
+		Name:   "git-production",
+		Labels: map[string]string{"env": "production"},
+	}, pipeline, gitSource,
 		core.DependsOn(gitStaging))
 
 	// register pipeline on system
@@ -97,9 +101,9 @@ func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	return nil
 }
 
-func (c *CheckoutResource) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.Filesystem) error {
+func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
 		os.O_RDONLY,
 		0644,
 	)
@@ -121,9 +125,9 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, phase *glu.Phase, fs fs.F
 	return nil
 }
 
-func (c *CheckoutResource) WriteTo(ctx context.Context, phase *glu.Phase, fs fs.Filesystem) error {
+func (c *CheckoutResource) WriteTo(ctx context.Context, meta glu.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
 		os.O_RDONLY,
 		0644,
 	)
