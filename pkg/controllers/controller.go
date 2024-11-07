@@ -28,14 +28,14 @@ type Pipeline[R core.Resource] interface {
 type Controller[R core.Resource] struct {
 	meta     core.Metadata
 	pipeline Pipeline[R]
-	repo     Source[R]
+	source   Source[R]
 }
 
 func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) *Controller[R] {
 	controller := &Controller[R]{
 		meta:     meta,
 		pipeline: pipeline,
-		repo:     repo,
+		source:   repo,
 	}
 
 	pipeline.Add(controller, opts...)
@@ -54,7 +54,7 @@ func (i *Controller[R]) Get(ctx context.Context) (any, error) {
 // GetResource returns the identified resource as its concrete pointer type.
 func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 	a = i.pipeline.New()
-	if err := i.repo.View(ctx, i.meta, a); err != nil {
+	if err := i.source.View(ctx, i.meta, a); err != nil {
 		return a, err
 	}
 
@@ -69,7 +69,7 @@ func (i *Controller[R]) Reconcile(ctx context.Context) error {
 	slog.Debug("reconcile started")
 
 	from := i.pipeline.New()
-	if err := i.repo.View(ctx, i.meta, from); err != nil {
+	if err := i.source.View(ctx, i.meta, from); err != nil {
 		return err
 	}
 
@@ -78,7 +78,7 @@ func (i *Controller[R]) Reconcile(ctx context.Context) error {
 		return nil
 	}
 
-	updatable, ok := i.repo.(UpdatableSource[R])
+	updatable, ok := i.source.(UpdatableSource[R])
 	if !ok {
 		return nil
 	}
