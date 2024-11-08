@@ -3,6 +3,7 @@ package glu
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -255,9 +256,30 @@ type fields interface {
 	PrinterFields() [][2]string
 }
 
+type labels map[string]string
+
+func (l labels) String() string {
+	return "KEY=VALUE"
+}
+
+func (l labels) Set(v string) error {
+	key, value, match := strings.Cut(v, "=")
+	if !match {
+		return fmt.Errorf("value should be in the form key=value (found %q)", v)
+	}
+
+	l[key] = value
+
+	return nil
+}
+
 func (s *System) reconcile(ctx context.Context, args ...string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("reconcile <pipeline> <controller>")
+	const usage = `reconcile <pipeline> FLAGS [controller <controller>]
+
+    FLAGS:
+    --label key=value`
+	if len(args) < 1 {
+		return errors.New(usage)
 	}
 
 	pipeline, err := s.getPipeline(args[0])
@@ -265,7 +287,27 @@ func (s *System) reconcile(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	controller, ok := pipeline.Controllers()[args[1]]
+	labels := labels{}
+	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
+	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
+	if err := set.Parse(args[1:]); err != nil {
+		return err
+	}
+
+	controllers := pipeline.Controllers()
+	if set.NArg() < 1 {
+		for _, controller := range controllers {
+			if !contollerHasLabels(controller, labels) {
+				continue
+			}
+
+			if err := controller.Reconcile(ctx); err != nil {
+				return err
+			}
+		}
+	}
+
+	controller, ok := pipeline.Controllers()[set.Arg(0)]
 	if !ok {
 		return fmt.Errorf("controller not found: %q", args[1])
 	}
@@ -288,15 +330,20 @@ func (s Schedule) matches(c core.Controller) bool {
 		return s.matchesController == c
 	}
 
-	if len(s.matchesLabels) > 0 {
-		labels := c.Metadata().Labels
-		for k, v := range s.matchesLabels {
-			if found, ok := labels[k]; !ok || v != found {
-				return false
-			}
-		}
+	if !contollerHasLabels(c, s.matchesLabels) {
+		return false
 	}
 
+	return true
+}
+
+func contollerHasLabels(c core.Controller, toFind map[string]string) bool {
+	labels := c.Metadata().Labels
+	for k, v := range toFind {
+		if found, ok := labels[k]; !ok || v != found {
+			return false
+		}
+	}
 	return true
 }
 

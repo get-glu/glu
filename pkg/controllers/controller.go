@@ -26,13 +26,20 @@ type Pipeline[R core.Resource] interface {
 }
 
 type Controller[R core.Resource] struct {
+	logger   *slog.Logger
 	meta     core.Metadata
 	pipeline Pipeline[R]
 	source   Source[R]
 }
 
 func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) *Controller[R] {
+	logger := slog.With("name", meta.Name)
+	for k, v := range meta.Labels {
+		logger = logger.With(k, v)
+	}
+
 	controller := &Controller[R]{
+		logger:   logger,
 		meta:     meta,
 		pipeline: pipeline,
 		source:   repo,
@@ -66,7 +73,7 @@ func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 // If the dependent controller resource differs, then the controller attempts
 // to update its underlying repository to match the new desired state.
 func (i *Controller[R]) Reconcile(ctx context.Context) error {
-	slog.Debug("reconcile started")
+	i.logger.Debug("reconcile started")
 
 	from := i.pipeline.New()
 	if err := i.source.View(ctx, i.meta, from); err != nil {
@@ -103,7 +110,7 @@ func (i *Controller[R]) Reconcile(ctx context.Context) error {
 	}
 
 	if fromDigest == toDigest {
-		slog.Debug("skipping reconcile", "reason", "UpToDate")
+		i.logger.Debug("skipping reconcile", "reason", "UpToDate")
 
 		return nil
 	}
