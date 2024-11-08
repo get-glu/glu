@@ -17,16 +17,22 @@ import (
 )
 
 func run(ctx context.Context) error {
-	return glu.NewSystem().AddPipeline(func(config glu.Config) (glu.Pipeline, error) {
-		ociSource, err := oci.New[*CheckoutResource]("checkout", config)
+	return glu.NewSystem().AddPipeline(func(config *glu.Config) (glu.Pipeline, error) {
+		// fetch the configured OCI repositority source named "checkout"
+		ociRepo, err := config.OCIRepository("checkout")
 		if err != nil {
 			return nil, err
 		}
 
-		gitSource, err := git.NewSource[*CheckoutResource](ctx, "checkout", config, git.ProposeChanges, git.AutoMerge)
+		ociSource := oci.New[*CheckoutResource](ociRepo)
+
+		// fetch the configured Git repository source named "checkout"
+		gitRepo, gitProposer, err := config.GitRepository(ctx, "checkout")
 		if err != nil {
 			return nil, err
 		}
+
+		gitSource := git.NewSource[*CheckoutResource](gitRepo, gitProposer, git.ProposeChanges, git.AutoMerge)
 
 		// create initial (empty) pipeline
 		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
@@ -36,17 +42,13 @@ func run(ctx context.Context) error {
 
 		// build a controller for the staging environment which source from the git repository
 		// configure it to promote from the OCI controller
-		gitStaging := controllers.New(glu.Metadata{
-			Name:   "git-staging",
-			Labels: map[string]string{"env": "staging"},
-		}, pipeline, gitSource, core.PromotesFrom(ociController))
+		gitStaging := controllers.New(glu.Name("git-staging", glu.Label("env", "staging")),
+			pipeline, gitSource, core.PromotesFrom(ociController))
 
 		// build a controller for the production environment which source from the git repository
 		// configure it to promote from the staging git controller
-		_ = controllers.New(core.Metadata{
-			Name:   "git-production",
-			Labels: map[string]string{"env": "production"},
-		}, pipeline, gitSource, core.PromotesFrom(gitStaging))
+		_ = controllers.New(glu.Name("git-production", glu.Label("env", "production")),
+			pipeline, gitSource, core.PromotesFrom(gitStaging))
 
 		// return configured pipeline to the system
 		return pipeline, nil

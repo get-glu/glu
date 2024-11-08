@@ -3,11 +3,8 @@ package oci
 import (
 	"context"
 
-	"github.com/get-glu/glu/internal/oci"
-	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/controllers"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/credentials"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -26,35 +23,10 @@ type Source[R Resource] struct {
 	resolver Resolver
 }
 
-type ConfigSource interface {
-	OCIRepositoryConfig(name string) (*config.OCIRepository, error)
-	GetCredential(name string) (*credentials.Credential, error)
-}
-
-func New[R Resource](name string, cconf ConfigSource) (*Source[R], error) {
-	conf, err := cconf.OCIRepositoryConfig(name)
-	if err != nil {
-		return nil, err
-	}
-
-	var cred *credentials.Credential
-	if conf.Credential != "" {
-		cred, err = cconf.GetCredential(conf.Credential)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	resolver, err := oci.New(conf.Reference, cred)
-	if err != nil {
-		return nil, err
-	}
-
-	src := &Source[R]{
+func New[R Resource](resolver Resolver) *Source[R] {
+	return &Source[R]{
 		resolver: resolver,
 	}
-
-	return src, nil
 }
 
 func (s *Source[R]) View(ctx context.Context, _ core.Metadata, r R) error {

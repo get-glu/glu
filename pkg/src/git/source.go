@@ -5,21 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/get-glu/glu/internal/git"
-	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/controllers"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/fs"
-	"github.com/get-glu/glu/pkg/scm/github"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	giturls "github.com/whilp/git-urls"
 )
 
 var _ controllers.Source[Resource] = (*Source[Resource])(nil)
@@ -31,11 +24,8 @@ type Resource interface {
 }
 
 type Source[A Resource] struct {
-	name string
-	conf *config.Repository
-
 	mu            sync.RWMutex
-	source        *git.Repository
+	repo          *git.Repository
 	proposer      core.Proposer
 	proposeChange bool
 	autoMerge     bool
@@ -52,130 +42,19 @@ func AutoMerge[A Resource](i *Source[A]) {
 	i.autoMerge = true
 }
 
-type ConfigSource interface {
-	GitRepositoryConfig(name string) (*config.Repository, error)
-	GetCredential(name string) (*credentials.Credential, error)
-}
-
-func NewSource[A Resource](
-	ctx context.Context,
-	name string,
-	cconf ConfigSource,
-	opts ...containers.Option[Source[A]],
-) (_ *Source[A], err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("git %q: %w", name, err)
-		}
-	}()
-
-	conf, err := cconf.GitRepositoryConfig(name)
-	if err != nil {
-		return nil, err
+func NewSource[A Resource](repo *git.Repository, proposer core.Proposer, opts ...containers.Option[Source[A]]) (_ *Source[A]) {
+	source := &Source[A]{
+		repo:     repo,
+		proposer: proposer,
 	}
 
-	var (
-		method transport.AuthMethod
-		repo   = &Source[A]{
-			conf: conf,
-			name: name,
-		}
-		srcOpts = []containers.Option[git.Repository]{}
-	)
+	containers.ApplyAll(source, opts...)
 
-	containers.ApplyAll(repo, opts...)
-
-	if conf.Path != "" {
-		srcOpts = append(srcOpts, git.WithFilesystemStorage(conf.Path))
-	}
-
-	if conf.Remote != nil {
-		slog.Debug("configuring remote", "remote", conf.Remote.Name)
-
-		srcOpts = append(srcOpts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
-
-		if conf.Remote.Credential != "" {
-			creds, err := cconf.GetCredential(conf.Remote.Credential)
-			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-
-			method, err = creds.GitAuthentication()
-			if err != nil {
-				return nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-		}
-	}
-
-	if method == nil {
-		method, err = ssh.DefaultAuthBuilder("git")
-		if err != nil {
-			return nil, err
-		}
-
-	}
-
-	repo.source, err = git.NewRepository(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
-	if err != nil {
-		return nil, err
-	}
-
-	if conf.Proposals != nil {
-		repoURL, err := giturls.Parse(conf.Remote.URL)
-		if err != nil {
-			return nil, err
-		}
-
-		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
-		if len(parts) < 2 {
-			return nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
-		}
-
-		var (
-			repoOwner = parts[0]
-			repoName  = strings.TrimSuffix(parts[1], ".git")
-		)
-
-		var proposalsEnabled bool
-		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
-			creds, err := cconf.GetCredential(conf.Proposals.Credential)
-			if err != nil {
-				return nil, err
-			}
-
-			client, err := creds.GitHubClient(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			repo.proposer = github.New(
-				client.PullRequests,
-				repoOwner,
-				repoName,
-			)
-		}
-
-		slog.Debug("configured scm proposer",
-			slog.String("owner", repoOwner),
-			slog.String("name", repoName),
-			slog.Bool("proposals_enabled", proposalsEnabled),
-		)
-	}
-
-	return repo, nil
+	return source
 }
 
 type Branched interface {
 	Branch() string
-}
-
-func (g *Source[A]) getBranch(r core.Resource) string {
-	branch := g.conf.DefaultBranch
-	if branched, ok := r.(Branched); ok {
-		branch = branched.Branch()
-	}
-
-	return branch
 }
 
 func (g *Source[A]) View(ctx context.Context, meta core.Metadata, r A) error {
@@ -184,13 +63,18 @@ func (g *Source[A]) View(ctx context.Context, meta core.Metadata, r A) error {
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
-	if err := g.source.Fetch(ctx); err != nil {
+	if err := g.repo.Fetch(ctx); err != nil {
 		return err
 	}
 
-	return g.source.View(ctx, g.getBranch(r), func(hash plumbing.Hash, fs fs.Filesystem) error {
+	opts := []containers.Option[git.ViewUpdateOptions]{}
+	if branched, ok := core.Resource(r).(Branched); ok {
+		opts = append(opts, git.WithBranch(branched.Branch()))
+	}
+
+	return g.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
 		return r.ReadFrom(ctx, meta, fs)
-	})
+	}, opts...)
 }
 
 func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) error {
@@ -201,7 +85,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
-	if err := g.source.Fetch(ctx); err != nil {
+	if err := g.repo.Fetch(ctx); err != nil {
 		return err
 	}
 
@@ -214,14 +98,14 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 		return message, nil
 	}
 
-	baseBranch := g.getBranch(to)
-	if !g.proposeChange {
-		// direct to phase branch without attempting proposals
-		if err := g.source.CreateBranchIfNotExists(baseBranch); err != nil {
-			return err
-		}
+	// use the target resources branch if it implementes an override
+	baseBranch := g.repo.DefaultBranch()
+	if branched, ok := core.Resource(to).(Branched); ok {
+		baseBranch = branched.Branch()
+	}
 
-		if _, err := g.source.UpdateAndPush(ctx, baseBranch, nil, update); err != nil {
+	if !g.proposeChange {
+		if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(baseBranch)); err != nil {
 			if errors.Is(err, git.ErrEmptyCommit) {
 				slog.Info("reconcile produced no changes")
 
@@ -238,7 +122,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 		return errors.New("proposal requested but not configured")
 	}
 
-	baseRev, err := g.source.Resolve(baseBranch)
+	baseRev, err := g.repo.Resolve(baseBranch)
 	if err != nil {
 		return err
 	}
@@ -250,7 +134,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 
 	// create branch name and check if this phase, resource and state has previously been observed
 	branch := fmt.Sprintf("glu/%s/%s", meta.Name, digest)
-	if _, err := g.source.Resolve(branch); err != nil {
+	if _, err := g.repo.Resolve(branch); err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return err
 		}
@@ -275,7 +159,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 				return nil
 			}
 
-			if _, err := g.source.UpdateAndPush(ctx, branch, nil, update); err != nil {
+			if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(branch)); err != nil {
 				if errors.Is(err, git.ErrEmptyCommit) {
 					slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
 
@@ -298,11 +182,11 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 		}
 	}
 
-	if err := g.source.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
+	if err := g.repo.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
 		return err
 	}
 
-	if _, err := g.source.UpdateAndPush(ctx, branch, nil, update); err != nil {
+	if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(branch)); err != nil {
 		if errors.Is(err, git.ErrEmptyCommit) {
 			slog.Info("reconcile produced no changes")
 

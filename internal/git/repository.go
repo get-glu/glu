@@ -65,7 +65,7 @@ func NewRepository(ctx context.Context, logger *slog.Logger, opts ...containers.
 	if empty {
 		logger.Warn("repository empty, attempting to add and push a README")
 		// add initial readme if repo is empty
-		if _, err := repo.UpdateAndPush(ctx, repo.defaultBranch, nil, func(fs fs.Filesystem) (string, error) {
+		if _, err := repo.UpdateAndPush(ctx, func(fs fs.Filesystem) (string, error) {
 			fi, err := fs.OpenFile("README.md", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 			if err != nil {
 				return "", err
@@ -97,9 +97,9 @@ func newRepository(ctx context.Context, logger *slog.Logger, opts ...containers.
 	r := &Repository{
 		logger:        logger,
 		defaultBranch: "main",
-		sigName:       "example",
-		sigEmail:      "something@example.com",
-		readme:        []byte(`# Reprise Configuration Repository`),
+		sigName:       "glu bot",
+		sigEmail:      "bot@get-glu.dev",
+		readme:        []byte(`# Glu Configuration Repository`),
 		// we initialize with a noop function incase
 		// we dont start the polling loop
 		cancel: func() {},
@@ -213,6 +213,10 @@ func (r *Repository) startPolling(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (r *Repository) DefaultBranch() string {
+	return r.defaultBranch
 }
 
 func (r *Repository) Close() error {
@@ -350,13 +354,38 @@ func (r *Repository) ListCommits(ctx context.Context, branch, from string, filte
 	}), nil
 }
 
-func (r *Repository) View(ctx context.Context, branch string, fn func(hash plumbing.Hash, fs fs.Filesystem) error) (err error) {
+type ViewUpdateOptions struct {
+	branch   string
+	revision *plumbing.Hash
+}
+
+func (r *Repository) getOptions(opts ...containers.Option[ViewUpdateOptions]) *ViewUpdateOptions {
+	defaultOptions := &ViewUpdateOptions{branch: r.defaultBranch}
+	containers.ApplyAll(defaultOptions, opts...)
+	return defaultOptions
+}
+
+func WithBranch(branch string) containers.Option[ViewUpdateOptions] {
+	return func(vuo *ViewUpdateOptions) {
+		vuo.branch = branch
+	}
+}
+
+func WithRevision(rev *plumbing.Hash) containers.Option[ViewUpdateOptions] {
+	return func(vuo *ViewUpdateOptions) {
+		vuo.revision = rev
+	}
+}
+
+func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[ViewUpdateOptions]) (err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	r.logger.Debug("View", slog.String("branch", branch))
+	options := r.getOptions(opts...)
 
-	hash, err := r.Resolve(branch)
+	r.logger.Debug("View", slog.String("branch", options.branch))
+
+	hash, err := r.Resolve(options.branch)
 	if err != nil {
 		return err
 	}
@@ -369,9 +398,15 @@ func (r *Repository) View(ctx context.Context, branch string, fn func(hash plumb
 	return fn(hash, fs)
 }
 
-func (r *Repository) UpdateAndPush(ctx context.Context, branch string, rev *plumbing.Hash, fn func(fs fs.Filesystem) (string, error)) (hash plumbing.Hash, err error) {
+func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem) (string, error), opts ...containers.Option[ViewUpdateOptions]) (hash plumbing.Hash, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	var (
+		options = r.getOptions(opts...)
+		branch  = options.branch
+		rev     = options.revision
+	)
 
 	hash, err = r.Resolve(branch)
 	if err != nil {

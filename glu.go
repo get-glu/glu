@@ -8,17 +8,22 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"text/tabwriter"
 	"time"
 
+	"github.com/get-glu/glu/internal/git"
+	"github.com/get-glu/glu/internal/oci"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
-	"github.com/get-glu/glu/pkg/src/git"
-	"github.com/get-glu/glu/pkg/src/oci"
+	"github.com/get-glu/glu/pkg/scm/github"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	giturls "github.com/whilp/git-urls"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -30,8 +35,20 @@ type Metadata = core.Metadata
 
 type Resource = core.Resource
 
-func Name(name string) Metadata {
-	return Metadata{Name: name}
+func Name(name string, opts ...containers.Option[Metadata]) Metadata {
+	meta := Metadata{Name: name}
+	containers.ApplyAll(&meta, opts...)
+	return meta
+}
+
+func Label(k, v string) containers.Option[Metadata] {
+	return func(m *core.Metadata) {
+		if m.Labels == nil {
+			m.Labels = map[string]string{}
+		}
+
+		m.Labels[k] = v
+	}
 }
 
 func NewPipeline[R core.Resource](meta Metadata, newFn func() R) *core.Pipeline[R] {
@@ -63,7 +80,7 @@ func NewSystem() *System {
 	return r
 }
 
-func (s *System) AddPipeline(fn func(Config) (Pipeline, error)) *System {
+func (s *System) AddPipeline(fn func(*Config) (Pipeline, error)) *System {
 	config, err := s.configuration()
 	if err != nil {
 		s.err = err
@@ -80,7 +97,7 @@ func (s *System) AddPipeline(fn func(Config) (Pipeline, error)) *System {
 	return s
 }
 
-func (s *System) configuration() (_ Config, err error) {
+func (s *System) configuration() (_ *Config, err error) {
 	if s.conf != nil {
 		return newConfigSource(s.conf), nil
 	}
@@ -379,41 +396,133 @@ func (s *System) run(ctx context.Context) error {
 	}
 }
 
-type Config interface {
-	git.ConfigSource
-	oci.ConfigSource
-}
-
-type configSource struct {
+type Config struct {
 	conf  *config.Config
 	creds *credentials.CredentialSource
 }
 
-func newConfigSource(conf *config.Config) *configSource {
-	return &configSource{
+func newConfigSource(conf *config.Config) *Config {
+	return &Config{
 		conf:  conf,
 		creds: credentials.New(conf.Credentials),
 	}
 }
 
-func (c *configSource) GitRepositoryConfig(name string) (*config.Repository, error) {
+func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer core.Proposer, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("git %q: %w", name, err)
+		}
+	}()
+
 	conf, ok := c.conf.Sources.Git[name]
 	if !ok {
-		return nil, fmt.Errorf("git %q: configuration not found", name)
+		return nil, nil, errors.New("configuration not found")
 	}
 
-	return conf, nil
+	var (
+		method  transport.AuthMethod
+		srcOpts = []containers.Option[git.Repository]{
+			git.WithDefaultBranch(conf.DefaultBranch),
+		}
+	)
+
+	if conf.Path != "" {
+		srcOpts = append(srcOpts, git.WithFilesystemStorage(conf.Path))
+	}
+
+	if conf.Remote != nil {
+		slog.Debug("configuring remote", "remote", conf.Remote.Name)
+
+		srcOpts = append(srcOpts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
+
+		if conf.Remote.Credential != "" {
+			creds, err := c.creds.Get(conf.Remote.Credential)
+			if err != nil {
+				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
+			}
+
+			method, err = creds.GitAuthentication()
+			if err != nil {
+				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
+			}
+		}
+	}
+
+	if method == nil {
+		method, err = ssh.DefaultAuthBuilder("git")
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	repo, err := git.NewRepository(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if conf.Proposals != nil {
+		repoURL, err := giturls.Parse(conf.Remote.URL)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
+		if len(parts) < 2 {
+			return nil, nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
+		}
+
+		var (
+			repoOwner = parts[0]
+			repoName  = strings.TrimSuffix(parts[1], ".git")
+		)
+
+		var proposalsEnabled bool
+		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
+			creds, err := c.creds.Get(conf.Proposals.Credential)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			client, err := creds.GitHubClient(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			proposer = github.New(
+				client.PullRequests,
+				repoOwner,
+				repoName,
+			)
+		}
+
+		slog.Debug("configured scm proposer",
+			slog.String("owner", repoOwner),
+			slog.String("name", repoName),
+			slog.Bool("proposals_enabled", proposalsEnabled),
+		)
+	}
+
+	return repo, proposer, nil
 }
 
-func (c *configSource) OCIRepositoryConfig(name string) (*config.OCIRepository, error) {
+func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 	conf, ok := c.conf.Sources.OCI[name]
 	if !ok {
 		return nil, fmt.Errorf("oci %q: configuration not found", name)
 	}
 
-	return conf, nil
+	var cred *credentials.Credential
+	if conf.Credential != "" {
+		cred, err = c.creds.Get(conf.Credential)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return oci.New(conf.Reference, cred)
 }
 
-func (c *configSource) GetCredential(name string) (*credentials.Credential, error) {
+func (c *Config) GetCredential(name string) (*credentials.Credential, error) {
 	return c.creds.Get(name)
 }
