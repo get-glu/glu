@@ -62,6 +62,7 @@ type Pipeline interface {
 }
 
 type System struct {
+	ctx       context.Context
 	conf      *config.Config
 	pipelines map[string]Pipeline
 	schedules []Schedule
@@ -70,8 +71,9 @@ type System struct {
 	server *Server
 }
 
-func NewSystem() *System {
+func NewSystem(ctx context.Context) *System {
 	r := &System{
+		ctx:       ctx,
 		pipelines: map[string]Pipeline{},
 	}
 
@@ -80,14 +82,14 @@ func NewSystem() *System {
 	return r
 }
 
-func (s *System) AddPipeline(fn func(*Config) (Pipeline, error)) *System {
+func (s *System) AddPipeline(fn func(context.Context, *Config) (Pipeline, error)) *System {
 	config, err := s.configuration()
 	if err != nil {
 		s.err = err
 		return s
 	}
 
-	pipe, err := fn(config)
+	pipe, err := fn(s.ctx, config)
 	if err != nil {
 		s.err = err
 		return s
@@ -119,12 +121,12 @@ func (s *System) configuration() (_ *Config, err error) {
 	return newConfigSource(s.conf), nil
 }
 
-func (s *System) Run(ctx context.Context) error {
+func (s *System) Run() error {
 	if s.err != nil {
 		return s.err
 	}
 
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(s.ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	if len(os.Args) > 1 {

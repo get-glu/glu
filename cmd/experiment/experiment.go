@@ -17,7 +17,7 @@ import (
 )
 
 func run(ctx context.Context) error {
-	return glu.NewSystem().AddPipeline(func(config *glu.Config) (glu.Pipeline, error) {
+	return glu.NewSystem(ctx).AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
 		// fetch the configured OCI repositority source named "checkout"
 		ociRepo, err := config.OCIRepository("checkout")
 		if err != nil {
@@ -57,7 +57,7 @@ func run(ctx context.Context) error {
 		glu.ScheduleMatchesLabel("env", "staging"),
 		// alternatively, the controller instance can be target directly with:
 		// glu.ScheduleMatchesController(gitStaging),
-	).Run(ctx)
+	).Run()
 }
 
 type CheckoutResource struct {
