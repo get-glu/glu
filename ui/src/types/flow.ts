@@ -8,7 +8,7 @@ export interface FlowPipeline {
 
 export interface PipelineNode extends Node {
   type: 'phase' | 'group';
-  data: PhaseData | { label: string };
+  data: PhaseData | { labels: Record<string, string> };
   parentNode?: string;
 }
 

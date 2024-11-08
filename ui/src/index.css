@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+.react-flow__handle {
+  opacity: 0;
+}
 @layer base {
   :root {
     --background: 0 0% 100%;

@@ -11,6 +11,7 @@ export interface Phase {
   type: 'oci' | 'staging' | 'production';
   dependsOn?: string;
   pipelineId: string;
+  labels?: Record<string, string>;
 }
 
 export interface PhaseData extends Record<string, unknown> {
