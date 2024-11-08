@@ -47,6 +47,7 @@ func (c *Credential) validate() error {
 		}
 	case CredentialTypeGitHubApp:
 		return c.GitHubApp.validate()
+	case CredentialTypeDockerLocal:
 	default:
 		return fmt.Errorf("unexpected credential type %q", c.Type)
 	}
