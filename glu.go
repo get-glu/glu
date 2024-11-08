@@ -66,7 +66,7 @@ type Pipeline interface {
 
 type System struct {
 	ctx       context.Context
-	conf      *config.Config
+	conf      *Config
 	pipelines map[string]Pipeline
 	schedules []Schedule
 	err       error
@@ -104,16 +104,16 @@ func (s *System) AddPipeline(fn func(context.Context, *Config) (Pipeline, error)
 
 func (s *System) configuration() (_ *Config, err error) {
 	if s.conf != nil {
-		return newConfigSource(s.conf), nil
+		return s.conf, nil
 	}
 
-	s.conf, err = config.ReadFromPath("glu.yaml")
+	conf, err := config.ReadFromPath("glu.yaml")
 	if err != nil {
 		return nil, err
 	}
 
 	var level slog.Level
-	if err := level.UnmarshalText([]byte(s.conf.Log.Level)); err != nil {
+	if err := level.UnmarshalText([]byte(conf.Log.Level)); err != nil {
 		return nil, err
 	}
 
@@ -121,7 +121,9 @@ func (s *System) configuration() (_ *Config, err error) {
 		Level: level,
 	})))
 
-	return newConfigSource(s.conf), nil
+	s.conf = newConfigSource(conf)
+
+	return s.conf, nil
 }
 
 func (s *System) Run() error {
