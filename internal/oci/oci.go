@@ -21,7 +21,7 @@ func New(reference string, cred *credentials.Credential) (_ *Repository, err err
 	}
 
 	if cred != nil {
-		repo.Client, err = cred.OCIClient(repo.Reference.Repository)
+		repo.Client, err = cred.OCIClient(repo.Reference.Registry)
 		if err != nil {
 			return nil, err
 		}
