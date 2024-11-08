@@ -28,8 +28,8 @@ func (o OCIRepositories) validate() error {
 }
 
 type OCIRepository struct {
-	Reference  string
-	Credential string
+	Reference  string `glu:"reference"`
+	Credential string `glu:"credential"`
 }
 
 func (o *OCIRepository) setDefaults() error {
