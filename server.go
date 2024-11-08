@@ -39,7 +39,7 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/controller/{phase}", s.getController)
+		r.Get("/pipelines/{pipeline}/controller/{controller}", s.getController)
 	})
 }
 
