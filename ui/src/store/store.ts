@@ -1,10 +1,8 @@
 import { configureStore } from '@reduxjs/toolkit';
-import pipelineReducer from './pipelineSlice';
 import flowReducer from './flowSlice';
 
 export const store = configureStore({
   reducer: {
-    pipeline: pipelineReducer,
     flow: flowReducer
   }
 });
