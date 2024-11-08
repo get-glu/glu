@@ -16,72 +16,49 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// func main() {
-// 	ctx := context.Background()
-// 	if err := run(ctx); err != nil {
-// 		fmt.Fprintln(os.Stderr, err)
-// 		os.Exit(1)
-// 	}
-// }
-
 func run(ctx context.Context) error {
-	system := glu.NewSystem()
-	config, err := system.Configuration()
-	if err != nil {
-		return err
-	}
+	return glu.NewSystem().AddPipeline(func(config glu.Config, sch glu.Scheduler) (glu.Pipeline, error) {
+		ociSource, err := oci.New[*CheckoutResource]("checkout", config)
+		if err != nil {
+			return nil, err
+		}
 
-	ociSource, err := oci.New[*CheckoutResource]("checkout", config)
-	if err != nil {
-		return err
-	}
+		gitSource, err := git.NewSource[*CheckoutResource](ctx, "checkout", config, git.ProposeChanges, git.AutoMerge)
+		if err != nil {
+			return nil, err
+		}
 
-	gitSource, err := git.NewSource[*CheckoutResource](ctx, "checkout", config, git.ProposeChanges, git.AutoMerge)
-	if err != nil {
-		return err
-	}
+		// create initial (empty) pipeline
+		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
 
-	var (
-		pipeline = glu.NewPipeline(glu.Metadata{
-			Name: "checkout",
-		},
-			NewCheckoutResource,
+		// build a controller which sources from the OCI repository
+		ociController := controllers.New(glu.Name("oci"), pipeline, ociSource)
+
+		// build a controller for the staging environment which source from the git repository
+		// configure it to promote from the OCI controller
+		gitStaging := controllers.New(glu.Metadata{
+			Name:   "git-staging",
+			Labels: map[string]string{"env": "staging"},
+		}, pipeline, gitSource, core.PromotesFrom(ociController))
+
+		// build a controller for the production environment which source from the git repository
+		// configure it to promote from the staging git controller
+		_ = controllers.New(core.Metadata{
+			Name:   "git-production",
+			Labels: map[string]string{"env": "production"},
+		}, pipeline, gitSource, core.PromotesFrom(gitStaging))
+
+		// schedule a reconcile of any controllers with the label pair env=staging
+		sch.ScheduleReconcile(
+			glu.ScheduleInterval(10*time.Second),
+			glu.ScheduleMatchesLabel("env", "staging"),
+			// alternatively, the controller instance can be target directly with:
+			// glu.ScheduleMatchesController(gitStaging),
 		)
-	)
 
-	// oci controller
-	ociController := controllers.New(core.Metadata{
-		Name: "oci",
-	}, pipeline, ociSource)
-
-	// staging git controller
-	gitStaging := controllers.New(core.Metadata{
-		Name:   "git-staging",
-		Labels: map[string]string{"env": "staging"},
-	}, pipeline, gitSource,
-		// depends on oci upstream controller
-		core.DependsOn(ociController))
-
-	// force a reconcile of the staging instance every 10 seconds
-	system.ScheduleReconcile(
-		glu.ScheduleInterval(10*time.Second),
-		glu.ScheduleMatchesController(gitStaging),
-		// alternatively, labels can be matched to reconcile all
-		// controllers with a common label k/v pair:
-		// glu.ScheduleMatchesLabel("env", "staging"),
-	)
-
-	// construct and register production phase controller
-	controllers.New(core.Metadata{
-		Name:   "git-production",
-		Labels: map[string]string{"env": "production"},
-	}, pipeline, gitSource,
-		core.DependsOn(gitStaging))
-
-	// register pipeline on system
-	system.AddPipeline(pipeline)
-
-	return system.Run(ctx)
+		// return configured pipeline to the system
+		return pipeline, nil
+	}).Run(ctx)
 }
 
 type CheckoutResource struct {

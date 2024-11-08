@@ -30,6 +30,10 @@ type Metadata = core.Metadata
 
 type Resource = core.Resource
 
+func Name(name string) Metadata {
+	return Metadata{Name: name}
+}
+
 func NewPipeline[R core.Resource](meta Metadata, newFn func(Metadata) R) *core.Pipeline[R] {
 	return core.NewPipeline(meta, newFn)
 }
@@ -44,6 +48,7 @@ type System struct {
 	conf      *config.Config
 	pipelines map[string]Pipeline
 	schedules []Schedule
+	err       error
 
 	server *Server
 }
@@ -58,11 +63,28 @@ func NewSystem() *System {
 	return r
 }
 
-func (s *System) AddPipeline(pipeline Pipeline) {
-	s.pipelines[pipeline.Metadata().Name] = pipeline
+type Scheduler interface {
+	ScheduleReconcile(opts ...containers.Option[Schedule])
 }
 
-func (s *System) Configuration() (_ Config, err error) {
+func (s *System) AddPipeline(fn func(Config, Scheduler) (Pipeline, error)) *System {
+	config, err := s.configuration()
+	if err != nil {
+		s.err = err
+		return s
+	}
+
+	pipe, err := fn(config, s)
+	if err != nil {
+		s.err = err
+		return s
+	}
+
+	s.pipelines[pipe.Metadata().Name] = pipe
+	return s
+}
+
+func (s *System) configuration() (_ Config, err error) {
 	if s.conf != nil {
 		return newConfigSource(s.conf), nil
 	}
@@ -85,6 +107,10 @@ func (s *System) Configuration() (_ Config, err error) {
 }
 
 func (s *System) Run(ctx context.Context) error {
+	if s.err != nil {
+		return s.err
+	}
+
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
