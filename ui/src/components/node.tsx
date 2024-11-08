@@ -2,13 +2,13 @@ import { Handle, Position } from '@xyflow/react';
 import { Package, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-interface PhaseData {
-  label: string;
+interface ControllerData {
+  name: string;
   type: string;
   labels?: Record<string, string>;
 }
 
-const PhaseNode = ({ data }: { data: PhaseData }) => {
+const ControllerNode = ({ data }: { data: ControllerData }) => {
   const getIcon = () => {
     switch (data.type) {
       case 'oci':
@@ -24,7 +24,7 @@ const PhaseNode = ({ data }: { data: PhaseData }) => {
 
       <div className="flex items-center gap-2">
         {getIcon()}
-        <span className="text-sm font-medium">{data.label}</span>
+        <span className="text-sm font-medium">{data.name}</span>
       </div>
 
       {data.labels && Object.entries(data.labels).length > 0 && (
@@ -64,4 +64,4 @@ function getLabelColor(key: string, value: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export { PhaseNode };
+export { ControllerNode };
