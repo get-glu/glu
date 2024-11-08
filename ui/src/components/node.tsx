@@ -20,7 +20,7 @@ const ControllerNode = ({ data }: { data: ControllerData }) => {
 
   return (
     <div className="relative min-h-[80px] min-w-[200px] rounded-lg border bg-background p-6 shadow-lg">
-      <Handle type="target" position={Position.Right} style={{ right: -8 }} />
+      <Handle type="source" position={Position.Right} style={{ right: -8 }} />
 
       <div className="flex items-center gap-2">
         {getIcon()}
@@ -40,7 +40,7 @@ const ControllerNode = ({ data }: { data: ControllerData }) => {
         </div>
       )}
 
-      <Handle type="source" position={Position.Left} style={{ left: -8 }} />
+      <Handle type="target" position={Position.Left} style={{ left: -8 }} />
     </div>
   );
 };

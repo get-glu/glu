@@ -63,6 +63,7 @@ export default function Workflow() {
               height: 20,
               color: 'currentColor'
             },
+            animated: true,
             selectable: false,
             style: {
               strokeWidth: 2
@@ -142,8 +143,8 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
       if (controller.depends_on) {
         edges.push({
           id: `edge-${controller.depends_on}-${controller.name}`,
-          target: controller.depends_on,
-          source: controller.name
+          source: controller.depends_on,
+          target: controller.name
         });
       }
     });
