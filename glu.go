@@ -381,13 +381,25 @@ func (s *System) run(ctx context.Context) error {
 type Config struct {
 	conf  *config.Config
 	creds *credentials.CredentialSource
+
+	cache struct {
+		oci      map[string]*oci.Repository
+		repo     map[string]*git.Repository
+		proposer map[string]core.Proposer
+	}
 }
 
 func newConfigSource(conf *config.Config) *Config {
-	return &Config{
+	c := &Config{
 		conf:  conf,
 		creds: credentials.New(conf.Credentials),
 	}
+
+	c.cache.oci = map[string]*oci.Repository{}
+	c.cache.repo = map[string]*git.Repository{}
+	c.cache.proposer = map[string]core.Proposer{}
+
+	return c
 }
 
 func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer core.Proposer, err error) {
@@ -396,6 +408,11 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 			err = fmt.Errorf("git %q: %w", name, err)
 		}
 	}()
+
+	// check cache for previously built repository
+	if repo, ok := c.cache.repo[name]; ok {
+		return repo, c.cache.proposer[name], nil
+	}
 
 	conf, ok := c.conf.Sources.Git[name]
 	if !ok {
@@ -485,10 +502,18 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		)
 	}
 
+	c.cache.repo[name] = repo
+	c.cache.proposer[name] = proposer
+
 	return repo, proposer, nil
 }
 
 func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
+	// check cache for previously built repository
+	if repo, ok := c.cache.oci[name]; ok {
+		return repo, nil
+	}
+
 	conf, ok := c.conf.Sources.OCI[name]
 	if !ok {
 		return nil, fmt.Errorf("oci %q: configuration not found", name)
@@ -502,7 +527,14 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 		}
 	}
 
-	return oci.New(conf.Reference, cred)
+	repo, err := oci.New(conf.Reference, cred)
+	if err != nil {
+		return nil, err
+	}
+
+	c.cache.oci[name] = repo
+
+	return repo, nil
 }
 
 func (c *Config) GetCredential(name string) (*credentials.Credential, error) {
