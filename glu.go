@@ -63,18 +63,14 @@ func NewSystem() *System {
 	return r
 }
 
-type Scheduler interface {
-	ScheduleReconcile(opts ...containers.Option[Schedule])
-}
-
-func (s *System) AddPipeline(fn func(Config, Scheduler) (Pipeline, error)) *System {
+func (s *System) AddPipeline(fn func(Config) (Pipeline, error)) *System {
 	config, err := s.configuration()
 	if err != nil {
 		s.err = err
 		return s
 	}
 
-	pipe, err := fn(config, s)
+	pipe, err := fn(config)
 	if err != nil {
 		s.err = err
 		return s
@@ -305,7 +301,7 @@ func (s Schedule) matches(c core.Controller) bool {
 	return true
 }
 
-func (s *System) ScheduleReconcile(opts ...containers.Option[Schedule]) {
+func (s *System) ScheduleReconcile(opts ...containers.Option[Schedule]) *System {
 	sch := Schedule{
 		interval: defaultScheduleInternal,
 	}
@@ -313,6 +309,8 @@ func (s *System) ScheduleReconcile(opts ...containers.Option[Schedule]) {
 	containers.ApplyAll(&sch, opts...)
 
 	s.schedules = append(s.schedules, sch)
+
+	return s
 }
 
 func ScheduleInterval(d time.Duration) containers.Option[Schedule] {

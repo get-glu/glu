@@ -17,7 +17,7 @@ import (
 )
 
 func run(ctx context.Context) error {
-	return glu.NewSystem().AddPipeline(func(config glu.Config, sch glu.Scheduler) (glu.Pipeline, error) {
+	return glu.NewSystem().AddPipeline(func(config glu.Config) (glu.Pipeline, error) {
 		ociSource, err := oci.New[*CheckoutResource]("checkout", config)
 		if err != nil {
 			return nil, err
@@ -48,17 +48,14 @@ func run(ctx context.Context) error {
 			Labels: map[string]string{"env": "production"},
 		}, pipeline, gitSource, core.PromotesFrom(gitStaging))
 
-		// schedule a reconcile of any controllers with the label pair env=staging
-		sch.ScheduleReconcile(
-			glu.ScheduleInterval(10*time.Second),
-			glu.ScheduleMatchesLabel("env", "staging"),
-			// alternatively, the controller instance can be target directly with:
-			// glu.ScheduleMatchesController(gitStaging),
-		)
-
 		// return configured pipeline to the system
 		return pipeline, nil
-	}).Run(ctx)
+	}).ScheduleReconcile(
+		glu.ScheduleInterval(10*time.Second),
+		glu.ScheduleMatchesLabel("env", "staging"),
+		// alternatively, the controller instance can be target directly with:
+		// glu.ScheduleMatchesController(gitStaging),
+	).Run(ctx)
 }
 
 type CheckoutResource struct {
