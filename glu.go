@@ -167,29 +167,9 @@ func (s *System) Run() error {
 func (s *System) runOnce(ctx context.Context) error {
 	switch os.Args[1] {
 	case "inspect":
-		if len(os.Args) < 3 {
-			return fmt.Errorf("inspect <kind> (expected kind argument (one of [pipeline phase]))")
-		}
-
-		// inspect <kind> ...
-		switch os.Args[2] {
-		case "pipeline":
-			return s.inspectPipeline(ctx, os.Args[3:]...)
-		default:
-			return fmt.Errorf("unexpected kind: %q", os.Args[2])
-		}
+		return s.inspect(ctx, os.Args[2:]...)
 	case "reconcile":
-		if len(os.Args) < 3 {
-			return fmt.Errorf("reconcile <kind> (expected kind argument (one of [pipeline phase]))")
-		}
-
-		// reconcile <kind> ...
-		switch os.Args[2] {
-		case "pipeline":
-			return s.reconcilePipeline(ctx, os.Args[2:]...)
-		default:
-			return fmt.Errorf("unexpected kind: %q", os.Args[2])
-		}
+		return s.reconcile(ctx, os.Args[2:]...)
 	default:
 		return fmt.Errorf("unexpected command %q (expected one of [inspect reconcile])", os.Args[1])
 	}
@@ -204,7 +184,7 @@ func (s *System) getPipeline(name string) (Pipeline, error) {
 	return pipeline, nil
 }
 
-func (s *System) inspectPipeline(ctx context.Context, args ...string) (err error) {
+func (s *System) inspect(ctx context.Context, args ...string) (err error) {
 	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	defer func() {
 		if ferr := wr.Flush(); ferr != nil && err == nil {
@@ -275,7 +255,7 @@ type fields interface {
 	PrinterFields() [][2]string
 }
 
-func (s *System) reconcilePipeline(ctx context.Context, args ...string) error {
+func (s *System) reconcile(ctx context.Context, args ...string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("reconcile <pipeline> <controller>")
 	}
