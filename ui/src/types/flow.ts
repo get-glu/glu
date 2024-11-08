@@ -1,5 +1,4 @@
 import { Node } from '@xyflow/react';
-import { PhaseData } from './pipeline';
 
 export interface FlowPipeline {
   nodes: PipelineNode[];
@@ -7,8 +6,8 @@ export interface FlowPipeline {
 }
 
 export interface PipelineNode extends Node {
-  type: 'phase' | 'group';
-  data: PhaseData | { labels: Record<string, string> };
+  type: 'controller' | 'group';
+  data: any;
   parentNode?: string;
 }
 

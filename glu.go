@@ -152,6 +152,7 @@ func (s *System) Run() error {
 	group.Go(func() error {
 		slog.Info("starting server", "addr", ":8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			cancel()
 			return err
 		}
 		return nil

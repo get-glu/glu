@@ -1,22 +1,25 @@
 package glu
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Server struct {
-	registry *System
-	router   *chi.Mux
+	system *System
+	router *chi.Mux
 }
 
-func newServer(registry *System) *Server {
+func newServer(system *System) *Server {
 	s := &Server{
-		registry: registry,
-		router:   chi.NewRouter(),
+		system: system,
+		router: chi.NewRouter(),
 	}
 
 	s.setupRoutes()
@@ -30,6 +33,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+	s.router.Use(middleware.SetHeader("Content-Type", "application/json"))
+	s.router.Use(middleware.StripSlashes)
 
 	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -39,52 +44,103 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/controller/{controller}", s.getController)
+		r.Get("/pipelines/{pipeline}/controllers/{controller}", s.getController)
 	})
 }
 
 type listPipelinesResponse struct {
-	// TODO: return registry metadata
+	// TODO: does a system have metadata?
+	//	Metadata  Metadata           `json:"metadata"`
 	Pipelines []pipelineResponse `json:"pipelines"`
 }
 
 type pipelineResponse struct {
-	// TODO: return pipeline metadata
 	Name        string               `json:"name"`
-	Controllers []controllerResponse `json:"controllers"`
+	Labels      map[string]string    `json:"labels,omitempty"`
+	Controllers []controllerResponse `json:"controllers,omitempty"`
 }
 
 type controllerResponse struct {
-	Name   string            `json:"name"`
-	Labels map[string]string `json:"labels"`
-	Value  interface{}       `json:"value"`
+	Name      string            `json:"name"`
+	DependsOn string            `json:"depends_on,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	Value     interface{}       `json:"value,omitempty"`
 }
 
-func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
+// Helper functions
+func (s *Server) getPipelineByName(name string) (Pipeline, error) {
+	pipeline, ok := s.system.pipelines[name]
+	if !ok {
+		return nil, fmt.Errorf("pipeline not found")
+	}
+	return pipeline, nil
+}
+
+func (s *Server) createControllerResponse(controller core.Controller, dependencies map[core.Controller]core.Controller) controllerResponse {
 	var (
-		pipelines         = s.registry.pipelines
-		pipelineResponses = []pipelineResponse{}
+		dependsOn string
+		labels    map[string]string
 	)
 
-	for name, pipeline := range pipelines {
-		controllers := []controllerResponse{}
-		for name, controller := range pipeline.Controllers() {
-			v, err := controller.Get(r.Context())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			controllers = append(controllers, controllerResponse{
-				Name:  name,
-				Value: v,
-			})
+	if dependencies != nil {
+		if d, ok := dependencies[controller]; ok && d != nil {
+			dependsOn = d.Metadata().Name
 		}
+	}
 
-		pipelineResponses = append(pipelineResponses, pipelineResponse{
-			Name:        name,
-			Controllers: controllers,
-		})
+	if controller.Metadata().Labels != nil {
+		labels = controller.Metadata().Labels
+	}
+
+	return controllerResponse{
+		Name:      controller.Metadata().Name,
+		DependsOn: dependsOn,
+		Labels:    labels,
+	}
+}
+
+func (s *Server) createPipelineResponse(ctx context.Context, pipeline Pipeline) (pipelineResponse, error) {
+	dependencies := pipeline.Dependencies()
+	controllers := make([]controllerResponse, 0, len(pipeline.Controllers()))
+
+	for _, controller := range pipeline.Controllers() {
+		response := s.createControllerResponse(controller, dependencies)
+
+		v, err := controller.Get(ctx)
+		if err != nil {
+			return pipelineResponse{}, err
+		}
+		response.Value = v
+
+		controllers = append(controllers, response)
+	}
+
+	var labels map[string]string
+	if pipeline.Metadata().Labels != nil {
+		labels = pipeline.Metadata().Labels
+	}
+
+	return pipelineResponse{
+		Name:        pipeline.Metadata().Name,
+		Labels:      labels,
+		Controllers: controllers,
+	}, nil
+}
+
+// Handler methods
+func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
+	var (
+		ctx               = r.Context()
+		pipelineResponses = make([]pipelineResponse, 0, len(s.system.pipelines))
+	)
+
+	for _, pipeline := range s.system.pipelines {
+		response, err := s.createPipelineResponse(ctx, pipeline)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pipelineResponses = append(pipelineResponses, response)
 	}
 
 	// TODO: handle pagination
@@ -94,46 +150,31 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
-	pipelineName := chi.URLParam(r, "pipeline")
-	pipeline, ok := s.registry.pipelines[pipelineName]
-	if !ok {
-		http.Error(w, "pipeline not found", http.StatusNotFound)
+	ctx := r.Context()
+
+	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	controllers := []controllerResponse{}
-	for name, controller := range pipeline.Controllers() {
-		v, err := controller.Get(r.Context())
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		controllers = append(controllers, controllerResponse{
-			Name:   name,
-			Labels: controller.Metadata().Labels,
-			Value:  v,
-		})
+	response, err := s.createPipelineResponse(ctx, pipeline)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	json.NewEncoder(w).Encode(pipelineResponse{
-		Name:        pipelineName,
-		Controllers: controllers,
-	})
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
-	var (
-		pipelineName   = chi.URLParam(r, "pipeline")
-		controllerName = chi.URLParam(r, "controller")
-	)
-
-	pipeline, ok := s.registry.pipelines[pipelineName]
-	if !ok {
-		http.Error(w, "pipeline not found", http.StatusNotFound)
+	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	controllerName := chi.URLParam(r, "controller")
 	controller, ok := pipeline.Controllers()[controllerName]
 	if !ok {
 		http.Error(w, "controller not found", http.StatusNotFound)
@@ -146,9 +187,8 @@ func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(controllerResponse{
-		Name:   controller.Metadata().Name,
-		Labels: controller.Metadata().Labels,
-		Value:  v,
-	})
+	response := s.createControllerResponse(controller, pipeline.Dependencies())
+	response.Value = v
+
+	json.NewEncoder(w).Encode(response)
 }

@@ -1,22 +1,14 @@
 // Server-side pipeline types
 export interface Pipeline {
-  id: string;
   name: string;
-  phases: Phase[];
+  controllers: Controller[];
 }
 
-export interface Phase {
-  id: string;
+export interface Controller {
   name: string;
-  type: 'oci' | 'staging' | 'production';
-  dependsOn?: string;
-  pipelineId: string;
+  depends_on?: string;
   labels?: Record<string, string>;
-}
-
-export interface PhaseData extends Record<string, unknown> {
-  label: string;
-  type: 'oci' | 'staging' | 'production';
+  value?: unknown;
 }
 
 export interface PipelineGroup {
