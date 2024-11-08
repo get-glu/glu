@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"iter"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -274,7 +276,7 @@ func (l labels) Set(v string) error {
 }
 
 func (s *System) reconcile(ctx context.Context, args ...string) error {
-	const usage = `reconcile <pipeline> FLAGS [controller <controller>]
+	const usage = `reconcile FLAGS [pipeline] [controller]
 
     FLAGS:
     --label key=value`
@@ -282,34 +284,36 @@ func (s *System) reconcile(ctx context.Context, args ...string) error {
 		return errors.New(usage)
 	}
 
-	pipeline, err := s.getPipeline(args[0])
+	labels := labels{}
+	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
+	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+
+	if set.NArg() == 0 {
+		for _, pipeline := range s.pipelines {
+			if err := reconcileControllers(ctx, maps.Values(pipeline.Controllers()), labels); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	pipeline, err := s.getPipeline(set.Arg(0))
 	if err != nil {
 		return err
 	}
 
-	labels := labels{}
-	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
-	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
-	if err := set.Parse(args[1:]); err != nil {
-		return err
-	}
-
 	controllers := pipeline.Controllers()
-	if set.NArg() < 1 {
-		for _, controller := range controllers {
-			if !contollerHasLabels(controller, labels) {
-				continue
-			}
-
-			if err := controller.Reconcile(ctx); err != nil {
-				return err
-			}
-		}
+	if set.NArg() < 2 {
+		return reconcileControllers(ctx, maps.Values(controllers), labels)
 	}
 
-	controller, ok := pipeline.Controllers()[set.Arg(0)]
+	controller, ok := pipeline.Controllers()[set.Arg(1)]
 	if !ok {
-		return fmt.Errorf("controller not found: %q", args[1])
+		return fmt.Errorf("controller not found: %q", set.Arg(1))
 	}
 
 	if err := controller.Reconcile(ctx); err != nil {
@@ -330,14 +334,28 @@ func (s Schedule) matches(c core.Controller) bool {
 		return s.matchesController == c
 	}
 
-	if !contollerHasLabels(c, s.matchesLabels) {
+	if !controllerHasLabels(c, s.matchesLabels) {
 		return false
 	}
 
 	return true
 }
 
-func contollerHasLabels(c core.Controller, toFind map[string]string) bool {
+func reconcileControllers(ctx context.Context, controllers iter.Seq[core.Controller], labels labels) error {
+	for controller := range controllers {
+		if !controllerHasLabels(controller, labels) {
+			continue
+		}
+
+		if err := controller.Reconcile(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func controllerHasLabels(c core.Controller, toFind map[string]string) bool {
 	labels := c.Metadata().Labels
 	for k, v := range toFind {
 		if found, ok := labels[k]; !ok || v != found {
