@@ -62,17 +62,11 @@ func run(ctx context.Context) error {
 }
 
 type CheckoutResource struct {
-	meta glu.Metadata
-
 	ImageDigest string `json:"digest"`
 }
 
-func NewCheckoutResource(meta glu.Metadata) *CheckoutResource {
-	return &CheckoutResource{meta: meta}
-}
-
-func (c *CheckoutResource) Metadata() *glu.Metadata {
-	return &c.meta
+func NewCheckoutResource() *CheckoutResource {
+	return &CheckoutResource{}
 }
 
 func (c *CheckoutResource) Digest() (string, error) {

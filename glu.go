@@ -34,7 +34,7 @@ func Name(name string) Metadata {
 	return Metadata{Name: name}
 }
 
-func NewPipeline[R core.Resource](meta Metadata, newFn func(Metadata) R) *core.Pipeline[R] {
+func NewPipeline[R core.Resource](meta Metadata, newFn func() R) *core.Pipeline[R] {
 	return core.NewPipeline(meta, newFn)
 }
 

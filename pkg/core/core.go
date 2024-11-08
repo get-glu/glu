@@ -33,11 +33,11 @@ type Resource interface {
 
 type Pipeline[R Resource] struct {
 	meta         Metadata
-	newFn        func(Metadata) R
+	newFn        func() R
 	dependencies map[ResourceController[R]]AddOptions[R]
 }
 
-func NewPipeline[R Resource](meta Metadata, newFn func(Metadata) R) *Pipeline[R] {
+func NewPipeline[R Resource](meta Metadata, newFn func() R) *Pipeline[R] {
 	return &Pipeline[R]{
 		meta:         meta,
 		newFn:        newFn,
@@ -49,7 +49,7 @@ type AddOptions[R Resource] struct {
 	dependsOn ResourceController[R]
 }
 
-func DependsOn[R Resource](c ResourceController[R]) containers.Option[AddOptions[R]] {
+func PromotesFrom[R Resource](c ResourceController[R]) containers.Option[AddOptions[R]] {
 	return func(ao *AddOptions[R]) {
 		ao.dependsOn = c
 	}
@@ -61,7 +61,7 @@ type ResourceController[R Resource] interface {
 }
 
 func (p *Pipeline[R]) New() R {
-	return p.newFn(p.meta)
+	return p.newFn()
 }
 
 func (p *Pipeline[R]) Metadata() Metadata {
