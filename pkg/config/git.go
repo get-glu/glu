@@ -2,9 +2,9 @@ package config
 
 import "log/slog"
 
-type Repositories map[string]*Repository
+type GitRepositories map[string]*Repository
 
-func (r Repositories) validate() error {
+func (r GitRepositories) validate() error {
 	for _, repo := range r {
 		if err := repo.validate(); err != nil {
 			return err
@@ -14,7 +14,7 @@ func (r Repositories) validate() error {
 	return nil
 }
 
-func (r Repositories) setDefaults() error {
+func (r GitRepositories) setDefaults() error {
 	for _, repo := range r {
 		if err := repo.setDefaults(); err != nil {
 			return err

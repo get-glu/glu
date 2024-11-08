@@ -28,7 +28,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-type Source struct {
+type Repository struct {
 	logger          *slog.Logger
 	remote          *config.RemoteConfig
 	defaultBranch   string
@@ -56,7 +56,7 @@ type Subscriber interface {
 	Notify(ctx context.Context, refs map[string]string) error
 }
 
-func NewSource(ctx context.Context, logger *slog.Logger, opts ...containers.Option[Source]) (*Source, error) {
+func NewRepository(ctx context.Context, logger *slog.Logger, opts ...containers.Option[Repository]) (*Repository, error) {
 	repo, empty, err := newRepository(ctx, logger, opts...)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func NewSource(ctx context.Context, logger *slog.Logger, opts ...containers.Opti
 	if empty {
 		logger.Warn("repository empty, attempting to add and push a README")
 		// add initial readme if repo is empty
-		if _, err := repo.UpdateAndPush(ctx, repo.defaultBranch, nil, func(fs fs.Filesystem) (string, error) {
+		if _, err := repo.UpdateAndPush(ctx, func(fs fs.Filesystem) (string, error) {
 			fi, err := fs.OpenFile("README.md", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 			if err != nil {
 				return "", err
@@ -93,13 +93,13 @@ func NewSource(ctx context.Context, logger *slog.Logger, opts ...containers.Opti
 // newRepository is a wrapper around the core *git.Repository
 // It handles configuring a repository source appropriately based on our configuration
 // It also exposes some common operations and ensures safe concurrent access while fetching and pushing
-func newRepository(ctx context.Context, logger *slog.Logger, opts ...containers.Option[Source]) (_ *Source, empty bool, err error) {
-	r := &Source{
+func newRepository(ctx context.Context, logger *slog.Logger, opts ...containers.Option[Repository]) (_ *Repository, empty bool, err error) {
+	r := &Repository{
 		logger:        logger,
 		defaultBranch: "main",
-		sigName:       "example",
-		sigEmail:      "something@example.com",
-		readme:        []byte(`# Reprise Configuration Repository`),
+		sigName:       "glu bot",
+		sigEmail:      "bot@get-glu.dev",
+		readme:        []byte(`# Glu Configuration Repository`),
 		// we initialize with a noop function incase
 		// we dont start the polling loop
 		cancel: func() {},
@@ -189,7 +189,7 @@ func newRepository(ctx context.Context, logger *slog.Logger, opts ...containers.
 	return r, empty, nil
 }
 
-func (r *Source) startPolling(ctx context.Context) {
+func (r *Repository) startPolling(ctx context.Context) {
 	if r.pollInterval == 0 {
 		close(r.done)
 		return
@@ -215,7 +215,11 @@ func (r *Source) startPolling(ctx context.Context) {
 	}()
 }
 
-func (r *Source) Close() error {
+func (r *Repository) DefaultBranch() string {
+	return r.defaultBranch
+}
+
+func (r *Repository) Close() error {
 	r.cancel()
 
 	<-r.done
@@ -225,14 +229,14 @@ func (r *Source) Close() error {
 
 // Subscribe registers the functions for the given branch name.
 // It will be called each time the branch is updated while holding a lock.
-func (r *Source) Subscribe(sub Subscriber) {
+func (r *Repository) Subscribe(sub Subscriber) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.subs = append(r.subs, sub)
 }
 
-func (r *Source) fetchHeads() []string {
+func (r *Repository) fetchHeads() []string {
 	heads := map[string]struct{}{r.defaultBranch: {}}
 	for _, sub := range r.subs {
 		for _, head := range sub.Branches() {
@@ -247,7 +251,7 @@ func (r *Source) fetchHeads() []string {
 // If the remote is not defined, then it is a silent noop.
 // Iff specific is explicitly requested then only the heads in specific are fetched.
 // Otherwise, it fetches all previously tracked head references.
-func (r *Source) Fetch(ctx context.Context, specific ...string) (err error) {
+func (r *Repository) Fetch(ctx context.Context, specific ...string) (err error) {
 	if r.remote == nil {
 		return nil
 	}
@@ -314,7 +318,7 @@ func (r *Source) Fetch(ctx context.Context, specific ...string) (err error) {
 	return nil
 }
 
-func (r *Source) ListCommits(ctx context.Context, branch, from string, filter func(string) bool) (_ iter.Seq[*object.Commit], err error) {
+func (r *Repository) ListCommits(ctx context.Context, branch, from string, filter func(string) bool) (_ iter.Seq[*object.Commit], err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -350,13 +354,38 @@ func (r *Source) ListCommits(ctx context.Context, branch, from string, filter fu
 	}), nil
 }
 
-func (r *Source) View(ctx context.Context, branch string, fn func(hash plumbing.Hash, fs fs.Filesystem) error) (err error) {
+type ViewUpdateOptions struct {
+	branch   string
+	revision *plumbing.Hash
+}
+
+func (r *Repository) getOptions(opts ...containers.Option[ViewUpdateOptions]) *ViewUpdateOptions {
+	defaultOptions := &ViewUpdateOptions{branch: r.defaultBranch}
+	containers.ApplyAll(defaultOptions, opts...)
+	return defaultOptions
+}
+
+func WithBranch(branch string) containers.Option[ViewUpdateOptions] {
+	return func(vuo *ViewUpdateOptions) {
+		vuo.branch = branch
+	}
+}
+
+func WithRevision(rev *plumbing.Hash) containers.Option[ViewUpdateOptions] {
+	return func(vuo *ViewUpdateOptions) {
+		vuo.revision = rev
+	}
+}
+
+func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[ViewUpdateOptions]) (err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	r.logger.Debug("View", slog.String("branch", branch))
+	options := r.getOptions(opts...)
 
-	hash, err := r.Resolve(branch)
+	r.logger.Debug("View", slog.String("branch", options.branch))
+
+	hash, err := r.Resolve(options.branch)
 	if err != nil {
 		return err
 	}
@@ -369,9 +398,15 @@ func (r *Source) View(ctx context.Context, branch string, fn func(hash plumbing.
 	return fn(hash, fs)
 }
 
-func (r *Source) UpdateAndPush(ctx context.Context, branch string, rev *plumbing.Hash, fn func(fs fs.Filesystem) (string, error)) (hash plumbing.Hash, err error) {
+func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem) (string, error), opts ...containers.Option[ViewUpdateOptions]) (hash plumbing.Hash, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	var (
+		options = r.getOptions(opts...)
+		branch  = options.branch
+		rev     = options.revision
+	)
 
 	hash, err = r.Resolve(branch)
 	if err != nil {
@@ -439,7 +474,7 @@ func (r *Source) UpdateAndPush(ctx context.Context, branch string, rev *plumbing
 	return commit.Hash, nil
 }
 
-func (r *Source) updateSubs(ctx context.Context, refs map[string]plumbing.Hash) {
+func (r *Repository) updateSubs(ctx context.Context, refs map[string]plumbing.Hash) {
 	// update subscribers for each matching ref
 	for _, sub := range r.subs {
 		matched := map[string]string{}
@@ -465,7 +500,7 @@ func refMatch(ref, pattern string) bool {
 	return strings.HasPrefix(ref, pattern[:strings.Index(pattern, "*")])
 }
 
-func (r *Source) Resolve(branch string) (plumbing.Hash, error) {
+func (r *Repository) Resolve(branch string) (plumbing.Hash, error) {
 	reference, err := r.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -484,7 +519,7 @@ func WithBase(name string) containers.Option[CreateBranchOptions] {
 	}
 }
 
-func (r *Source) CreateBranchIfNotExists(branch string, opts ...containers.Option[CreateBranchOptions]) error {
+func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.Option[CreateBranchOptions]) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -512,7 +547,7 @@ func (r *Source) CreateBranchIfNotExists(branch string, opts ...containers.Optio
 		reference.Hash()))
 }
 
-func (r *Source) newFilesystem(hash plumbing.Hash) (_ *filesystem, err error) {
+func (r *Repository) newFilesystem(hash plumbing.Hash) (_ *filesystem, err error) {
 	var (
 		commit *object.Commit
 		tree   = &object.Tree{}
@@ -543,8 +578,8 @@ func (r *Source) newFilesystem(hash plumbing.Hash) (_ *filesystem, err error) {
 	}, nil
 }
 
-func WithRemote(name, url string) containers.Option[Source] {
-	return func(r *Source) {
+func WithRemote(name, url string) containers.Option[Repository] {
+	return func(r *Repository) {
 		r.remote = &config.RemoteConfig{
 			Name: "origin",
 			URLs: []string{url},
@@ -555,32 +590,32 @@ func WithRemote(name, url string) containers.Option[Source] {
 // WithDefaultBranch configures the default branch used to initially seed
 // the repo, or base other branches on when they're not already present
 // in the upstream.
-func WithDefaultBranch(ref string) containers.Option[Source] {
-	return func(s *Source) {
+func WithDefaultBranch(ref string) containers.Option[Repository] {
+	return func(s *Repository) {
 		s.defaultBranch = ref
 	}
 }
 
 // WithAuth returns an option which configures the auth method used
 // by the provided source.
-func WithAuth(auth transport.AuthMethod) containers.Option[Source] {
-	return func(s *Source) {
+func WithAuth(auth transport.AuthMethod) containers.Option[Repository] {
+	return func(s *Repository) {
 		s.auth = auth
 	}
 }
 
 // WithInsecureTLS returns an option which configures the insecure TLS
 // setting for the provided source.
-func WithInsecureTLS(insecureSkipTLS bool) containers.Option[Source] {
-	return func(s *Source) {
+func WithInsecureTLS(insecureSkipTLS bool) containers.Option[Repository] {
+	return func(s *Repository) {
 		s.insecureSkipTLS = insecureSkipTLS
 	}
 }
 
 // WithCABundle returns an option which configures the CA Bundle used for
 // validating the TLS connection to the provided source.
-func WithCABundle(caCertBytes []byte) containers.Option[Source] {
-	return func(s *Source) {
+func WithCABundle(caCertBytes []byte) containers.Option[Repository] {
+	return func(s *Repository) {
 		if caCertBytes != nil {
 			s.caBundle = caCertBytes
 		}
@@ -590,31 +625,31 @@ func WithCABundle(caCertBytes []byte) containers.Option[Source] {
 // WithFilesystemStorage configures the Git repository to clone into
 // the local filesystem, instead of the default which is in-memory.
 // The provided path is location for the dotgit folder.
-func WithFilesystemStorage(path string) containers.Option[Source] {
-	return func(r *Source) {
+func WithFilesystemStorage(path string) containers.Option[Repository] {
+	return func(r *Repository) {
 		r.localPath = path
 	}
 }
 
 // WithSignature sets the default signature name and email when the signature
 // cannot be derived from the request context.
-func WithSignature(name, email string) containers.Option[Source] {
-	return func(r *Source) {
+func WithSignature(name, email string) containers.Option[Repository] {
+	return func(r *Repository) {
 		r.sigName = name
 		r.sigEmail = email
 	}
 }
 
 // WithInterval sets the period between automatic fetches from the upstream (if a remote is configured)
-func WithInterval(interval time.Duration) containers.Option[Source] {
-	return func(r *Source) {
+func WithInterval(interval time.Duration) containers.Option[Repository] {
+	return func(r *Repository) {
 		r.pollInterval = interval
 	}
 }
 
 // WithMaxOpenDescriptors sets the maximum number of open file descriptors when using filesystem backed storage
-func WithMaxOpenDescriptors(n int) containers.Option[Source] {
-	return func(r *Source) {
+func WithMaxOpenDescriptors(n int) containers.Option[Repository] {
+	return func(r *Repository) {
 		r.maxOpenDescs = n
 	}
 }

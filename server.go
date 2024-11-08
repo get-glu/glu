@@ -9,11 +9,11 @@ import (
 )
 
 type Server struct {
-	registry *Registry
+	registry *System
 	router   *chi.Mux
 }
 
-func newServer(registry *Registry) *Server {
+func newServer(registry *System) *Server {
 	s := &Server{
 		registry: registry,
 		router:   chi.NewRouter(),
@@ -39,8 +39,7 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
-		r.Get("/pipelines/{pipeline}/phases/{phase}/resources/{resource}", s.getResource)
+		r.Get("/pipelines/{pipeline}/controller/{controller}", s.getController)
 	})
 }
 
@@ -49,18 +48,13 @@ type listPipelinesResponse struct {
 	Pipelines []pipelineResponse `json:"pipelines"`
 }
 
-type phaseResponse struct {
-	Name      string   `json:"name"`
-	Resources []string `json:"resources"`
-}
-
 type pipelineResponse struct {
 	// TODO: return pipeline metadata
-	Name   string          `json:"name"`
-	Phases []phaseResponse `json:"phases"`
+	Name        string               `json:"name"`
+	Controllers []controllerResponse `json:"controllers"`
 }
 
-type resourceResponse struct {
+type controllerResponse struct {
 	Name   string            `json:"name"`
 	Labels map[string]string `json:"labels"`
 	Value  interface{}       `json:"value"`
@@ -73,22 +67,23 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	)
 
 	for name, pipeline := range pipelines {
-		phases := []phaseResponse{}
-		for phase, reconcilers := range pipeline.Phases() {
-			resources := []string{}
-			for _, r := range reconcilers {
-				resources = append(resources, r.Metadata().Name)
+		controllers := []controllerResponse{}
+		for name, controller := range pipeline.Controllers() {
+			v, err := controller.Get(r.Context())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 
-			phases = append(phases, phaseResponse{
-				Name:      phase,
-				Resources: resources,
+			controllers = append(controllers, controllerResponse{
+				Name:  name,
+				Value: v,
 			})
 		}
 
 		pipelineResponses = append(pipelineResponses, pipelineResponse{
-			Name:   name,
-			Phases: phases,
+			Name:        name,
+			Controllers: controllers,
 		})
 	}
 
@@ -106,29 +101,31 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	phases := []phaseResponse{}
-	for phase, reconcilers := range pipeline.Phases() {
-		resources := []string{}
-		for _, r := range reconcilers {
-			resources = append(resources, r.Metadata().Name)
+	controllers := []controllerResponse{}
+	for name, controller := range pipeline.Controllers() {
+		v, err := controller.Get(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
-		phases = append(phases, phaseResponse{
-			Name:      phase,
-			Resources: resources,
+		controllers = append(controllers, controllerResponse{
+			Name:   name,
+			Labels: controller.Metadata().Labels,
+			Value:  v,
 		})
 	}
 
 	json.NewEncoder(w).Encode(pipelineResponse{
-		Name:   pipelineName,
-		Phases: phases,
+		Name:        pipelineName,
+		Controllers: controllers,
 	})
 }
 
-func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
 	var (
-		pipelineName = chi.URLParam(r, "pipeline")
-		phaseName    = chi.URLParam(r, "phase")
+		pipelineName   = chi.URLParam(r, "pipeline")
+		controllerName = chi.URLParam(r, "controller")
 	)
 
 	pipeline, ok := s.registry.pipelines[pipelineName]
@@ -137,60 +134,21 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	phases := pipeline.Phases()
-	reconcilers, ok := phases[phaseName]
+	controller, ok := pipeline.Controllers()[controllerName]
 	if !ok {
-		http.Error(w, "phase not found", http.StatusNotFound)
+		http.Error(w, "controller not found", http.StatusNotFound)
 		return
 	}
 
-	resources := []string{}
-	for _, r := range reconcilers {
-		resources = append(resources, r.Metadata().Name)
-	}
-
-	json.NewEncoder(w).Encode(phaseResponse{
-		Name:      phaseName,
-		Resources: resources,
-	})
-}
-
-func (s *Server) getResource(w http.ResponseWriter, r *http.Request) {
-	var (
-		pipelineName = chi.URLParam(r, "pipeline")
-		phaseName    = chi.URLParam(r, "phase")
-		resourceName = chi.URLParam(r, "resource")
-	)
-
-	pipeline, ok := s.registry.pipelines[pipelineName]
-	if !ok {
-		http.Error(w, "pipeline not found", http.StatusNotFound)
-		return
-	}
-
-	phases := pipeline.Phases()
-	reconcilers, ok := phases[phaseName]
-	if !ok {
-		http.Error(w, "phase not found", http.StatusNotFound)
-		return
-	}
-
-	resource, ok := reconcilers[resourceName]
-	if !ok {
-		http.Error(w, "resource not found", http.StatusNotFound)
-		return
-	}
-
-	payload, err := resource.Get(r.Context())
+	v, err := controller.Get(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	metadata := resource.Metadata()
-	json.NewEncoder(w).Encode(resourceResponse{
-		Name:   metadata.Name,
-		Labels: metadata.Labels,
-		Value:  payload,
+	json.NewEncoder(w).Encode(controllerResponse{
+		Name:   controller.Metadata().Name,
+		Labels: controller.Metadata().Labels,
+		Value:  v,
 	})
 }

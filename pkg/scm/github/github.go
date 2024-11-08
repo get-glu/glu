@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/repository"
-	"github.com/get-glu/glu/pkg/sources/git"
 	"github.com/google/go-github/v64/github"
 )
 
@@ -17,7 +15,7 @@ const (
 	GitHubPRNumberField = "github.pr.number"
 )
 
-var _ repository.Proposer = (*SCM)(nil)
+var _ core.Proposer = (*SCM)(nil)
 
 type SCM struct {
 	client    *github.PullRequestsService
@@ -29,18 +27,18 @@ func New(client *github.PullRequestsService, repoOwner, repoName string) *SCM {
 	return &SCM{client: client, repoOwner: repoOwner, repoName: repoName}
 }
 
-func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadata *core.Metadata) (*git.Proposal, error) {
+func (s *SCM) GetCurrentProposal(ctx context.Context, metadata core.Metadata, baseBranch string) (*core.Proposal, error) {
 	var (
 		prs      = s.listPRs(ctx, baseBranch)
-		proposal *git.Proposal
+		proposal *core.Proposal
 	)
 
-	branchPrefix := fmt.Sprintf("glu/%s/%s", metadata.Phase, metadata.Name)
+	branchPrefix := fmt.Sprintf("glu/%s", metadata.Name)
 
 	for pr := range prs.All() {
 		parts := strings.Split(pr.Head.GetRef(), "/")
 		if strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
-			proposal = &git.Proposal{
+			proposal = &core.Proposal{
 				BaseRevision: pr.Base.GetSHA(),
 				BaseBranch:   pr.Base.GetRef(),
 				Branch:       pr.Head.GetRef(),
@@ -58,13 +56,13 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch string, metadat
 	}
 
 	if proposal == nil {
-		return nil, fmt.Errorf("phase %q resource %q: %w", metadata.Phase, metadata.Name, git.ErrProposalNotFound)
+		return nil, fmt.Errorf("resource %q: %w", metadata.Name, core.ErrProposalNotFound)
 	}
 
 	return proposal, nil
 }
 
-func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal) error {
+func (s *SCM) CreateProposal(ctx context.Context, proposal *core.Proposal) error {
 	pr, _, err := s.client.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
 		Base:  github.String(proposal.BaseBranch),
 		Head:  github.String(proposal.Branch),
@@ -84,7 +82,7 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal) error 
 	return nil
 }
 
-func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
+func (s *SCM) MergeProposal(ctx context.Context, proposal *core.Proposal) error {
 	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
 	if !ok {
 		slog.Warn("could not close pr", "reason", "missing PR number on proposal")
@@ -98,7 +96,7 @@ func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
 	return err
 }
 
-func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
+func (s *SCM) CloseProposal(ctx context.Context, proposal *core.Proposal) error {
 	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
 	if !ok {
 		slog.Warn("could not close pr", "reason", "missing PR number on proposal")

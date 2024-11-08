@@ -7,99 +7,65 @@ import (
 	"time"
 
 	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/controllers"
+	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
-	"github.com/get-glu/glu/pkg/sources/git"
-	"github.com/get-glu/glu/pkg/sources/oci"
+	"github.com/get-glu/glu/pkg/src/git"
+	"github.com/get-glu/glu/pkg/src/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
 )
 
-// func main() {
-// 	ctx := context.Background()
-// 	if err := run(ctx); err != nil {
-// 		fmt.Fprintln(os.Stderr, err)
-// 		os.Exit(1)
-// 	}
-// }
-
 func run(ctx context.Context) error {
-	pipeline, err := glu.NewPipeline(ctx, "myorgpipeline")
-	if err != nil {
-		return err
-	}
-
-	repository, err := pipeline.NewRepository("configuration")
-	if err != nil {
-		return err
-	}
-
-	checkoutResourceMeta := func(phase string) glu.Metadata {
-		return glu.Metadata{
-			Name:  "checkout",
-			Phase: phase,
-			Labels: map[string]string{
-				"team": "ecommerce",
-			},
+	return glu.NewSystem(ctx).AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+		// fetch the configured OCI repositority source named "checkout"
+		ociRepo, err := config.OCIRepository("checkout")
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	// create an OCI source for the checkout app which derives the app
-	// configuration from the latest tags image digest
-	checkoutResourceSource, err := oci.New(
-		pipeline,
-		"ghcr.io/myorg/checkout",
-		checkoutResourceMeta("source"),
-		NewCheckoutResource)
-	if err != nil {
-		return err
-	}
+		ociSource := oci.New[*CheckoutResource](ociRepo)
 
-	// create a staging phase checkout app which is dependedent
-	// on the OCI source
-	checkoutStaging := git.New(
-		pipeline,
-		repository,
-		checkoutResourceMeta("staging"),
-		NewCheckoutResource,
-		// depends on the state of the OCI source reconciler
-		git.DependsOn(checkoutResourceSource),
-		// proposes changes and marks them to merge once
-		// status checks have passed
-		git.ProposeChanges,
-		git.AutoMerge,
-	)
+		// fetch the configured Git repository source named "checkout"
+		gitRepo, gitProposer, err := config.GitRepository(ctx, "checkout")
+		if err != nil {
+			return nil, err
+		}
 
-	// force a reconcile of the staging instance every 10 seconds
-	pipeline.ScheduleReconcile(checkoutStaging, 10*time.Second)
+		gitSource := git.NewSource[*CheckoutResource](gitRepo, gitProposer, git.ProposeChanges, git.AutoMerge)
 
-	// create a production phase checkout app which is dependedent
-	// on the staging phase instance
-	git.New(
-		pipeline,
-		repository,
-		checkoutResourceMeta("production"),
-		NewCheckoutResource,
-		// depends on the state of the staging reconciler
-		git.DependsOn(checkoutStaging),
-		// proposes changes but does not auto-merge
-		git.ProposeChanges,
-	)
+		// create initial (empty) pipeline
+		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
 
-	return glu.Run(ctx)
+		// build a controller which sources from the OCI repository
+		ociController := controllers.New(glu.Name("oci"), pipeline, ociSource)
+
+		// build a controller for the staging environment which source from the git repository
+		// configure it to promote from the OCI controller
+		gitStaging := controllers.New(glu.Name("git-staging", glu.Label("env", "staging")),
+			pipeline, gitSource, core.PromotesFrom(ociController))
+
+		// build a controller for the production environment which source from the git repository
+		// configure it to promote from the staging git controller
+		_ = controllers.New(glu.Name("git-production", glu.Label("env", "production")),
+			pipeline, gitSource, core.PromotesFrom(gitStaging))
+
+		// return configured pipeline to the system
+		return pipeline, nil
+	}).ScheduleReconcile(
+		glu.ScheduleInterval(10*time.Second),
+		glu.ScheduleMatchesLabel("env", "staging"),
+		// alternatively, the controller instance can be target directly with:
+		// glu.ScheduleMatchesController(gitStaging),
+	).Run()
 }
 
 type CheckoutResource struct {
-	meta glu.Metadata
-
 	ImageDigest string `json:"digest"`
 }
 
-func NewCheckoutResource(meta glu.Metadata) *CheckoutResource {
-	return &CheckoutResource{meta: meta}
-}
-
-func (c *CheckoutResource) Metadata() *glu.Metadata {
-	return &c.meta
+func NewCheckoutResource() *CheckoutResource {
+	return &CheckoutResource{}
 }
 
 func (c *CheckoutResource) Digest() (string, error) {
@@ -111,9 +77,9 @@ func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	return nil
 }
 
-func (c *CheckoutResource) ReadFrom(_ context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
 		os.O_RDONLY,
 		0644,
 	)
@@ -135,9 +101,9 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, fs fs.Filesystem) error {
 	return nil
 }
 
-func (c *CheckoutResource) WriteTo(ctx context.Context, fs fs.Filesystem) error {
+func (c *CheckoutResource) WriteTo(ctx context.Context, meta glu.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", c.meta.Phase),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
 		os.O_RDONLY,
 		0644,
 	)
