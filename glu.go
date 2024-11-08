@@ -278,22 +278,28 @@ func (l labels) Set(v string) error {
 }
 
 func (s *System) reconcile(ctx context.Context, args ...string) error {
-	const usage = `reconcile FLAGS [pipeline] [controller]
+	var (
+		labels = labels{}
+		all    bool
+	)
 
-    FLAGS:
-    --label key=value`
-	if len(args) < 1 {
-		return errors.New(usage)
-	}
-
-	labels := labels{}
 	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
 	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
+	set.BoolVar(&all, "all", false, "reconcile all controllers (ignores label filters)")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
 
+	if all {
+		// ignore labels if the all flag is passed
+		labels = nil
+	}
+
 	if set.NArg() == 0 {
+		if len(labels) == 0 && !all {
+			return errors.New("please pass --all if you want to reconcile all controllers")
+		}
+
 		for _, pipeline := range s.pipelines {
 			if err := reconcileControllers(ctx, maps.Values(pipeline.Controllers()), labels); err != nil {
 				return err
