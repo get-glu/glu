@@ -14,12 +14,15 @@ import (
 	"time"
 
 	"github.com/get-glu/glu/pkg/config"
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/src/git"
 	"github.com/get-glu/glu/pkg/src/oci"
 	"golang.org/x/sync/errgroup"
 )
+
+const defaultScheduleInternal = time.Minute
 
 var ErrNotFound = errors.New("not found")
 
@@ -28,7 +31,7 @@ type Metadata = core.Metadata
 type Resource = core.Resource
 
 func NewPipeline[R core.Resource](meta Metadata, newFn func(Metadata) R) *core.Pipeline[R] {
-	return core.NewPipeline[R](meta, newFn)
+	return core.NewPipeline(meta, newFn)
 }
 
 type Pipeline interface {
@@ -40,7 +43,7 @@ type Pipeline interface {
 type System struct {
 	conf      *config.Config
 	pipelines map[string]Pipeline
-	scheduled []scheduled
+	schedules []Schedule
 
 	server *Server
 }
@@ -253,21 +256,66 @@ func (s *System) reconcilePipeline(ctx context.Context, args ...string) error {
 	return nil
 }
 
-type scheduled struct {
-	core.Controller
-
-	interval time.Duration
+type Schedule struct {
+	interval          time.Duration
+	matchesController core.Controller
+	matchesLabels     map[string]string
 }
 
-func (s *System) ScheduleReconcile(c core.Controller, interval time.Duration) {
-	s.scheduled = append(s.scheduled, scheduled{c, interval})
+func (s Schedule) matches(c core.Controller) bool {
+	if s.matchesController != nil {
+		return s.matchesController == c
+	}
+
+	if len(s.matchesLabels) > 0 {
+		labels := c.Metadata().Labels
+		for k, v := range s.matchesLabels {
+			if found, ok := labels[k]; !ok || v != found {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (s *System) ScheduleReconcile(opts ...containers.Option[Schedule]) {
+	sch := Schedule{
+		interval: defaultScheduleInternal,
+	}
+
+	containers.ApplyAll(&sch, opts...)
+
+	s.schedules = append(s.schedules, sch)
+}
+
+func ScheduleInterval(d time.Duration) containers.Option[Schedule] {
+	return func(s *Schedule) {
+		s.interval = d
+	}
+}
+
+func ScheduleMatchesController(c core.Controller) containers.Option[Schedule] {
+	return func(s *Schedule) {
+		s.matchesController = c
+	}
+}
+
+func ScheduleMatchesLabel(k, v string) containers.Option[Schedule] {
+	return func(s *Schedule) {
+		if s.matchesLabels == nil {
+			s.matchesLabels = map[string]string{}
+		}
+
+		s.matchesLabels[k] = v
+	}
 }
 
 func (s *System) run(ctx context.Context) error {
 	var wg sync.WaitGroup
-	for _, sch := range s.scheduled {
+	for _, sch := range s.schedules {
 		wg.Add(1)
-		go func(sch scheduled) {
+		go func(sch Schedule) {
 			defer wg.Done()
 
 			ticker := time.NewTicker(sch.interval)
@@ -276,9 +324,16 @@ func (s *System) run(ctx context.Context) error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if err := sch.Reconcile(ctx); err != nil {
-						slog.Error("reconciling resource", "name", sch.Metadata().Name, "error", err)
+					for _, pipeline := range s.pipelines {
+						for _, controller := range pipeline.Controllers() {
+							if sch.matches(controller) {
+								if err := controller.Reconcile(ctx); err != nil {
+									slog.Error("reconciling resource", "name", controller.Metadata().Name, "error", err)
+								}
+							}
+						}
 					}
+
 				}
 			}
 		}(sch)
@@ -320,7 +375,7 @@ func newConfigSource(conf *config.Config) *configSource {
 func (c *configSource) GitRepositoryConfig(name string) (*config.Repository, error) {
 	conf, ok := c.conf.Sources.Git[name]
 	if !ok {
-		return nil, fmt.Errorf("git %w: configuration not found", name)
+		return nil, fmt.Errorf("git %q: configuration not found", name)
 	}
 
 	return conf, nil
@@ -329,7 +384,7 @@ func (c *configSource) GitRepositoryConfig(name string) (*config.Repository, err
 func (c *configSource) OCIRepositoryConfig(name string) (*config.OCIRepository, error) {
 	conf, ok := c.conf.Sources.OCI[name]
 	if !ok {
-		return nil, fmt.Errorf("oci %w: configuration not found", name)
+		return nil, fmt.Errorf("oci %q: configuration not found", name)
 	}
 
 	return conf, nil

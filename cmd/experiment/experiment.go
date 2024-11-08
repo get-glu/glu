@@ -63,7 +63,13 @@ func run(ctx context.Context) error {
 		core.DependsOn(ociController))
 
 	// force a reconcile of the staging instance every 10 seconds
-	system.ScheduleReconcile(gitStaging, 10*time.Second)
+	system.ScheduleReconcile(
+		glu.ScheduleInterval(10*time.Second),
+		glu.ScheduleMatchesController(gitStaging),
+		// alternatively, labels can be matched to reconcile all
+		// controllers with a common label k/v pair:
+		// glu.ScheduleMatchesLabel("env", "staging"),
+	)
 
 	// construct and register production phase controller
 	controllers.New(core.Metadata{
