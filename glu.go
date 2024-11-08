@@ -3,8 +3,11 @@ package glu
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"iter"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -63,7 +66,7 @@ type Pipeline interface {
 
 type System struct {
 	ctx       context.Context
-	conf      *config.Config
+	conf      *Config
 	pipelines map[string]Pipeline
 	schedules []Schedule
 	err       error
@@ -101,16 +104,16 @@ func (s *System) AddPipeline(fn func(context.Context, *Config) (Pipeline, error)
 
 func (s *System) configuration() (_ *Config, err error) {
 	if s.conf != nil {
-		return newConfigSource(s.conf), nil
+		return s.conf, nil
 	}
 
-	s.conf, err = config.ReadFromPath("glu.yaml")
+	conf, err := config.ReadFromPath("glu.yaml")
 	if err != nil {
 		return nil, err
 	}
 
 	var level slog.Level
-	if err := level.UnmarshalText([]byte(s.conf.Log.Level)); err != nil {
+	if err := level.UnmarshalText([]byte(conf.Log.Level)); err != nil {
 		return nil, err
 	}
 
@@ -118,7 +121,9 @@ func (s *System) configuration() (_ *Config, err error) {
 		Level: level,
 	})))
 
-	return newConfigSource(s.conf), nil
+	s.conf = newConfigSource(conf)
+
+	return s.conf, nil
 }
 
 func (s *System) Run() error {
@@ -255,19 +260,68 @@ type fields interface {
 	PrinterFields() [][2]string
 }
 
-func (s *System) reconcile(ctx context.Context, args ...string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("reconcile <pipeline> <controller>")
+type labels map[string]string
+
+func (l labels) String() string {
+	return "KEY=VALUE"
+}
+
+func (l labels) Set(v string) error {
+	key, value, match := strings.Cut(v, "=")
+	if !match {
+		return fmt.Errorf("value should be in the form key=value (found %q)", v)
 	}
 
-	pipeline, err := s.getPipeline(args[0])
+	l[key] = value
+
+	return nil
+}
+
+func (s *System) reconcile(ctx context.Context, args ...string) error {
+	var (
+		labels = labels{}
+		all    bool
+	)
+
+	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
+	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
+	set.BoolVar(&all, "all", false, "reconcile all controllers (ignores label filters)")
+	if err := set.Parse(args); err != nil {
+		return err
+	}
+
+	if all {
+		// ignore labels if the all flag is passed
+		labels = nil
+	}
+
+	if set.NArg() == 0 {
+		if len(labels) == 0 && !all {
+			return errors.New("please pass --all if you want to reconcile all controllers")
+		}
+
+		for _, pipeline := range s.pipelines {
+			if err := reconcileControllers(ctx, maps.Values(pipeline.Controllers()), labels); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	pipeline, err := s.getPipeline(set.Arg(0))
 	if err != nil {
 		return err
 	}
 
-	controller, ok := pipeline.Controllers()[args[1]]
+	controllers := pipeline.Controllers()
+	if set.NArg() < 2 {
+		return reconcileControllers(ctx, maps.Values(controllers), labels)
+	}
+
+	controller, ok := pipeline.Controllers()[set.Arg(1)]
 	if !ok {
-		return fmt.Errorf("controller not found: %q", args[1])
+		return fmt.Errorf("controller not found: %q", set.Arg(1))
 	}
 
 	if err := controller.Reconcile(ctx); err != nil {
@@ -288,15 +342,34 @@ func (s Schedule) matches(c core.Controller) bool {
 		return s.matchesController == c
 	}
 
-	if len(s.matchesLabels) > 0 {
-		labels := c.Metadata().Labels
-		for k, v := range s.matchesLabels {
-			if found, ok := labels[k]; !ok || v != found {
-				return false
-			}
+	if !controllerHasLabels(c, s.matchesLabels) {
+		return false
+	}
+
+	return true
+}
+
+func reconcileControllers(ctx context.Context, controllers iter.Seq[core.Controller], labels labels) error {
+	for controller := range controllers {
+		if !controllerHasLabels(controller, labels) {
+			continue
+		}
+
+		if err := controller.Reconcile(ctx); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func controllerHasLabels(c core.Controller, toFind map[string]string) bool {
+	labels := c.Metadata().Labels
+	for k, v := range toFind {
+		if found, ok := labels[k]; !ok || v != found {
+			return false
+		}
+	}
 	return true
 }
 
