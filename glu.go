@@ -86,6 +86,11 @@ func NewSystem(ctx context.Context) *System {
 }
 
 func (s *System) AddPipeline(fn func(context.Context, *Config) (Pipeline, error)) *System {
+	// skip next step if error is not nil
+	if s.err != nil {
+		return s
+	}
+
 	config, err := s.configuration()
 	if err != nil {
 		s.err = err
