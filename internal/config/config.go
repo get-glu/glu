@@ -53,11 +53,11 @@ func (d *Decoder[C]) Decode(c *C) error {
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			mapstructure.DecodeHookFuncType(func(from, to reflect.Type, i interface{}) (interface{}, error) {
 				if from.Kind() != reflect.String {
-					return data, nil
+					return i, nil
 				}
 
 				if to.Kind() != reflect.Int64 {
-					return data, nil
+					return i, nil
 				}
 
 				return strconv.ParseInt(i.(string), 10, 64)
