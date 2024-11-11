@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path"
 	"sync"
 
 	"github.com/get-glu/glu/internal/git"
@@ -24,7 +25,7 @@ type Resource interface {
 }
 
 type Proposer interface {
-	GetCurrentProposal(_ context.Context, _ core.Metadata, baseBranch string) (*Proposal, error)
+	GetCurrentProposal(_ context.Context, baseBranch, branchPrefix string) (*Proposal, error)
 	CreateProposal(context.Context, *Proposal, ProposalOption) error
 	MergeProposal(context.Context, *Proposal) error
 	CloseProposal(context.Context, *Proposal) error
@@ -79,7 +80,7 @@ type Branched interface {
 	Branch() string
 }
 
-func (g *Source[A]) View(ctx context.Context, meta core.Metadata, r A) error {
+func (g *Source[A]) View(ctx context.Context, _, controller core.Metadata, r A) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -95,7 +96,7 @@ func (g *Source[A]) View(ctx context.Context, meta core.Metadata, r A) error {
 	}
 
 	return g.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
-		return r.ReadFrom(ctx, meta, fs)
+		return r.ReadFrom(ctx, controller, fs)
 	}, opts...)
 }
 
@@ -117,29 +118,29 @@ type proposalBody[A Resource] interface {
 	ProposalBody(meta core.Metadata, from A) (string, error)
 }
 
-func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) error {
+func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metadata, from, to A) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	slog := slog.With("name", meta.Name)
+	slog := slog.With("name", controller.Name)
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
 	err := g.repo.Fetch(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetching upstream during update: %w", err)
 	}
 
-	message := fmt.Sprintf("Update %s", meta.Name)
+	message := fmt.Sprintf("Update %s", controller.Name)
 	if m, ok := core.Resource(to).(commitMessage[A]); ok {
-		message, err = m.CommitMessage(meta, from)
+		message, err = m.CommitMessage(controller, from)
 		if err != nil {
-			return err
+			return fmt.Errorf("overriding commit message during update: %w", err)
 		}
 	}
 
 	update := func(fs fs.Filesystem) (string, error) {
-		if err := to.WriteTo(ctx, meta, fs); err != nil {
+		if err := to.WriteTo(ctx, controller, fs); err != nil {
 			return "", err
 		}
 
@@ -172,7 +173,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 
 	baseRev, err := g.repo.Resolve(baseBranch)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolving base branch %q: %w", baseBranch, err)
 	}
 
 	digest, err := to.Digest()
@@ -181,14 +182,15 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 	}
 
 	// create branch name and check if this phase, resource and state has previously been observed
-	branch := fmt.Sprintf("glu/%s/%s", meta.Name, digest)
+	branchPrefix := fmt.Sprintf("glu/%s/%s", pipeline.Name, controller.Name)
+	branch := path.Join(branchPrefix, digest)
 	if _, err := g.repo.Resolve(branch); err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return err
+			return fmt.Errorf("resolving update branch %q: %w", branch, err)
 		}
 	}
 
-	proposal, err := g.proposer.GetCurrentProposal(ctx, meta, baseBranch)
+	proposal, err := g.proposer.GetCurrentProposal(ctx, baseBranch, branchPrefix)
 	if err != nil {
 		if !errors.Is(err, core.ErrProposalNotFound) {
 			return err
@@ -214,7 +216,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 					return nil
 				}
 
-				return err
+				return fmt.Errorf("updating existing proposal: %w", err)
 			}
 
 			// existing proposal has been updated
@@ -251,7 +253,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 
 	title := message
 	if p, ok := core.Resource(to).(proposalTitle[A]); ok {
-		title, err = p.ProposalTitle(meta, from)
+		title, err = p.ProposalTitle(controller, from)
 		if err != nil {
 			return err
 		}
@@ -262,7 +264,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 | %s | %s |
 `, fromDigest, digest)
 	if b, ok := core.Resource(to).(proposalBody[A]); ok {
-		body, err = b.ProposalBody(meta, from)
+		body, err = b.ProposalBody(controller, from)
 		if err != nil {
 			return err
 		}

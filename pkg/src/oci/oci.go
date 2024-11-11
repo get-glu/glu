@@ -29,7 +29,7 @@ func New[R Resource](resolver Resolver) *Source[R] {
 	}
 }
 
-func (s *Source[R]) View(ctx context.Context, _ core.Metadata, r R) error {
+func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 	desc, err := s.resolver.Resolve(ctx)
 	if err != nil {
 		return err

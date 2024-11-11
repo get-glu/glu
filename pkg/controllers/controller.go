@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/get-glu/glu/pkg/containers"
@@ -10,17 +11,18 @@ import (
 
 // Source is an interface around storage for resources.
 type Source[R core.Resource] interface {
-	View(context.Context, core.Metadata, R) error
+	View(_ context.Context, pipeline, controller core.Metadata, _ R) error
 }
 
 type UpdatableSource[R core.Resource] interface {
 	Source[R]
-	Update(_ context.Context, _ core.Metadata, from, to R) error
+	Update(_ context.Context, pipeline, controller core.Metadata, from, to R) error
 }
 
 // Pipeline is a set of reconcilers organised into phases.
 type Pipeline[R core.Resource] interface {
 	New() R
+	Metadata() core.Metadata
 	Add(r core.ResourceController[R], opts ...containers.Option[core.AddOptions[R]])
 	GetDependency(core.ResourceController[R]) (core.ResourceController[R], bool)
 }
@@ -33,7 +35,7 @@ type Controller[R core.Resource] struct {
 }
 
 func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) *Controller[R] {
-	logger := slog.With("name", meta.Name)
+	logger := slog.With("name", meta.Name, "pipeline", pipeline.Metadata().Name)
 	for k, v := range meta.Labels {
 		logger = logger.With(k, v)
 	}
@@ -61,7 +63,7 @@ func (i *Controller[R]) Get(ctx context.Context) (any, error) {
 // GetResource returns the identified resource as its concrete pointer type.
 func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 	a = i.pipeline.New()
-	if err := i.source.View(ctx, i.meta, a); err != nil {
+	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, a); err != nil {
 		return a, err
 	}
 
@@ -72,11 +74,17 @@ func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 // If a dependent controller has been defined, then it is also reconciled.
 // If the dependent controller resource differs, then the controller attempts
 // to update its underlying repository to match the new desired state.
-func (i *Controller[R]) Reconcile(ctx context.Context) error {
-	i.logger.Debug("reconcile started")
+func (i *Controller[R]) Reconcile(ctx context.Context) (err error) {
+	i.logger.Debug("Reconcile started")
+	defer func() {
+		i.logger.Debug("Reconcile finished")
+		if err != nil {
+			err = fmt.Errorf("reconciling %s/%s: %w", i.pipeline.Metadata().Name, i.meta.Name, err)
+		}
+	}()
 
 	from := i.pipeline.New()
-	if err := i.source.View(ctx, i.meta, from); err != nil {
+	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, from); err != nil {
 		return err
 	}
 
@@ -91,7 +99,7 @@ func (i *Controller[R]) Reconcile(ctx context.Context) error {
 	}
 
 	if err := src.Reconcile(ctx); err != nil {
-		return err
+		return fmt.Errorf("reconciling source dependency %q: %w", src.Metadata().Name, err)
 	}
 
 	to, err := src.GetResource(ctx)
@@ -115,8 +123,8 @@ func (i *Controller[R]) Reconcile(ctx context.Context) error {
 		return nil
 	}
 
-	if err := updatable.Update(ctx, i.meta, from, to); err != nil {
-		return err
+	if err := updatable.Update(ctx, i.pipeline.Metadata(), i.meta, from, to); err != nil {
+		return fmt.Errorf("updating from %q to %q: %w", fromDigest, toDigest, err)
 	}
 
 	return nil

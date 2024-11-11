@@ -29,13 +29,11 @@ func New(client *github.Client, repoOwner, repoName string) *SCM {
 	return &SCM{client: client.PullRequests, issues: client.Issues, repoOwner: repoOwner, repoName: repoName}
 }
 
-func (s *SCM) GetCurrentProposal(ctx context.Context, metadata core.Metadata, baseBranch string) (*git.Proposal, error) {
+func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix string) (*git.Proposal, error) {
 	var (
 		prs      = s.listPRs(ctx, baseBranch)
 		proposal *git.Proposal
 	)
-
-	branchPrefix := fmt.Sprintf("glu/%s", metadata.Name)
 
 	for pr := range prs.All() {
 		parts := strings.Split(pr.Head.GetRef(), "/")
@@ -58,7 +56,7 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, metadata core.Metadata, ba
 	}
 
 	if proposal == nil {
-		return nil, fmt.Errorf("resource %q: %w", metadata.Name, core.ErrProposalNotFound)
+		return nil, fmt.Errorf("base %q: prefix %q: %w", baseBranch, branchPrefix, core.ErrProposalNotFound)
 	}
 
 	return proposal, nil
