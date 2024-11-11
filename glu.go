@@ -24,6 +24,7 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/scm/github"
+	srcgit "github.com/get-glu/glu/pkg/src/git"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	giturls "github.com/whilp/git-urls"
@@ -464,7 +465,7 @@ type Config struct {
 	cache struct {
 		oci      map[string]*oci.Repository
 		repo     map[string]*git.Repository
-		proposer map[string]core.Proposer
+		proposer map[string]srcgit.Proposer
 	}
 }
 
@@ -476,12 +477,12 @@ func newConfigSource(conf *config.Config) *Config {
 
 	c.cache.oci = map[string]*oci.Repository{}
 	c.cache.repo = map[string]*git.Repository{}
-	c.cache.proposer = map[string]core.Proposer{}
+	c.cache.proposer = map[string]srcgit.Proposer{}
 
 	return c
 }
 
-func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer core.Proposer, err error) {
+func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer srcgit.Proposer, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("git %q: %w", name, err)
@@ -568,7 +569,7 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 			}
 
 			proposer = github.New(
-				client.PullRequests,
+				client,
 				repoOwner,
 				repoName,
 			)

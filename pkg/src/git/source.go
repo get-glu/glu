@@ -23,26 +23,48 @@ type Resource interface {
 	WriteTo(context.Context, core.Metadata, fs.Filesystem) error
 }
 
+type Proposer interface {
+	GetCurrentProposal(_ context.Context, _ core.Metadata, baseBranch string) (*Proposal, error)
+	CreateProposal(context.Context, *Proposal, ProposalOption) error
+	MergeProposal(context.Context, *Proposal) error
+	CloseProposal(context.Context, *Proposal) error
+}
+
+// Proposal contains the fields necessary to propose a resource update
+// to a Repository.
+type Proposal struct {
+	BaseRevision string
+	BaseBranch   string
+	Branch       string
+	Digest       string
+	Title        string
+	Body         string
+
+	ExternalMetadata map[string]any
+}
+
 type Source[A Resource] struct {
-	mu            sync.RWMutex
-	repo          *git.Repository
-	proposer      core.Proposer
-	proposeChange bool
-	autoMerge     bool
+	mu              sync.RWMutex
+	repo            *git.Repository
+	proposer        Proposer
+	proposeChange   bool
+	proposalOptions ProposalOption
+}
+
+type ProposalOption struct {
+	Labels []string
 }
 
 // ProposeChanges configures the controller to propose the change (via PR or MR)
 // as opposed to directly integrating it into the target trunk branch.
-func ProposeChanges[A Resource](i *Source[A]) {
-	i.proposeChange = true
+func ProposeChanges[A Resource](opts ProposalOption) containers.Option[Source[A]] {
+	return func(i *Source[A]) {
+		i.proposeChange = true
+		i.proposalOptions = opts
+	}
 }
 
-// AutoMerge configures the proposal to be marked to merge once any conditions are met.
-func AutoMerge[A Resource](i *Source[A]) {
-	i.autoMerge = true
-}
-
-func NewSource[A Resource](repo *git.Repository, proposer core.Proposer, opts ...containers.Option[Source[A]]) (_ *Source[A]) {
+func NewSource[A Resource](repo *git.Repository, proposer Proposer, opts ...containers.Option[Source[A]]) (_ *Source[A]) {
 	source := &Source[A]{
 		repo:     repo,
 		proposer: proposer,
@@ -207,7 +229,7 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 | %s | %s | %s |
 `, message, meta.Name, fromDigest, digest)
 
-	proposal = &core.Proposal{
+	proposal = &Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
@@ -215,12 +237,8 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 		Body:         body,
 	}
 
-	if err := g.proposer.CreateProposal(ctx, proposal); err != nil {
+	if err := g.proposer.CreateProposal(ctx, proposal, g.proposalOptions); err != nil {
 		return err
-	}
-
-	if g.autoMerge {
-		return g.proposer.MergeProposal(ctx, proposal)
 	}
 
 	return nil

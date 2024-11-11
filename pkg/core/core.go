@@ -101,23 +101,3 @@ func (p *Pipeline[R]) Dependencies() map[Controller]Controller {
 
 	return deps
 }
-
-type Proposer interface {
-	GetCurrentProposal(_ context.Context, _ Metadata, baseBranch string) (*Proposal, error)
-	CreateProposal(context.Context, *Proposal) error
-	MergeProposal(context.Context, *Proposal) error
-	CloseProposal(context.Context, *Proposal) error
-}
-
-// Proposal contains the fields necessary to propose a resource update
-// to a Repository.
-type Proposal struct {
-	BaseRevision string
-	BaseBranch   string
-	Branch       string
-	Digest       string
-	Title        string
-	Body         string
-
-	ExternalMetadata map[string]any
-}

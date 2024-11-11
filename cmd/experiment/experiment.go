@@ -32,7 +32,9 @@ func run(ctx context.Context) error {
 			return nil, err
 		}
 
-		gitSource := git.NewSource[*CheckoutResource](gitRepo, gitProposer, git.ProposeChanges, git.AutoMerge)
+		gitSource := git.NewSource(gitRepo, gitProposer, git.ProposeChanges[*CheckoutResource](git.ProposalOption{
+			Labels: []string{"automerge"},
+		}))
 
 		// create initial (empty) pipeline
 		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
