@@ -99,6 +99,24 @@ func (g *Source[A]) View(ctx context.Context, meta core.Metadata, r A) error {
 	}, opts...)
 }
 
+type commitMessage[A Resource] interface {
+	// CommitMessage is an optional git specific method for overriding generated commit messages.
+	// The function is provided with the source controllers metadata and the previous value of resource.
+	CommitMessage(meta core.Metadata, from A) (string, error)
+}
+
+type proposalTitle[A Resource] interface {
+	// ProposalTitle is an optional git specific method for overriding generated proposal message (PR/MR) title message.
+	// The function is provided with the source controllers metadata and the previous value of resource.
+	ProposalTitle(meta core.Metadata, from A) (string, error)
+}
+
+type proposalBody[A Resource] interface {
+	// ProposalBody is an optional git specific method for overriding generated proposal body (PR/MR) body message.
+	// The function is provided with the source controllers metadata and the previous value of resource.
+	ProposalBody(meta core.Metadata, from A) (string, error)
+}
+
 func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -107,11 +125,19 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
-	if err := g.repo.Fetch(ctx); err != nil {
+	err := g.repo.Fetch(ctx)
+	if err != nil {
 		return err
 	}
 
 	message := fmt.Sprintf("Update %s", meta.Name)
+	if m, ok := core.Resource(to).(commitMessage[A]); ok {
+		message, err = m.CommitMessage(meta, from)
+		if err != nil {
+			return err
+		}
+	}
+
 	update := func(fs fs.Filesystem) (string, error) {
 		if err := to.WriteTo(ctx, meta, fs); err != nil {
 			return "", err
@@ -223,17 +249,30 @@ func (g *Source[A]) Update(ctx context.Context, meta core.Metadata, from, to A) 
 		return err
 	}
 
-	body := fmt.Sprintf(`%s:
-| app | from | to |
-| --- | ---- | -- |
-| %s | %s | %s |
-`, message, meta.Name, fromDigest, digest)
+	title := message
+	if p, ok := core.Resource(to).(proposalTitle[A]); ok {
+		title, err = p.ProposalTitle(meta, from)
+		if err != nil {
+			return err
+		}
+	}
+
+	body := fmt.Sprintf(`| from | to |
+| -- | -- |
+| %s | %s |
+`, fromDigest, digest)
+	if b, ok := core.Resource(to).(proposalBody[A]); ok {
+		body, err = b.ProposalBody(meta, from)
+		if err != nil {
+			return err
+		}
+	}
 
 	proposal = &Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
-		Title:        message,
+		Title:        title,
 		Body:         body,
 	}
 
