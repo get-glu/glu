@@ -3,7 +3,9 @@ package credentials
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -38,18 +40,13 @@ func (s *CredentialSource) Get(name string) (*Credential, error) {
 
 type Credential struct {
 	config *config.Credential
+
+	transport *ghinstallation.Transport
 }
 
 func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err error) {
 	if c.config.Type == config.CredentialTypeGitHubApp {
-		conf := c.config.GitHubApp
-
-		var transport *ghinstallation.Transport
-		if len(conf.PrivateKeyBytes) > 0 {
-			transport, err = ghinstallation.New(http.DefaultTransport, conf.AppID, conf.InstallationID, []byte(conf.PrivateKeyBytes))
-		} else if conf.PrivateKeyPath != "" {
-			transport, err = ghinstallation.NewKeyFromFile(http.DefaultTransport, conf.AppID, conf.InstallationID, conf.PrivateKeyPath)
-		}
+		transport, err := c.githubInstallationTransport()
 		if err != nil {
 			return nil, err
 		}
@@ -88,6 +85,13 @@ func (c *Credential) HTTPClient(ctx context.Context) (*http.Client, error) {
 
 func (c *Credential) GitAuthentication() (auth transport.AuthMethod, err error) {
 	switch c.config.Type {
+	case config.CredentialTypeGitHubApp:
+		transport, err := c.githubInstallationTransport()
+		if err != nil {
+			return nil, err
+		}
+
+		return &ghAppInstallation{transport}, nil
 	case config.CredentialTypeBasic:
 		return &githttp.BasicAuth{
 			Username: c.config.Basic.Username,
@@ -158,4 +162,46 @@ func (c *Credential) OCIClient(registry string) (_ *auth.Client, err error) {
 		Cache:      auth.NewCache(),
 		Credential: creds,
 	}, nil
+}
+
+type ghAppInstallation struct {
+	transport *ghinstallation.Transport
+}
+
+func (i *ghAppInstallation) String() string {
+	return "github-app"
+}
+
+func (i *ghAppInstallation) Name() string {
+	return i.String()
+}
+
+func (i *ghAppInstallation) SetAuth(r *http.Request) {
+	token, err := i.transport.Token(r.Context())
+	if err != nil {
+		slog.Error("Attempting to fetch GitHub app installation token", "error", err)
+		return
+	}
+
+	r.SetBasicAuth("x-access-token", token)
+}
+
+func (c *Credential) githubInstallationTransport() (_ *ghinstallation.Transport, err error) {
+	if c.transport != nil {
+		return c.transport, nil
+	}
+
+	conf := c.config.GitHubApp
+	if len(conf.PrivateKeyBytes) > 0 {
+		c.transport, err = ghinstallation.New(http.DefaultTransport, conf.AppID, conf.InstallationID, []byte(conf.PrivateKeyBytes))
+	} else if conf.PrivateKeyPath != "" {
+		c.transport, err = ghinstallation.NewKeyFromFile(http.DefaultTransport, conf.AppID, conf.InstallationID, conf.PrivateKeyPath)
+	} else {
+		return nil, errors.New("github_app auth: neither private key bytes nor path was provided")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return c.transport, nil
 }
