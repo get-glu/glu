@@ -62,23 +62,63 @@ func run(ctx context.Context) error {
 	).Run()
 }
 
+// CheckoutResource is a custom envelope for carrying our specific repository configuration
+// from one source to the next in our pipeline.
 type CheckoutResource struct {
 	ImageDigest string `json:"digest"`
 }
 
+// NewCheckoutResource constructs a new instance of the CheckoutResource.
+// This function is required for creating a new pipeline.
 func NewCheckoutResource() *CheckoutResource {
 	return &CheckoutResource{}
 }
 
+// Digest is a core required function for implementing glu.Resource
+// It should return a unique digest for the state of the resource.
+// In this instance we happen to be reading a unique digest from the source
+// and so we can lean into that.
+// This will be used for comparisons in the controller to decided whether or not
+// a change has occurred when deciding if to update the target source.
 func (c *CheckoutResource) Digest() (string, error) {
 	return c.ImageDigest, nil
 }
 
+// CommitMessage is an optional git specific method for overriding generated commit messages.
+// The function is provided with the source controllers metadata and the previous value of resource.
+func (c *CheckoutResource) CommitMessage(meta glu.Metadata, _ *CheckoutResource) (string, error) {
+	return fmt.Sprintf("feat: update app %q in %q", meta.Name, meta.Labels["env"]), nil
+}
+
+// ProposalTitle is an optional git specific method for overriding generated proposal message (PR/MR) title message.
+// The function is provided with the source controllers metadata and the previous value of resource.
+func (c *CheckoutResource) ProposalTitle(meta glu.Metadata, r *CheckoutResource) (string, error) {
+	return c.CommitMessage(meta, r)
+}
+
+// ProposalBody is an optional git specific method for overriding generated proposal body (PR/MR) body message.
+// The function is provided with the source controllers metadata and the previous value of resource.
+func (c *CheckoutResource) ProposalBody(meta glu.Metadata, r *CheckoutResource) (string, error) {
+	return fmt.Sprintf(`| app | from | to |
+| -------- | ---- | -- |
+| checkout | %s | %s |
+`, r.ImageDigest, c.ImageDigest), nil
+}
+
+// ReadFromOCIDescriptor is an OCI specific resource requirement.
+// Its purpose is to read the resources state from a target OCI metadata descriptor.
+// Here we're reading out the images digest from the metadata.
 func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 	c.ImageDigest = d.Digest.String()
 	return nil
 }
 
+// ReadFrom is a Git specific resource requirement.
+// It specifies how to read the resource from a target Filesystem.
+// The type should navigate and source the relevant state from the fileystem provided.
+// The function is also provided with metadata for the calling controller.
+// This allows the defining type to adjust behaviour based on the context of the controller.
+// Here we are reading a yaml file from a directory signified by a label ("env") on the controller metadata.
 func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
 		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
@@ -103,6 +143,12 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs
 	return nil
 }
 
+// WriteTo is a Git specific resource requirement.
+// It specifies how to write the resource to a target Filesystem.
+// The type should navigate and encode the state of the resource to the target Filesystem.
+// The function is also provided with metadata for the calling controller.
+// This allows the defining type to adjust behaviour based on the context of the controller.
+// Here we are writing a yaml file to a directory signified by a label ("env") on the controller metadata.
 func (c *CheckoutResource) WriteTo(ctx context.Context, meta glu.Metadata, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
 		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
