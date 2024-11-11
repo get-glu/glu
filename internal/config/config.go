@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -48,6 +50,19 @@ func (d *Decoder[C]) Decode(c *C) error {
 
 			return strings.EqualFold(stripUnderscore(mapKey), stripUnderscore(fieldName))
 		},
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.DecodeHookFuncType(func(from, to reflect.Type, i interface{}) (interface{}, error) {
+				if from.Kind() != reflect.String {
+					return data, nil
+				}
+
+				if to.Kind() != reflect.Int64 {
+					return data, nil
+				}
+
+				return strconv.ParseInt(i.(string), 10, 64)
+			}),
+		),
 	})
 
 	if err != nil {
