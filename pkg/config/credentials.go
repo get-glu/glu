@@ -103,10 +103,10 @@ func (a *SSHAuthConfig) validate() (err error) {
 }
 
 type GitHubAppConfig struct {
-	AppID           int64
-	InstallationID  int64
-	PrivateKeyBytes string
-	PrivateKeyPath  string
+	AppID           int64  `glu:"app_id"`
+	InstallationID  int64  `glu:"installation_id"`
+	PrivateKeyBytes string `glu:"private_key_bytes"`
+	PrivateKeyPath  string `glu:"private_key_path"`
 }
 
 func (c *GitHubAppConfig) validate() (err error) {
