@@ -16,7 +16,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-var ErrProposalNotFound = errors.New("proposal not foun")
+var ErrProposalNotFound = errors.New("proposal not found")
 
 var _ controllers.Source[Resource] = (*Source[Resource])(nil)
 
