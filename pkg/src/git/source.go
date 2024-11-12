@@ -16,6 +16,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
+var ErrProposalNotFound = errors.New("proposal not found")
+
 var _ controllers.Source[Resource] = (*Source[Resource])(nil)
 
 type Resource interface {
@@ -156,7 +158,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 	if !g.proposeChange {
 		if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(baseBranch)); err != nil {
 			if errors.Is(err, git.ErrEmptyCommit) {
-				slog.Info("reconcile produced no changes")
+				slog.Info("promotion produced no changes")
 
 				return nil
 			}
@@ -182,63 +184,57 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 	}
 
 	// create branch name and check if this phase, resource and state has previously been observed
-	branchPrefix := fmt.Sprintf("glu/%s/%s", pipeline.Name, controller.Name)
-	branch := path.Join(branchPrefix, digest)
-	if _, err := g.repo.Resolve(branch); err != nil {
-		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return fmt.Errorf("resolving update branch %q: %w", branch, err)
-		}
+	var (
+		branchPrefix = fmt.Sprintf("glu/%s/%s", pipeline.Name, controller.Name)
+		branch       = path.Join(branchPrefix, digest)
+	)
+
+	// ensure branch exists locally either way
+	if err := g.repo.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
+		return err
 	}
 
 	proposal, err := g.proposer.GetCurrentProposal(ctx, baseBranch, branchPrefix)
 	if err != nil {
-		if !errors.Is(err, core.ErrProposalNotFound) {
+		if !errors.Is(err, ErrProposalNotFound) {
 			return err
 		}
 
 		slog.Debug("proposal not found")
 	}
 
+	options := []containers.Option[git.ViewUpdateOptions]{git.WithBranch(branch)}
 	if proposal != nil {
 		// there is an existing proposal
-		if proposal.BaseRevision == baseRev.String() {
+		slog.Debug("proposal found", "base", proposal.BaseBranch, "base_revision", proposal.BaseRevision)
+		if proposal.BaseRevision != baseRev.String() {
+			// we're potentially going to force update the branch to move the base
+			options = append(options, git.WithForce)
+		} else {
 			if proposal.Digest == digest {
-				// nothing has changed since the last reconciliation and proposals
+				// nothing has changed since the last promotion and proposals
 				slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
 
 				return nil
 			}
+		}
 
-			if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(branch)); err != nil {
-				if errors.Is(err, git.ErrEmptyCommit) {
-					slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
+		if _, err := g.repo.UpdateAndPush(ctx, update, options...); err != nil {
+			if errors.Is(err, git.ErrEmptyCommit) {
+				slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
 
-					return nil
-				}
-
-				return fmt.Errorf("updating existing proposal: %w", err)
+				return nil
 			}
 
-			// existing proposal has been updated
-
-			return nil
+			return fmt.Errorf("updating existing proposal: %w", err)
 		}
 
-		// current open proposal is based on an outdated revision
-		// so we're going to close this PR and create a new one from
-		// the new base
-		if err := g.proposer.CloseProposal(ctx, proposal); err != nil {
-			return err
-		}
+		return nil
 	}
 
-	if err := g.repo.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
-		return err
-	}
-
-	if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(branch)); err != nil {
+	if _, err := g.repo.UpdateAndPush(ctx, update, options...); err != nil {
 		if errors.Is(err, git.ErrEmptyCommit) {
-			slog.Info("reconcile produced no changes")
+			slog.Info("promotion produced no changes")
 
 			return nil
 		}

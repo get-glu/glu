@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/src/git"
 	"github.com/google/go-github/v64/github"
 )
@@ -19,14 +18,13 @@ const (
 var _ git.Proposer = (*SCM)(nil)
 
 type SCM struct {
-	client    *github.PullRequestsService
-	issues    *github.IssuesService
+	client    *github.Client
 	repoOwner string
 	repoName  string
 }
 
 func New(client *github.Client, repoOwner, repoName string) *SCM {
-	return &SCM{client: client.PullRequests, issues: client.Issues, repoOwner: repoOwner, repoName: repoName}
+	return &SCM{client: client, repoOwner: repoOwner, repoName: repoName}
 }
 
 func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix string) (*git.Proposal, error) {
@@ -56,14 +54,14 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix s
 	}
 
 	if proposal == nil {
-		return nil, fmt.Errorf("base %q: prefix %q: %w", baseBranch, branchPrefix, core.ErrProposalNotFound)
+		return nil, fmt.Errorf("base %q: prefix %q: %w", baseBranch, branchPrefix, git.ErrProposalNotFound)
 	}
 
 	return proposal, nil
 }
 
 func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts git.ProposalOption) error {
-	pr, _, err := s.client.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
+	pr, _, err := s.client.PullRequests.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
 		Base:  github.String(proposal.BaseBranch),
 		Head:  github.String(proposal.Branch),
 		Title: github.String(proposal.Title),
@@ -80,7 +78,7 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts g
 	}
 
 	if len(opts.Labels) > 0 {
-		if _, _, err := s.issues.AddLabelsToIssue(ctx, s.repoOwner, s.repoName, pr.GetNumber(), opts.Labels); err != nil {
+		if _, _, err := s.client.Issues.AddLabelsToIssue(ctx, s.repoOwner, s.repoName, pr.GetNumber(), opts.Labels); err != nil {
 			return err
 		}
 	}
@@ -95,7 +93,7 @@ func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
 		return nil
 	}
 
-	_, _, err := s.client.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
+	_, _, err := s.client.PullRequests.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
 		MergeMethod: "merge",
 	})
 
@@ -109,7 +107,7 @@ func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
 		return nil
 	}
 
-	_, _, err := s.client.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
+	_, _, err := s.client.PullRequests.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
 		State: github.String("closed"),
 	})
 
@@ -127,7 +125,7 @@ type prs struct {
 }
 
 func (s *SCM) listPRs(ctx context.Context, base string) *prs {
-	return &prs{ctx, s.client, s.repoOwner, s.repoName, base, nil}
+	return &prs{ctx, s.client.PullRequests, s.repoOwner, s.repoName, base, nil}
 }
 
 func (p *prs) Err() error {

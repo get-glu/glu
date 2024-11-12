@@ -357,6 +357,7 @@ func (r *Repository) ListCommits(ctx context.Context, branch, from string, filte
 type ViewUpdateOptions struct {
 	branch   string
 	revision *plumbing.Hash
+	force    bool
 }
 
 func (r *Repository) getOptions(opts ...containers.Option[ViewUpdateOptions]) *ViewUpdateOptions {
@@ -375,6 +376,10 @@ func WithRevision(rev *plumbing.Hash) containers.Option[ViewUpdateOptions] {
 	return func(vuo *ViewUpdateOptions) {
 		vuo.revision = rev
 	}
+}
+
+func WithForce(vuo *ViewUpdateOptions) {
+	vuo.force = true
 }
 
 func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[ViewUpdateOptions]) (err error) {
@@ -441,13 +446,18 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 			return hash, err
 		}
 
+		spec := fmt.Sprintf("%[1]s:%[1]s", local)
+		if options.force {
+			spec = "+" + spec
+		}
+
 		if err := r.repo.PushContext(ctx, &git.PushOptions{
 			RemoteName:      r.remote.Name,
 			Auth:            r.auth,
 			CABundle:        r.caBundle,
 			InsecureSkipTLS: r.insecureSkipTLS,
 			RefSpecs: []config.RefSpec{
-				config.RefSpec(fmt.Sprintf("%[1]s:%[1]s", local)),
+				config.RefSpec(spec),
 			},
 		}); err != nil {
 			return hash, err

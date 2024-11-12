@@ -40,21 +40,30 @@ func run(ctx context.Context) error {
 		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
 
 		// build a controller which sources from the OCI repository
-		ociController := controllers.New(glu.Name("oci"), pipeline, ociSource)
+		ociController, err := controllers.New(glu.Name("oci"), pipeline, ociSource)
+		if err != nil {
+			return nil, err
+		}
 
 		// build a controller for the staging environment which source from the git repository
 		// configure it to promote from the OCI controller
-		gitStaging := controllers.New(glu.Name("git-staging", glu.Label("env", "staging")),
+		gitStaging, err := controllers.New(glu.Name("git-staging", glu.Label("env", "staging")),
 			pipeline, gitSource, core.PromotesFrom(ociController))
+		if err != nil {
+			return nil, err
+		}
 
 		// build a controller for the production environment which source from the git repository
 		// configure it to promote from the staging git controller
-		_ = controllers.New(glu.Name("git-production", glu.Label("env", "production")),
+		_, err = controllers.New(glu.Name("git-production", glu.Label("env", "production")),
 			pipeline, gitSource, core.PromotesFrom(gitStaging))
+		if err != nil {
+			return nil, err
+		}
 
 		// return configured pipeline to the system
 		return pipeline, nil
-	}).ScheduleReconcile(
+	}).SchedulePromotion(
 		glu.ScheduleInterval(10*time.Second),
 		glu.ScheduleMatchesLabel("env", "staging"),
 		// alternatively, the controller instance can be target directly with:
