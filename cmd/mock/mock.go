@@ -30,7 +30,7 @@ func NewMockSource() *MockSource {
 	return &MockSource{}
 }
 
-func (m *MockSource) View(_ context.Context, _ core.Metadata, r *MockResource) error {
+func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {
 	return nil
 }
 
@@ -42,15 +42,18 @@ func run(ctx context.Context) error {
 
 		// OCI phase
 		ociSource := NewMockSource()
-		ociController := controllers.New(
+		ociController, err := controllers.New(
 			glu.Name("cloud-controller-oci", glu.Label("type", "oci"), glu.Label("status", "running"), glu.Label("version", "v1.2.3")),
 			ccPipeline,
 			ociSource,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		// Staging phase
 		stagingSource := NewMockSource()
-		stagingController := controllers.New(
+		stagingController, err := controllers.New(
 			glu.Name("cloud-controller-staging",
 				glu.Label("type", "staging"),
 				glu.Label("environment", "staging"),
@@ -60,6 +63,9 @@ func run(ctx context.Context) error {
 			stagingSource,
 			core.PromotesFrom(ociController),
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		// Production phases
 		prodEastSource := NewMockSource()
@@ -97,15 +103,18 @@ func run(ctx context.Context) error {
 
 		// OCI phase
 		fdOciSource := NewMockSource()
-		fdOciController := controllers.New(
+		fdOciController, err := controllers.New(
 			glu.Name("frontdoor-oci", glu.Label("type", "oci"), glu.Label("version", "v2.0.1"), glu.Label("builder", "docker")),
 			fdPipeline,
 			fdOciSource,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		// Staging phase
 		fdStagingSource := NewMockSource()
-		fdStagingController := controllers.New(
+		fdStagingController, err := controllers.New(
 			glu.Name("frontdoor-staging",
 				glu.Label("type", "staging"),
 				glu.Label("environment", "staging"),
@@ -115,6 +124,9 @@ func run(ctx context.Context) error {
 			fdStagingSource,
 			core.PromotesFrom(fdOciController),
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		// Production phase
 		fdProdSource := NewMockSource()

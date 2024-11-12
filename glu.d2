@@ -88,5 +88,5 @@ glu: {
     pull*.image -> github
   }
 
-  git.production -> git.staging -> oci.repository: reconcile
+  git.production -> git.staging -> oci.repository: promotes_from
 }

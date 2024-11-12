@@ -3,6 +3,7 @@ package glu
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -101,9 +102,9 @@ func (s *Server) createControllerResponse(controller core.Controller, dependenci
 
 func (s *Server) createPipelineResponse(ctx context.Context, pipeline Pipeline) (pipelineResponse, error) {
 	dependencies := pipeline.Dependencies()
-	controllers := make([]controllerResponse, 0, len(pipeline.Controllers()))
+	controllers := make([]controllerResponse, 0)
 
-	for _, controller := range pipeline.Controllers() {
+	for controller := range pipeline.Controllers() {
 		response := s.createControllerResponse(controller, dependencies)
 
 		v, err := controller.Get(ctx)
@@ -175,9 +176,14 @@ func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
 	}
 
 	controllerName := chi.URLParam(r, "controller")
-	controller, ok := pipeline.Controllers()[controllerName]
-	if !ok {
-		http.Error(w, "controller not found", http.StatusNotFound)
+	controller, err := pipeline.ControllerByName(controllerName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, core.ErrNotFound) {
+			status = http.StatusNotFound
+		}
+
+		http.Error(w, err.Error(), status)
 		return
 	}
 

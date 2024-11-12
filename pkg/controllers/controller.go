@@ -19,12 +19,12 @@ type UpdatableSource[R core.Resource] interface {
 	Update(_ context.Context, pipeline, controller core.Metadata, from, to R) error
 }
 
-// Pipeline is a set of reconcilers organised into phases.
+// Pipeline is a set of controller with promotion dependencies between one another.
 type Pipeline[R core.Resource] interface {
 	New() R
 	Metadata() core.Metadata
-	Add(r core.ResourceController[R], opts ...containers.Option[core.AddOptions[R]])
-	GetDependency(core.ResourceController[R]) (core.ResourceController[R], bool)
+	Add(r core.ResourceController[R], opts ...containers.Option[core.AddOptions[R]]) error
+	PromotedFrom(core.ResourceController[R]) (core.ResourceController[R], bool)
 }
 
 type Controller[R core.Resource] struct {
@@ -34,7 +34,7 @@ type Controller[R core.Resource] struct {
 	source   Source[R]
 }
 
-func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) *Controller[R] {
+func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) (*Controller[R], error) {
 	logger := slog.With("name", meta.Name, "pipeline", pipeline.Metadata().Name)
 	for k, v := range meta.Labels {
 		logger = logger.With(k, v)
@@ -47,9 +47,11 @@ func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[
 		source:   repo,
 	}
 
-	pipeline.Add(controller, opts...)
+	if err := pipeline.Add(controller, opts...); err != nil {
+		return nil, err
+	}
 
-	return controller
+	return controller, nil
 }
 
 func (i *Controller[R]) Metadata() core.Metadata {
@@ -70,39 +72,35 @@ func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 	return a, nil
 }
 
-// Reconcile forces the controller to retrieve the latest version of the resouce from the underlying repository.
-// If a dependent controller has been defined, then it is also reconciled.
-// If the dependent controller resource differs, then the controller attempts
-// to update its underlying repository to match the new desired state.
-func (i *Controller[R]) Reconcile(ctx context.Context) (err error) {
-	i.logger.Debug("Reconcile started")
+// Promote causes the controller to attempt a promotion from a dependent controller.
+// If there is no promotion controller, this process is skipped.
+// The controller fetches both its current resource state, and that of the promotion source controller.
+// If the resources differ, then the controller updates its source to match the promoted version.
+func (i *Controller[R]) Promote(ctx context.Context) (err error) {
+	i.logger.Debug("Promotion started")
 	defer func() {
-		i.logger.Debug("Reconcile finished")
+		i.logger.Debug("Promotion finished")
 		if err != nil {
-			err = fmt.Errorf("reconciling %s/%s: %w", i.pipeline.Metadata().Name, i.meta.Name, err)
+			err = fmt.Errorf("promoting %s/%s: %w", i.pipeline.Metadata().Name, i.meta.Name, err)
 		}
 	}()
-
-	from := i.pipeline.New()
-	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, from); err != nil {
-		return err
-	}
-
-	src, ok := i.pipeline.GetDependency(i)
-	if !ok {
-		return nil
-	}
 
 	updatable, ok := i.source.(UpdatableSource[R])
 	if !ok {
 		return nil
 	}
 
-	if err := src.Reconcile(ctx); err != nil {
-		return fmt.Errorf("reconciling source dependency %q: %w", src.Metadata().Name, err)
+	from := i.pipeline.New()
+	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, from); err != nil {
+		return err
 	}
 
-	to, err := src.GetResource(ctx)
+	dep, ok := i.pipeline.PromotedFrom(i)
+	if !ok {
+		return nil
+	}
+
+	to, err := dep.GetResource(ctx)
 	if err != nil {
 		return err
 	}
@@ -118,7 +116,7 @@ func (i *Controller[R]) Reconcile(ctx context.Context) (err error) {
 	}
 
 	if fromDigest == toDigest {
-		i.logger.Debug("skipping reconcile", "reason", "UpToDate")
+		i.logger.Debug("skipping promotion", "reason", "UpToDate")
 
 		return nil
 	}

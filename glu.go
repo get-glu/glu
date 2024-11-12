@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
-	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -61,7 +60,8 @@ func NewPipeline[R core.Resource](meta Metadata, newFn func() R) *core.Pipeline[
 
 type Pipeline interface {
 	Metadata() Metadata
-	Controllers() map[string]core.Controller
+	ControllerByName(string) (core.Controller, error)
+	Controllers(...containers.Option[core.ControllersOptions]) iter.Seq[core.Controller]
 	Dependencies() map[core.Controller]core.Controller
 }
 
@@ -180,10 +180,10 @@ func (s *System) runOnce(ctx context.Context) error {
 	switch os.Args[1] {
 	case "inspect":
 		return s.inspect(ctx, os.Args[2:]...)
-	case "reconcile":
-		return s.reconcile(ctx, os.Args[2:]...)
+	case "promote":
+		return s.promote(ctx, os.Args[2:]...)
 	default:
-		return fmt.Errorf("unexpected command %q (expected one of [inspect reconcile])", os.Args[1])
+		return fmt.Errorf("unexpected command %q (expected one of [inspect promote])", os.Args[1])
 	}
 }
 
@@ -220,20 +220,20 @@ func (s *System) inspect(ctx context.Context, args ...string) (err error) {
 	if len(args) == 1 {
 		fmt.Fprintln(wr, "NAME\tDEPENDS_ON")
 		deps := pipeline.Dependencies()
-		for name, controller := range pipeline.Controllers() {
+		for controller := range pipeline.Controllers() {
 			dependsName := ""
 			if depends, ok := deps[controller]; ok && depends != nil {
 				dependsName = depends.Metadata().Name
 			}
 
-			fmt.Fprintf(wr, "%s\t%s\n", name, dependsName)
+			fmt.Fprintf(wr, "%s\t%s\n", controller.Metadata().Name, dependsName)
 		}
 		return nil
 	}
 
-	controller, ok := pipeline.Controllers()[args[1]]
-	if !ok {
-		return fmt.Errorf("controller not found: %q", args[1])
+	controller, err := pipeline.ControllerByName(args[1])
+	if err != nil {
+		return err
 	}
 
 	inst, err := controller.Get(ctx)
@@ -284,15 +284,15 @@ func (l labels) Set(v string) error {
 	return nil
 }
 
-func (s *System) reconcile(ctx context.Context, args ...string) error {
+func (s *System) promote(ctx context.Context, args ...string) error {
 	var (
 		labels = labels{}
 		all    bool
 	)
 
-	set := flag.NewFlagSet("reconcile", flag.ExitOnError)
+	set := flag.NewFlagSet("promote", flag.ExitOnError)
 	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
-	set.BoolVar(&all, "all", false, "reconcile all controllers (ignores label filters)")
+	set.BoolVar(&all, "all", false, "promote all controllers (ignores label filters)")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -304,11 +304,11 @@ func (s *System) reconcile(ctx context.Context, args ...string) error {
 
 	if set.NArg() == 0 {
 		if len(labels) == 0 && !all {
-			return errors.New("please pass --all if you want to reconcile all controllers")
+			return errors.New("please pass --all if you want to promote all controllers")
 		}
 
 		for _, pipeline := range s.pipelines {
-			if err := reconcileControllers(ctx, maps.Values(pipeline.Controllers()), labels); err != nil {
+			if err := promoteAllControllers(ctx, pipeline.Controllers()); err != nil {
 				return err
 			}
 		}
@@ -321,17 +321,17 @@ func (s *System) reconcile(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	controllers := pipeline.Controllers()
+	controllers := pipeline.Controllers(core.HasAllLabels(labels))
 	if set.NArg() < 2 {
-		return reconcileControllers(ctx, maps.Values(controllers), labels)
+		return promoteAllControllers(ctx, controllers)
 	}
 
-	controller, ok := pipeline.Controllers()[set.Arg(1)]
-	if !ok {
-		return fmt.Errorf("controller not found: %q", set.Arg(1))
+	controller, err := pipeline.ControllerByName(set.Arg(1))
+	if err != nil {
+		return err
 	}
 
-	if err := controller.Reconcile(ctx); err != nil {
+	if err := controller.Promote(ctx); err != nil {
 		return err
 	}
 
@@ -339,30 +339,13 @@ func (s *System) reconcile(ctx context.Context, args ...string) error {
 }
 
 type Schedule struct {
-	interval          time.Duration
-	matchesController core.Controller
-	matchesLabels     map[string]string
+	interval time.Duration
+	options  []containers.Option[core.ControllersOptions]
 }
 
-func (s Schedule) matches(c core.Controller) bool {
-	if s.matchesController != nil {
-		return s.matchesController == c
-	}
-
-	if !controllerHasLabels(c, s.matchesLabels) {
-		return false
-	}
-
-	return true
-}
-
-func reconcileControllers(ctx context.Context, controllers iter.Seq[core.Controller], labels labels) error {
+func promoteAllControllers(ctx context.Context, controllers iter.Seq[core.Controller]) error {
 	for controller := range controllers {
-		if !controllerHasLabels(controller, labels) {
-			continue
-		}
-
-		if err := controller.Reconcile(ctx); err != nil {
+		if err := controller.Promote(ctx); err != nil {
 			return err
 		}
 	}
@@ -370,17 +353,7 @@ func reconcileControllers(ctx context.Context, controllers iter.Seq[core.Control
 	return nil
 }
 
-func controllerHasLabels(c core.Controller, toFind map[string]string) bool {
-	labels := c.Metadata().Labels
-	for k, v := range toFind {
-		if found, ok := labels[k]; !ok || v != found {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *System) ScheduleReconcile(opts ...containers.Option[Schedule]) *System {
+func (s *System) SchedulePromotion(opts ...containers.Option[Schedule]) *System {
 	sch := Schedule{
 		interval: defaultScheduleInternal,
 	}
@@ -400,17 +373,13 @@ func ScheduleInterval(d time.Duration) containers.Option[Schedule] {
 
 func ScheduleMatchesController(c core.Controller) containers.Option[Schedule] {
 	return func(s *Schedule) {
-		s.matchesController = c
+		s.options = append(s.options, core.IsController(c))
 	}
 }
 
 func ScheduleMatchesLabel(k, v string) containers.Option[Schedule] {
 	return func(s *Schedule) {
-		if s.matchesLabels == nil {
-			s.matchesLabels = map[string]string{}
-		}
-
-		s.matchesLabels[k] = v
+		s.options = append(s.options, core.HasLabel(k, v))
 	}
 }
 
@@ -428,11 +397,9 @@ func (s *System) run(ctx context.Context) error {
 					return
 				case <-ticker.C:
 					for _, pipeline := range s.pipelines {
-						for _, controller := range pipeline.Controllers() {
-							if sch.matches(controller) {
-								if err := controller.Reconcile(ctx); err != nil {
-									slog.Error("reconciling resource", "name", controller.Metadata().Name, "error", err)
-								}
+						for controller := range pipeline.Controllers(sch.options...) {
+							if err := controller.Promote(ctx); err != nil {
+								slog.Error("reconciling resource", "name", controller.Metadata().Name, "error", err)
 							}
 						}
 					}
