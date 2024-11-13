@@ -47,7 +47,7 @@ func run(ctx context.Context) error {
 
 		// build a controller for the staging environment which source from the git repository
 		// configure it to promote from the OCI controller
-		gitStaging, err := controllers.New(glu.Name("git-staging", glu.Label("env", "staging")),
+		staging, err := controllers.New(glu.Name("staging", glu.Label("env", "staging")),
 			pipeline, gitSource, core.PromotesFrom(ociController))
 		if err != nil {
 			return nil, err
@@ -55,8 +55,8 @@ func run(ctx context.Context) error {
 
 		// build a controller for the production environment which source from the git repository
 		// configure it to promote from the staging git controller
-		_, err = controllers.New(glu.Name("git-production", glu.Label("env", "production")),
-			pipeline, gitSource, core.PromotesFrom(gitStaging))
+		_, err = controllers.New(glu.Name("production", glu.Label("env", "production")),
+			pipeline, gitSource, core.PromotesFrom(staging))
 		if err != nil {
 			return nil, err
 		}
