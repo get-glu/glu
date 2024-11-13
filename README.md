@@ -10,18 +10,19 @@ It is a framework for orchestrating, manipulating and introspecting the state of
 
 Use it to implement anything that involes automating updates to Git repositories via commits and pull-requests.
 
-### Docker and OCI image version updates (think Renovate / Kargo)
-
-TODO(georgemac): Give demonstration (e.g. with FluxCD for the delivery component).
-Demonstrate how the API can be used for introspection of pipeline state.
+- ✅ Track new versions of applications in source repositories (OCI, Helm etc) and trigger updates to target configuration repositories (Git).
+- ⌛️ Coordinate any combination of scheduled, event driven or manually triggered promotions from one environment to the next.
+- ⏳ Expose a single pane of glass to compare and manipulating the state of your resources in one environment to the next.
+- 🗓️ Export standardized telemetry which ties together your entire end to end CI/CD and promotion pipeline sequence of events.
 
 ## Development
 
 ### Glu Framework
 
 The core framework is implemented in Go and is designed to be embedded in your own application.
+Glu's documentation site goes into details for integrating it into your own codebase and learning the concepts.
 
-// TODO(mark): more details.
+If you want to contribute to Glu, then Go (version 1.23+) is currently the only requirement to get building.
 
 ### Glu UI
 
@@ -35,8 +36,18 @@ npm start
 
 This will start a local server which can be viewed in your browser at http://localhost:1234.
 
-## Roadmap
+## Roadmap Ideas
 
 In the future we plan to support more use-case, such as:
 
-- (In Progress) Progressive delivery (think Kargo / Argo Rollouts)
+- New sources:
+  - Helm
+  - Webhook / API
+  - Kubernetes (direct to cluster)
+- Progressive delivery (think Kargo / Argo Rollouts)
+  - Ability to guard promotion with condition checks on resource status
+  - Expose status via Go function definitions on resource types
+- Pinning, history and rollback
+  - Ability to view past states for phases
+  - Be able to pin phases to current or manually overridden states
+  - Rollback phases to previous known states

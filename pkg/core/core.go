@@ -29,9 +29,9 @@ type Controller interface {
 	Promote(context.Context) error
 }
 
-// Resource is an instance of a resource in a phase
-// It exposes its metadata, unique current digest and functionality
-// for extracting from updating a filesystem with the current version.
+// Resource is an instance of a resource in a controller.
+// Primarilly, it exposes a Digest method used to produce
+// a hash digest of the resource instances current state.
 type Resource interface {
 	Digest() (string, error)
 }
