@@ -22,30 +22,30 @@ They're also not immutable and we would love for your help in shaping them.
 Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
 
 ```go
-// build a controller which sources from our OCI repository
-ociController, err := controllers.New(glu.Name("oci"), pipeline, ociSource)
+// build a phase which sources from our OCI repository
+ociPhase, err := phases.New(glu.Name("oci"), pipeline, ociSource)
 if err != nil {
     return nil, err
 }
 
-// build a controller for the staging environment which sources from our git repository
-// and configures it to promote from the OCI controller
-staging, err := controllers.New(glu.Name("staging", glu.Label("env", "staging")),
-	pipeline, gitSource, core.PromotesFrom(ociController))
+// build a phase for the staging environment which sources from our git repository
+// and configures it to promote from the OCI phase
+staging, err := phases.New(glu.Name("staging", glu.Label("env", "staging")),
+	pipeline, gitSource, core.PromotesFrom(ociPhase))
 if err != nil {
 	return nil, err
 }
 
-// build a controller for the production environment which also sources from our git repository
-// and configures it to promote from the staging git controller
-_, err = controllers.New(glu.Name("production", glu.Label("env", "production")),
+// build a phase for the production environment which also sources from our git repository
+// and configures it to promote from the staging git phase
+_, err = phases.New(glu.Name("production", glu.Label("env", "production")),
 	pipeline, gitSource, core.PromotesFrom(staging))
 if err != nil {
 	return nil, err
 }
 ```
 
-The Glu framework comprises of a set of abstractions for declaring the resources (your applications and configuration), update strategies (we call them controllers) and rules for progression (how and when to promote) within a pipeline.
+The Glu framework comprises of a set of abstractions for declaring the resources (your applications and configuration), update strategies (we call them phases) and rules for progression (how and when to promote) within a pipeline.
 
 ### System
 
@@ -74,7 +74,7 @@ Resources are the primary definition of _what_ is being represented in your pipe
 In Go, resources are represented as an interface for the author (that's you) to fill in the blanks:
 
 ```go
-// Resource is an instance of a resource in a controller.
+// Resource is an instance of a resource in a phase.
 // Primarilly, it exposes a Digest method used to produce
 // a hash digest of the instances current state.
 type Resource interface {
@@ -100,39 +100,39 @@ func (s *SomeResource) Digest() (string, error) { return s.ImageDigest, nil }
 
 ### Pipelines
 
-Pipelines carry your specific resources type across controller destinations.
+Pipelines carry your specific resources type across phase destinations.
 They coordinate the edges in the workflow that is your promotion pipeline.
 
 They are also responsible for constructing new instances of your resource types.
-These are used when fetching and updating controllers and sources during promotion.
+These are used when fetching and updating phases and sources during promotion.
 
 ```go
 pipeline := glu.NewPipeline(glu.Name("mypipeline"), func() *SomeResource {
     // this is an opportunity to set any initial default values
     // for fields before the rest of the fields are populated
-    // from a target controller source
+    // from a target phase source
     return &SomeResource{ImageName: "someimagename"}
 })
 ```
 
-### Controllers
+### Phases
 
-Controllers have the job of interfacing with both sources and other upstream controllers to manage the promotion lifecycle.
+Phases have the job of interfacing with both sources and other upstream phases to manage the promotion lifecycle.
 They have metadata to uniquely identify themselves within the context of a pipeline.
 They're also bound to a particular source implementation, and are optional dependent on an upstream source of the _same resource type_.
 
-When a controller attempts a promotion (`controller.Promote(ctx)`) the following occurs:
+When a phase attempts a promotion (`phase.Promote(ctx)`) the following occurs:
 
-1. If there is no upstream controller to promote from, then return (no op).
-2. Get the current resource state from the target source based on controller metadata.
-3. Get the current resource state from the upstream promotion target controller.
+1. If there is no upstream phase to promote from, then return (no op).
+2. Get the current resource state from the target source based on phase metadata.
+3. Get the current resource state from the upstream promotion target phase.
 4. If the resource from (2) is equal to that of (3) (based on comparing their digest), the return (no op).
 5. Update the state of the source with the state of the upstream resource (3) (this is a promotion).
 
 ### Sources
 
-Sources are the core engine for controllers to both view and update resources in a target external system.
-While controllers handle the lifecycle of promotion, sources interface with your resource types and sources of truth to perform relevant transactions.
+Sources are the core engine for phases to both view and update resources in a target external system.
+While phases handle the lifecycle of promotion, sources interface with your resource types and sources of truth to perform relevant transactions.
 
 Currently, Glu has implementations for the following sources:
 
@@ -142,24 +142,24 @@ Currently, Glu has implementations for the following sources:
 We look to add more in the not-so-distant future. However, these can also be implemented by hand via the following interfaces:
 
 ```go
-// Controller is the core interface for resource sourcing and management.
+// Phase is the core interface for resource sourcing and management.
 // These types can be registered on pipelines and can depend upon on another for promotion.
-type Controller interface {
+type Phase interface {
 	Metadata() Metadata
 	Get(context.Context) (any, error)
 	Promote(context.Context) error
 }
 
-// ResourceController is a Controller bound to a Resource type R.
-type ResourceController[R Resource] interface {
-	Controller
+// ResourcePhase is a Phase bound to a Resource type R.
+type ResourcePhase[R Resource] interface {
+	Phase
 	GetResource(context.Context) (R, error)
 }
 ```
 
 ### Triggers
 
-Schedule promotions to run automatically on an interval for controllers matching a specific set of labels:
+Schedule promotions to run automatically on an interval for phases matching a specific set of labels:
 
 ```go
 // schedule promotion attempts to staging every 10 seconds

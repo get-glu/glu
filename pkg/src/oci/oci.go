@@ -3,12 +3,12 @@ package oci
 import (
 	"context"
 
-	"github.com/get-glu/glu/pkg/controllers"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/phases"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-var _ controllers.Source[Resource] = (*Source[Resource])(nil)
+var _ phases.Source[Resource] = (*Source[Resource])(nil)
 
 type Resource interface {
 	core.Resource

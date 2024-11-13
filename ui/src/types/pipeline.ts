@@ -1,10 +1,10 @@
 // Server-side pipeline types
 export interface Pipeline {
   name: string;
-  controllers: Controller[];
+  phases: Phase[];
 }
 
-export interface Controller {
+export interface Phase {
   name: string;
   depends_on?: string;
   labels?: Record<string, string>;

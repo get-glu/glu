@@ -6,14 +6,14 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useTheme } from '@/components/theme-provider';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setFlow, updateNodes, updateEdges } from '@/store/flowSlice';
-import { ControllerNode } from '@/components/node';
+import { PhaseNode } from '@/components/node';
 import { Pipeline } from '@/types/pipeline';
 import { FlowPipeline, PipelineNode, PipelineEdge } from '@/types/flow';
 import { GroupNode } from '@/components/group-node';
 import { listPipelines } from '@/services/api';
 
 const nodeTypes = {
-  controller: ControllerNode,
+  phase: PhaseNode,
   group: GroupNode
 };
 
@@ -83,29 +83,29 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
   const edges: PipelineEdge[] = [];
   const PIPELINE_VERTICAL_PADDING = 100;
   const PIPELINE_SPACING = 100;
-  const CONTROLLER_SPACING_X = 350;
-  const CONTROLLER_SPACING_Y = 200;
+  const PHASE_SPACING_X = 350;
+  const PHASE_SPACING_Y = 200;
   const NODE_WIDTH = 200; // Base width of a node
 
   let currentY = 0;
 
   pipelines.forEach((pipeline, pipelineIndex) => {
-    // First pass: calculate max depth and count controllers per column
-    const controllersByColumn: { [key: number]: number } = {};
+    // First pass: calculate max depth and count phases per column
+    const phasesByColumn: { [key: number]: number } = {};
     let maxDepth = 0;
 
-    pipeline.controllers.forEach((controller) => {
-      const depth = getNodeDepth(controller, pipeline.controllers);
+    pipeline.phases.forEach((phase) => {
+      const depth = getNodeDepth(phase, pipeline.phases);
       maxDepth = Math.max(maxDepth, depth);
-      const xPosition = depth * CONTROLLER_SPACING_X;
-      controllersByColumn[xPosition] = (controllersByColumn[xPosition] || 0) + 1;
+      const xPosition = depth * PHASE_SPACING_X;
+      phasesByColumn[xPosition] = (phasesByColumn[xPosition] || 0) + 1;
     });
 
-    const maxPhasesInColumn = Math.max(...Object.values(controllersByColumn), 1);
-    const pipelineHeight = maxPhasesInColumn * CONTROLLER_SPACING_Y + PIPELINE_VERTICAL_PADDING;
+    const maxPhasesInColumn = Math.max(...Object.values(phasesByColumn), 1);
+    const pipelineHeight = maxPhasesInColumn * PHASE_SPACING_Y + PIPELINE_VERTICAL_PADDING;
 
     // Calculate required width based on deepest node plus padding
-    const requiredWidth = maxDepth * CONTROLLER_SPACING_X + NODE_WIDTH + 125; // 125px for padding
+    const requiredWidth = maxDepth * PHASE_SPACING_X + NODE_WIDTH + 125; // 125px for padding
 
     // Add group node
     const groupNode: PipelineNode = {
@@ -122,29 +122,29 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
 
     const columnCount: { [key: number]: number } = {};
 
-    pipeline.controllers.forEach((controller) => {
-      const xPosition = getNodeDepth(controller, pipeline.controllers) * CONTROLLER_SPACING_X + 50;
+    pipeline.phases.forEach((phase) => {
+      const xPosition = getNodeDepth(phase, pipeline.phases) * PHASE_SPACING_X + 50;
       columnCount[xPosition] = (columnCount[xPosition] || 0) + 1;
       const yPosition =
-        PIPELINE_VERTICAL_PADDING / 2 + (columnCount[xPosition] - 1) * CONTROLLER_SPACING_Y;
+        PIPELINE_VERTICAL_PADDING / 2 + (columnCount[xPosition] - 1) * PHASE_SPACING_Y;
 
       const node: PipelineNode = {
-        id: controller.name,
-        type: 'controller',
+        id: phase.name,
+        type: 'phase',
         position: { x: xPosition, y: yPosition },
         parentId: pipeline.name,
         data: {
-          name: controller.name,
-          labels: controller.labels || {}
+          name: phase.name,
+          labels: phase.labels || {}
         }
       };
       nodes.push(node);
 
-      if (controller.depends_on) {
+      if (phase.depends_on) {
         edges.push({
-          id: `edge-${controller.depends_on}-${controller.name}`,
-          source: controller.depends_on,
-          target: controller.name
+          id: `edge-${phase.depends_on}-${phase.name}`,
+          source: phase.depends_on,
+          target: phase.name
         });
       }
     });
@@ -160,15 +160,12 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
   return { nodes, edges };
 }
 
-// Helper function to calculate the depth of a controller based on its dependencies
-function getNodeDepth(
-  controller: Pipeline['controllers'][0],
-  allControllers: Pipeline['controllers']
-): number {
-  if (!controller.depends_on) return 0;
+// Helper function to calculate the depth of a phase based on its dependencies
+function getNodeDepth(phase: Pipeline['phases'][0], allPhases: Pipeline['phases']): number {
+  if (!phase.depends_on) return 0;
 
-  const parentController = allControllers.find((c) => c.name === controller.depends_on);
-  if (!parentController) return 0;
+  const parentPhase = allPhases.find((c) => c.name === phase.depends_on);
+  if (!parentPhase) return 0;
 
-  return 1 + getNodeDepth(parentController, allControllers);
+  return 1 + getNodeDepth(parentPhase, allPhases);
 }

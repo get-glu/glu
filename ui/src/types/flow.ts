@@ -6,7 +6,7 @@ export interface FlowPipeline {
 }
 
 export interface PipelineNode extends Node {
-  type: 'controller' | 'group';
+  type: 'phase' | 'group';
   data: any;
   parentNode?: string;
 }
