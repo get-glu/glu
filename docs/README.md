@@ -66,6 +66,7 @@ By delegating control to a `glu.System` instance we get a few out-of-the-box con
 1. A CLI interface for inspecting and manually promoting resources on the command-line.
 1. An API interface for inspecting and manually promoting resources over a network.
 1. Lifecycle control (signal handling and graceful shutdown).
+1. Add the optional UI component to visualize your pipelines in a browser.
 
 ### Resources
 
