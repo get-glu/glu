@@ -1,4 +1,4 @@
-package controllers
+package phases
 
 import (
 	"context"
@@ -11,59 +11,59 @@ import (
 
 // Source is an interface around storage for resources.
 type Source[R core.Resource] interface {
-	View(_ context.Context, pipeline, controller core.Metadata, _ R) error
+	View(_ context.Context, pipeline, phase core.Metadata, _ R) error
 }
 
 type UpdatableSource[R core.Resource] interface {
 	Source[R]
-	Update(_ context.Context, pipeline, controller core.Metadata, from, to R) error
+	Update(_ context.Context, pipeline, phase core.Metadata, from, to R) error
 }
 
-// Pipeline is a set of controller with promotion dependencies between one another.
+// Pipeline is a set of phase with promotion dependencies between one another.
 type Pipeline[R core.Resource] interface {
 	New() R
 	Metadata() core.Metadata
-	Add(r core.ResourceController[R], opts ...containers.Option[core.AddOptions[R]]) error
-	PromotedFrom(core.ResourceController[R]) (core.ResourceController[R], bool)
+	Add(r core.ResourcePhase[R], opts ...containers.Option[core.AddOptions[R]]) error
+	PromotedFrom(core.ResourcePhase[R]) (core.ResourcePhase[R], bool)
 }
 
-type Controller[R core.Resource] struct {
+type Phase[R core.Resource] struct {
 	logger   *slog.Logger
 	meta     core.Metadata
 	pipeline Pipeline[R]
 	source   Source[R]
 }
 
-func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) (*Controller[R], error) {
+func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) (*Phase[R], error) {
 	logger := slog.With("name", meta.Name, "pipeline", pipeline.Metadata().Name)
 	for k, v := range meta.Labels {
 		logger = logger.With(k, v)
 	}
 
-	controller := &Controller[R]{
+	phase := &Phase[R]{
 		logger:   logger,
 		meta:     meta,
 		pipeline: pipeline,
 		source:   repo,
 	}
 
-	if err := pipeline.Add(controller, opts...); err != nil {
+	if err := pipeline.Add(phase, opts...); err != nil {
 		return nil, err
 	}
 
-	return controller, nil
+	return phase, nil
 }
 
-func (i *Controller[R]) Metadata() core.Metadata {
+func (i *Phase[R]) Metadata() core.Metadata {
 	return i.meta
 }
 
-func (i *Controller[R]) Get(ctx context.Context) (any, error) {
+func (i *Phase[R]) Get(ctx context.Context) (any, error) {
 	return i.GetResource(ctx)
 }
 
 // GetResource returns the identified resource as its concrete pointer type.
-func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
+func (i *Phase[R]) GetResource(ctx context.Context) (a R, err error) {
 	a = i.pipeline.New()
 	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, a); err != nil {
 		return a, err
@@ -72,11 +72,11 @@ func (i *Controller[R]) GetResource(ctx context.Context) (a R, err error) {
 	return a, nil
 }
 
-// Promote causes the controller to attempt a promotion from a dependent controller.
-// If there is no promotion controller, this process is skipped.
-// The controller fetches both its current resource state, and that of the promotion source controller.
-// If the resources differ, then the controller updates its source to match the promoted version.
-func (i *Controller[R]) Promote(ctx context.Context) (err error) {
+// Promote causes the phase to attempt a promotion from a dependent phase.
+// If there is no promotion phase, this process is skipped.
+// The phase fetches both its current resource state, and that of the promotion source phase.
+// If the resources differ, then the phase updates its source to match the promoted version.
+func (i *Phase[R]) Promote(ctx context.Context) (err error) {
 	i.logger.Debug("Promotion started")
 	defer func() {
 		i.logger.Debug("Promotion finished")

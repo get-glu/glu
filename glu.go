@@ -60,9 +60,9 @@ func NewPipeline[R core.Resource](meta Metadata, newFn func() R) *core.Pipeline[
 
 type Pipeline interface {
 	Metadata() Metadata
-	ControllerByName(string) (core.Controller, error)
-	Controllers(...containers.Option[core.ControllersOptions]) iter.Seq[core.Controller]
-	Dependencies() map[core.Controller]core.Controller
+	PhaseByName(string) (core.Phase, error)
+	Phases(...containers.Option[core.PhaseOptions]) iter.Seq[core.Phase]
+	Dependencies() map[core.Phase]core.Phase
 }
 
 type System struct {
@@ -220,23 +220,23 @@ func (s *System) inspect(ctx context.Context, args ...string) (err error) {
 	if len(args) == 1 {
 		fmt.Fprintln(wr, "NAME\tDEPENDS_ON")
 		deps := pipeline.Dependencies()
-		for controller := range pipeline.Controllers() {
+		for phase := range pipeline.Phases() {
 			dependsName := ""
-			if depends, ok := deps[controller]; ok && depends != nil {
+			if depends, ok := deps[phase]; ok && depends != nil {
 				dependsName = depends.Metadata().Name
 			}
 
-			fmt.Fprintf(wr, "%s\t%s\n", controller.Metadata().Name, dependsName)
+			fmt.Fprintf(wr, "%s\t%s\n", phase.Metadata().Name, dependsName)
 		}
 		return nil
 	}
 
-	controller, err := pipeline.ControllerByName(args[1])
+	phase, err := pipeline.PhaseByName(args[1])
 	if err != nil {
 		return err
 	}
 
-	inst, err := controller.Get(ctx)
+	inst, err := phase.Get(ctx)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (s *System) inspect(ctx context.Context, args ...string) (err error) {
 	}
 	fmt.Fprintln(wr)
 
-	meta := controller.Metadata()
+	meta := phase.Metadata()
 	fmt.Fprintf(wr, "%s", meta.Name)
 	for _, field := range extraFields {
 		fmt.Fprintf(wr, "\t%s", field[1])
@@ -291,8 +291,8 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 	)
 
 	set := flag.NewFlagSet("promote", flag.ExitOnError)
-	set.Var(&labels, "label", "selector for filtering controllers (format key=value)")
-	set.BoolVar(&all, "all", false, "promote all controllers (ignores label filters)")
+	set.Var(&labels, "label", "selector for filtering phases (format key=value)")
+	set.BoolVar(&all, "all", false, "promote all phases (ignores label filters)")
 	if err := set.Parse(args); err != nil {
 		return err
 	}
@@ -304,11 +304,11 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 
 	if set.NArg() == 0 {
 		if len(labels) == 0 && !all {
-			return errors.New("please pass --all if you want to promote all controllers")
+			return errors.New("please pass --all if you want to promote all phases")
 		}
 
 		for _, pipeline := range s.pipelines {
-			if err := promoteAllControllers(ctx, pipeline.Controllers()); err != nil {
+			if err := promoteAllPhases(ctx, pipeline.Phases()); err != nil {
 				return err
 			}
 		}
@@ -321,17 +321,17 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	controllers := pipeline.Controllers(core.HasAllLabels(labels))
+	phases := pipeline.Phases(core.HasAllLabels(labels))
 	if set.NArg() < 2 {
-		return promoteAllControllers(ctx, controllers)
+		return promoteAllPhases(ctx, phases)
 	}
 
-	controller, err := pipeline.ControllerByName(set.Arg(1))
+	phase, err := pipeline.PhaseByName(set.Arg(1))
 	if err != nil {
 		return err
 	}
 
-	if err := controller.Promote(ctx); err != nil {
+	if err := phase.Promote(ctx); err != nil {
 		return err
 	}
 
@@ -340,12 +340,12 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 
 type Schedule struct {
 	interval time.Duration
-	options  []containers.Option[core.ControllersOptions]
+	options  []containers.Option[core.PhaseOptions]
 }
 
-func promoteAllControllers(ctx context.Context, controllers iter.Seq[core.Controller]) error {
-	for controller := range controllers {
-		if err := controller.Promote(ctx); err != nil {
+func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase]) error {
+	for phase := range phases {
+		if err := phase.Promote(ctx); err != nil {
 			return err
 		}
 	}
@@ -371,9 +371,9 @@ func ScheduleInterval(d time.Duration) containers.Option[Schedule] {
 	}
 }
 
-func ScheduleMatchesController(c core.Controller) containers.Option[Schedule] {
+func ScheduleMatchesPhase(c core.Phase) containers.Option[Schedule] {
 	return func(s *Schedule) {
-		s.options = append(s.options, core.IsController(c))
+		s.options = append(s.options, core.IsPhase(c))
 	}
 }
 
@@ -397,9 +397,9 @@ func (s *System) run(ctx context.Context) error {
 					return
 				case <-ticker.C:
 					for _, pipeline := range s.pipelines {
-						for controller := range pipeline.Controllers(sch.options...) {
-							if err := controller.Promote(ctx); err != nil {
-								slog.Error("reconciling resource", "name", controller.Metadata().Name, "error", err)
+						for phase := range pipeline.Phases(sch.options...) {
+							if err := phase.Promote(ctx); err != nil {
+								slog.Error("reconciling resource", "name", phase.Metadata().Name, "error", err)
 							}
 						}
 					}

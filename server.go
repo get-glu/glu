@@ -45,7 +45,7 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/controllers/{controller}", s.getController)
+		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 	})
 }
 
@@ -56,12 +56,12 @@ type listPipelinesResponse struct {
 }
 
 type pipelineResponse struct {
-	Name        string               `json:"name"`
-	Labels      map[string]string    `json:"labels,omitempty"`
-	Controllers []controllerResponse `json:"controllers,omitempty"`
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels,omitempty"`
+	Phases []phaseResponse   `json:"phases,omitempty"`
 }
 
-type controllerResponse struct {
+type phaseResponse struct {
 	Name      string            `json:"name"`
 	DependsOn string            `json:"depends_on,omitempty"`
 	Labels    map[string]string `json:"labels,omitempty"`
@@ -77,24 +77,24 @@ func (s *Server) getPipelineByName(name string) (Pipeline, error) {
 	return pipeline, nil
 }
 
-func (s *Server) createControllerResponse(controller core.Controller, dependencies map[core.Controller]core.Controller) controllerResponse {
+func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Phase]core.Phase) phaseResponse {
 	var (
 		dependsOn string
 		labels    map[string]string
 	)
 
 	if dependencies != nil {
-		if d, ok := dependencies[controller]; ok && d != nil {
+		if d, ok := dependencies[phase]; ok && d != nil {
 			dependsOn = d.Metadata().Name
 		}
 	}
 
-	if controller.Metadata().Labels != nil {
-		labels = controller.Metadata().Labels
+	if phase.Metadata().Labels != nil {
+		labels = phase.Metadata().Labels
 	}
 
-	return controllerResponse{
-		Name:      controller.Metadata().Name,
+	return phaseResponse{
+		Name:      phase.Metadata().Name,
 		DependsOn: dependsOn,
 		Labels:    labels,
 	}
@@ -102,18 +102,18 @@ func (s *Server) createControllerResponse(controller core.Controller, dependenci
 
 func (s *Server) createPipelineResponse(ctx context.Context, pipeline Pipeline) (pipelineResponse, error) {
 	dependencies := pipeline.Dependencies()
-	controllers := make([]controllerResponse, 0)
+	phases := make([]phaseResponse, 0)
 
-	for controller := range pipeline.Controllers() {
-		response := s.createControllerResponse(controller, dependencies)
+	for phase := range pipeline.Phases() {
+		response := s.createPhaseResponse(phase, dependencies)
 
-		v, err := controller.Get(ctx)
+		v, err := phase.Get(ctx)
 		if err != nil {
 			return pipelineResponse{}, err
 		}
 		response.Value = v
 
-		controllers = append(controllers, response)
+		phases = append(phases, response)
 	}
 
 	var labels map[string]string
@@ -122,9 +122,9 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline Pipeline) 
 	}
 
 	return pipelineResponse{
-		Name:        pipeline.Metadata().Name,
-		Labels:      labels,
-		Controllers: controllers,
+		Name:   pipeline.Metadata().Name,
+		Labels: labels,
+		Phases: phases,
 	}, nil
 }
 
@@ -168,15 +168,15 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	controllerName := chi.URLParam(r, "controller")
-	controller, err := pipeline.ControllerByName(controllerName)
+	phaseName := chi.URLParam(r, "phase")
+	phase, err := pipeline.PhaseByName(phaseName)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, core.ErrNotFound) {
@@ -187,13 +187,13 @@ func (s *Server) getController(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := controller.Get(r.Context())
+	v, err := phase.Get(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	response := s.createControllerResponse(controller, pipeline.Dependencies())
+	response := s.createPhaseResponse(phase, pipeline.Dependencies())
 	response.Value = v
 
 	json.NewEncoder(w).Encode(response)

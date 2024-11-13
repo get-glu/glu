@@ -10,15 +10,15 @@ import (
 
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/pkg/containers"
-	"github.com/get-glu/glu/pkg/controllers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/phases"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
 var ErrProposalNotFound = errors.New("proposal not found")
 
-var _ controllers.Source[Resource] = (*Source[Resource])(nil)
+var _ phases.Source[Resource] = (*Source[Resource])(nil)
 
 type Resource interface {
 	core.Resource
@@ -58,7 +58,7 @@ type ProposalOption struct {
 	Labels []string
 }
 
-// ProposeChanges configures the controller to propose the change (via PR or MR)
+// ProposeChanges configures the phase to propose the change (via PR or MR)
 // as opposed to directly integrating it into the target trunk branch.
 func ProposeChanges[A Resource](opts ProposalOption) containers.Option[Source[A]] {
 	return func(i *Source[A]) {
@@ -82,7 +82,7 @@ type Branched interface {
 	Branch() string
 }
 
-func (g *Source[A]) View(ctx context.Context, _, controller core.Metadata, r A) error {
+func (g *Source[A]) View(ctx context.Context, _, phase core.Metadata, r A) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -98,33 +98,33 @@ func (g *Source[A]) View(ctx context.Context, _, controller core.Metadata, r A) 
 	}
 
 	return g.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
-		return r.ReadFrom(ctx, controller, fs)
+		return r.ReadFrom(ctx, phase, fs)
 	}, opts...)
 }
 
 type commitMessage[A Resource] interface {
 	// CommitMessage is an optional git specific method for overriding generated commit messages.
-	// The function is provided with the source controllers metadata and the previous value of resource.
+	// The function is provided with the source phases metadata and the previous value of resource.
 	CommitMessage(meta core.Metadata, from A) (string, error)
 }
 
 type proposalTitle[A Resource] interface {
 	// ProposalTitle is an optional git specific method for overriding generated proposal message (PR/MR) title message.
-	// The function is provided with the source controllers metadata and the previous value of resource.
+	// The function is provided with the source phases metadata and the previous value of resource.
 	ProposalTitle(meta core.Metadata, from A) (string, error)
 }
 
 type proposalBody[A Resource] interface {
 	// ProposalBody is an optional git specific method for overriding generated proposal body (PR/MR) body message.
-	// The function is provided with the source controllers metadata and the previous value of resource.
+	// The function is provided with the source phases metadata and the previous value of resource.
 	ProposalBody(meta core.Metadata, from A) (string, error)
 }
 
-func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metadata, from, to A) error {
+func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, from, to A) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	slog := slog.With("name", controller.Name)
+	slog := slog.With("name", phase.Name)
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
@@ -133,16 +133,16 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 		return fmt.Errorf("fetching upstream during update: %w", err)
 	}
 
-	message := fmt.Sprintf("Update %s", controller.Name)
+	message := fmt.Sprintf("Update %s", phase.Name)
 	if m, ok := core.Resource(to).(commitMessage[A]); ok {
-		message, err = m.CommitMessage(controller, from)
+		message, err = m.CommitMessage(phase, from)
 		if err != nil {
 			return fmt.Errorf("overriding commit message during update: %w", err)
 		}
 	}
 
 	update := func(fs fs.Filesystem) (string, error) {
-		if err := to.WriteTo(ctx, controller, fs); err != nil {
+		if err := to.WriteTo(ctx, phase, fs); err != nil {
 			return "", err
 		}
 
@@ -185,7 +185,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 
 	// create branch name and check if this phase, resource and state has previously been observed
 	var (
-		branchPrefix = fmt.Sprintf("glu/%s/%s", pipeline.Name, controller.Name)
+		branchPrefix = fmt.Sprintf("glu/%s/%s", pipeline.Name, phase.Name)
 		branch       = path.Join(branchPrefix, digest)
 	)
 
@@ -249,7 +249,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 
 	title := message
 	if p, ok := core.Resource(to).(proposalTitle[A]); ok {
-		title, err = p.ProposalTitle(controller, from)
+		title, err = p.ProposalTitle(phase, from)
 		if err != nil {
 			return err
 		}
@@ -260,7 +260,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, controller core.Metada
 | %s | %s |
 `, fromDigest, digest)
 	if b, ok := core.Resource(to).(proposalBody[A]); ok {
-		body, err = b.ProposalBody(controller, from)
+		body, err = b.ProposalBody(phase, from)
 		if err != nil {
 			return err
 		}
