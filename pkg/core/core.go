@@ -89,7 +89,7 @@ func (p *Pipeline[R]) Metadata() Metadata {
 	return p.meta
 }
 
-// Add will add the provided resource controller to the pipeline along with configuring
+// Add will add the provided resource phase to the pipeline along with configuring
 // any dependent promotion source phases if configured to do so.
 func (p *Pipeline[R]) Add(r ResourcePhase[R], opts ...containers.Option[AddOptions[R]]) error {
 	add := AddOptions[R]{entry: entry[R]{ResourcePhase: r}}

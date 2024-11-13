@@ -2,13 +2,13 @@ import { Handle, Position } from '@xyflow/react';
 import { Package, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-interface ControllerData {
+interface PhaseData {
   name: string;
   type: string;
   labels?: Record<string, string>;
 }
 
-const ControllerNode = ({ data }: { data: ControllerData }) => {
+const PhaseNode = ({ data }: { data: PhaseData }) => {
   const getIcon = () => {
     switch (data.type) {
       case 'oci':
@@ -64,4 +64,4 @@ function getLabelColor(key: string, value: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export { ControllerNode };
+export { PhaseNode };
