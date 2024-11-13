@@ -51,10 +51,18 @@ func (s *Server) setupRoutes() {
 
 	// API routes
 	s.router.Route("/api/v1", func(r chi.Router) {
+		r.Get("/", s.getRoot)
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
 		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 	})
+}
+
+func (s *Server) getRoot(w http.ResponseWriter, r *http.Request) {
+	if err := json.NewEncoder(w).Encode(s.system.meta); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 type listPipelinesResponse struct {
