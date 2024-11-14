@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ReactFlow, Controls, Background, MarkerType } from '@xyflow/react';
 import { WorkflowIcon } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
@@ -10,7 +10,9 @@ import { PhaseNode } from '@/components/node';
 import { Pipeline } from '@/types/pipeline';
 import { FlowPipeline, PipelineNode, PipelineEdge } from '@/types/flow';
 import { GroupNode } from '@/components/group-node';
-import { listPipelines } from '@/services/api';
+import { getSystem, listPipelines } from '@/services/api';
+import { Badge } from '@/components/ui/badge';
+import { System } from '@/types/system';
 
 const nodeTypes = {
   phase: PhaseNode,
@@ -21,6 +23,14 @@ export default function Workflow() {
   const dispatch = useAppDispatch();
   const { theme } = useTheme();
   const { nodes, edges } = useAppSelector((state) => state.flow);
+  const [system, setSystem] = useState<System | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setSystem(await getSystem());
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,10 +47,22 @@ export default function Workflow() {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-4">
             <WorkflowIcon className="h-8 w-8" />
-            <div>
-              <h1 className="text-xl font-bold">Frontdoor</h1>
-              <p className="text-sm text-muted-foreground">https://github.com/flipt-io/frontdoor</p>
-            </div>
+            {system && (
+              <div>
+                <h1 className="text-xl font-bold">{system.name}</h1>
+                {system.labels && (
+                  <>
+                    {Object.keys(system.labels).map((key: string) => {
+                      return (
+                        <Badge variant={'secondary'}>
+                          {key}: {(system.labels ?? {})[key]}
+                        </Badge>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <ThemeToggle />
         </div>

@@ -35,7 +35,7 @@ func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource
 }
 
 func run(ctx context.Context) error {
-	system := glu.NewSystem(ctx)
+	system := glu.NewSystem(ctx, glu.Name("foundation", glu.Label("team", "ecommerce")))
 	system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
 		// Create cloud-controller pipeline
 		ccPipeline := glu.NewPipeline(glu.Name("cloud-controller"), NewMockResource)

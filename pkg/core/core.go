@@ -20,8 +20,8 @@ var (
 // Metadata contains the unique information used to identify
 // a named resource instance in a particular phase.
 type Metadata struct {
-	Name   string
-	Labels map[string]string
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // Phase is the core interface for resource sourcing and management.

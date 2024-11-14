@@ -17,53 +17,54 @@ import (
 )
 
 func run(ctx context.Context) error {
-	return glu.NewSystem(ctx).AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
-		// fetch the configured OCI repositority source named "checkout"
-		ociRepo, err := config.OCIRepository("checkout")
-		if err != nil {
-			return nil, err
-		}
+	return glu.NewSystem(ctx, glu.Name("mypipelines")).
+		AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+			// fetch the configured OCI repositority source named "checkout"
+			ociRepo, err := config.OCIRepository("checkout")
+			if err != nil {
+				return nil, err
+			}
 
-		ociSource := oci.New[*CheckoutResource](ociRepo)
+			ociSource := oci.New[*CheckoutResource](ociRepo)
 
-		// fetch the configured Git repository source named "checkout"
-		gitRepo, gitProposer, err := config.GitRepository(ctx, "checkout")
-		if err != nil {
-			return nil, err
-		}
+			// fetch the configured Git repository source named "checkout"
+			gitRepo, gitProposer, err := config.GitRepository(ctx, "checkout")
+			if err != nil {
+				return nil, err
+			}
 
-		gitSource := git.NewSource(gitRepo, gitProposer, git.ProposeChanges[*CheckoutResource](git.ProposalOption{
-			Labels: []string{"automerge"},
-		}))
+			gitSource := git.NewSource(gitRepo, gitProposer, git.ProposeChanges[*CheckoutResource](git.ProposalOption{
+				Labels: []string{"automerge"},
+			}))
 
-		// create initial (empty) pipeline
-		pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
+			// create initial (empty) pipeline
+			pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
 
-		// build a phase which sources from the OCI repository
-		ociPhase, err := phases.New(glu.Name("oci"), pipeline, ociSource)
-		if err != nil {
-			return nil, err
-		}
+			// build a phase which sources from the OCI repository
+			ociPhase, err := phases.New(glu.Name("oci"), pipeline, ociSource)
+			if err != nil {
+				return nil, err
+			}
 
-		// build a phase for the staging environment which source from the git repository
-		// configure it to promote from the OCI phase
-		staging, err := phases.New(glu.Name("staging", glu.Label("env", "staging")),
-			pipeline, gitSource, core.PromotesFrom(ociPhase))
-		if err != nil {
-			return nil, err
-		}
+			// build a phase for the staging environment which source from the git repository
+			// configure it to promote from the OCI phase
+			staging, err := phases.New(glu.Name("staging", glu.Label("env", "staging")),
+				pipeline, gitSource, core.PromotesFrom(ociPhase))
+			if err != nil {
+				return nil, err
+			}
 
-		// build a phase for the production environment which source from the git repository
-		// configure it to promote from the staging git phase
-		_, err = phases.New(glu.Name("production", glu.Label("env", "production")),
-			pipeline, gitSource, core.PromotesFrom(staging))
-		if err != nil {
-			return nil, err
-		}
+			// build a phase for the production environment which source from the git repository
+			// configure it to promote from the staging git phase
+			_, err = phases.New(glu.Name("production", glu.Label("env", "production")),
+				pipeline, gitSource, core.PromotesFrom(staging))
+			if err != nil {
+				return nil, err
+			}
 
-		// return configured pipeline to the system
-		return pipeline, nil
-	}).SchedulePromotion(
+			// return configured pipeline to the system
+			return pipeline, nil
+		}).SchedulePromotion(
 		glu.ScheduleInterval(10*time.Second),
 		glu.ScheduleMatchesLabel("env", "staging"),
 		// alternatively, the phase instance can be target directly with:

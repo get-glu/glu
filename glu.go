@@ -67,6 +67,7 @@ type Pipeline interface {
 
 type System struct {
 	ctx       context.Context
+	meta      Metadata
 	conf      *Config
 	pipelines map[string]Pipeline
 	schedules []Schedule
@@ -75,9 +76,10 @@ type System struct {
 	server *Server
 }
 
-func NewSystem(ctx context.Context) *System {
+func NewSystem(ctx context.Context, meta Metadata) *System {
 	r := &System{
 		ctx:       ctx,
+		meta:      meta,
 		pipelines: map[string]Pipeline{},
 	}
 
