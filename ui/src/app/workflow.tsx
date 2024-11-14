@@ -7,12 +7,13 @@ import { useTheme } from '@/components/theme-provider';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setFlow, updateNodes, updateEdges } from '@/store/flowSlice';
 import { PhaseNode } from '@/components/node';
-import { Pipeline } from '@/types/pipeline';
+import { Phase, Pipeline } from '@/types/pipeline';
 import { FlowPipeline, PipelineNode, PipelineEdge } from '@/types/flow';
 import { GroupNode } from '@/components/group-node';
 import { getSystem, listPipelines } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { System } from '@/types/system';
+import { getNodesBounds } from 'reactflow';
 
 const nodeTypes = {
   phase: PhaseNode,
@@ -54,7 +55,7 @@ export default function Workflow() {
                   <>
                     {Object.keys(system.labels).map((key: string) => {
                       return (
-                        <Badge variant={'secondary'}>
+                        <Badge key={`system-label-${key}`} variant={'secondary'}>
                           {key}: {(system.labels ?? {})[key]}
                         </Badge>
                       );
@@ -105,29 +106,32 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
   const edges: PipelineEdge[] = [];
   const PIPELINE_VERTICAL_PADDING = 100;
   const PIPELINE_SPACING = 100;
-  const PHASE_SPACING_X = 350;
   const PHASE_SPACING_Y = 200;
-  const NODE_WIDTH = 200; // Base width of a node
+  const PHASE_PADDING_X = 50;
 
   let currentY = 0;
 
   pipelines.forEach((pipeline, pipelineIndex) => {
     // First pass: calculate max depth and count phases per column
     const phasesByColumn: { [key: number]: number } = {};
+    const maxWidthByColumn: { [key: number]: number } = {};
     let maxDepth = 0;
 
     pipeline.phases.forEach((phase) => {
       const depth = getNodeDepth(phase, pipeline.phases);
       maxDepth = Math.max(maxDepth, depth);
-      const xPosition = depth * PHASE_SPACING_X;
-      phasesByColumn[xPosition] = (phasesByColumn[xPosition] || 0) + 1;
+      phasesByColumn[depth] = (phasesByColumn[depth] || 0) + 1;
+      maxWidthByColumn[depth] = Math.max(maxWidthByColumn[depth] || 0, getNodeWidth(phase));
     });
 
     const maxPhasesInColumn = Math.max(...Object.values(phasesByColumn), 1);
     const pipelineHeight = maxPhasesInColumn * PHASE_SPACING_Y + PIPELINE_VERTICAL_PADDING;
 
     // Calculate required width based on deepest node plus padding
-    const requiredWidth = maxDepth * PHASE_SPACING_X + NODE_WIDTH + 125; // 125px for padding
+    // const requiredWidth = ((maxDepth + 1) * (3 * PHASE_PADDING_X + PHASE_WIDTH));
+    const requiredWidth = Object.values(maxWidthByColumn).reduce((prev, curr) => {
+      return prev + curr + 2 * PHASE_PADDING_X;
+    }, 0);
 
     // Add group node
     const groupNode: PipelineNode = {
@@ -145,10 +149,20 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
     const columnCount: { [key: number]: number } = {};
 
     pipeline.phases.forEach((phase) => {
-      const xPosition = getNodeDepth(phase, pipeline.phases) * PHASE_SPACING_X + 50;
-      columnCount[xPosition] = (columnCount[xPosition] || 0) + 1;
-      const yPosition =
-        PIPELINE_VERTICAL_PADDING / 2 + (columnCount[xPosition] - 1) * PHASE_SPACING_Y;
+      const depth = getNodeDepth(phase, pipeline.phases);
+      columnCount[depth] = (columnCount[depth] || 0) + 1;
+
+      // const xPosition = depth * (PHASE_WIDTH + (2 * PHASE_PADDING_X)) + ((depth + 1) * PHASE_PADDING_X);
+      // WTF Typescript - Object.keys (even when object is typed as {[num]:num}) thinks it returns string[]
+      const xPosition =
+        (Object.keys(maxWidthByColumn) as unknown as number[])
+          .sort()
+          .slice(0, depth)
+          .reduce((prev, curr) => {
+            return prev + (maxWidthByColumn[curr] || 0) + 2 * PHASE_PADDING_X;
+          }, 0) + PHASE_PADDING_X;
+
+      const yPosition = PIPELINE_VERTICAL_PADDING / 2 + (columnCount[depth] - 1) * PHASE_SPACING_Y;
 
       const node: PipelineNode = {
         id: phase.name,
@@ -158,7 +172,8 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
         data: {
           name: phase.name,
           labels: phase.labels || {}
-        }
+        },
+        extent: 'parent'
       };
       nodes.push(node);
 
@@ -190,4 +205,14 @@ function getNodeDepth(phase: Pipeline['phases'][0], allPhases: Pipeline['phases'
   if (!parentPhase) return 0;
 
   return 1 + getNodeDepth(parentPhase, allPhases);
+}
+
+function getNodeWidth(phase: Phase): number {
+  let entries = [20, phase.name.length];
+  entries.push(
+    ...Object.entries(phase.labels || {}).map(([key, value]): number => {
+      return `${key}: ${value}`.length;
+    })
+  );
+  return Math.max(...entries) * 10;
 }
