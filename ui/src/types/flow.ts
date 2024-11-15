@@ -5,7 +5,7 @@ export interface FlowPipeline {
   edges: PipelineEdge[];
 }
 
-export type PipelineNode = PhaseNode | GroupNode;
+export type PipelineNode = PhaseNode;
 
 type PhaseNodeData = {
   name: string;
@@ -13,12 +13,6 @@ type PhaseNodeData = {
 };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
-
-type GroupNodeData = {
-  labels?: Record<string, string>;
-};
-
-export type GroupNode = Node<GroupNodeData, 'group'>;
 
 export type PipelineEdge = Edge<{
   id: string;

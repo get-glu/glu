@@ -14,12 +14,10 @@ import { useTheme } from '@/components/theme-provider';
 import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Pipeline } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
-import { GroupNode as GroupNodeComponent } from '@/components/group-node';
 import Dagre from '@dagrejs/dagre';
 
 const nodeTypes = {
-  phase: PhaseNodeComponent,
-  group: GroupNodeComponent
+  phase: PhaseNodeComponent
 };
 
 export function Pipeline(props: { pipeline: Pipeline }) {
