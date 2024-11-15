@@ -1,18 +1,27 @@
-import { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 
 export interface FlowPipeline {
   nodes: PipelineNode[];
   edges: PipelineEdge[];
 }
 
-export interface PipelineNode extends Node {
-  type: 'phase' | 'group';
-  data: any;
-  parentNode?: string;
-}
+export type PipelineNode = PhaseNode | GroupNode;
 
-export interface PipelineEdge {
+type PhaseNodeData = {
+  name: string;
+  labels?: Record<string, string>;
+};
+
+export type PhaseNode = Node<PhaseNodeData, 'phase'>;
+
+type GroupNodeData = {
+  labels?: Record<string, string>;
+};
+
+export type GroupNode = Node<GroupNodeData, 'group'>;
+
+export type PipelineEdge = Edge<{
   id: string;
   source: string;
   target: string;
-}
+}>;

@@ -31,6 +31,7 @@
     "typescript-eslint": "^8.12.2"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.4",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-switch": "^1.1.1",
     "@reduxjs/toolkit": "^2.3.0",

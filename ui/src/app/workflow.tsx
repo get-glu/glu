@@ -1,46 +1,81 @@
-import { useEffect, useState } from 'react';
-import { ReactFlow, Controls, Background, MarkerType } from '@xyflow/react';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  MarkerType,
+  useReactFlow,
+  useEdgesState,
+  useNodesState,
+  useNodesInitialized
+} from '@xyflow/react';
 import { WorkflowIcon } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useTheme } from '@/components/theme-provider';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setFlow, updateNodes, updateEdges } from '@/store/flowSlice';
-import { PhaseNode } from '@/components/node';
+import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Phase, Pipeline } from '@/types/pipeline';
-import { FlowPipeline, PipelineNode, PipelineEdge } from '@/types/flow';
-import { GroupNode } from '@/components/group-node';
+import { FlowPipeline, PipelineEdge, PhaseNode, GroupNode, PipelineNode } from '@/types/flow';
+import { GroupNode as GroupNodeComponent } from '@/components/group-node';
 import { getSystem, listPipelines } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { System } from '@/types/system';
-import { getNodesBounds } from 'reactflow';
+import Dagre from '@dagrejs/dagre';
 
 const nodeTypes = {
-  phase: PhaseNode,
-  group: GroupNode
+  phase: PhaseNodeComponent,
+  group: GroupNodeComponent
 };
 
+const initialNodes: PipelineNode[] = [];
+const initialEdges: PipelineEdge[] = [];
+
 export default function Workflow() {
-  const dispatch = useAppDispatch();
   const { theme } = useTheme();
-  const { nodes, edges } = useAppSelector((state) => state.flow);
-  const [system, setSystem] = useState<System | null>(null);
+  const [system, setSystem] = useState<System>();
+
+  const { fitView } = useReactFlow<PipelineNode, PipelineEdge>();
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  const nodesInitialized = useNodesInitialized();
+  const [initLayoutFinished, setInitLayoutFinished] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setSystem(await getSystem());
     };
     fetchData();
-  }, []);
+  }, [system]);
 
   useEffect(() => {
     const fetchData = async () => {
       const pipelines = await listPipelines();
-      const flow = transformPipelines(pipelines);
-      dispatch(setFlow({ nodes: flow.nodes, edges: flow.edges }));
+      const flow = getElements(pipelines);
+
+      setNodes([...flow.nodes]);
+      setEdges([...flow.edges]);
     };
+
     fetchData();
-  }, [dispatch]);
+  }, []);
+
+  useEffect(() => {
+    if (nodesInitialized && !initLayoutFinished) {
+      const flow = getLayoutedElements({ nodes, edges });
+
+      setNodes([...flow.nodes]);
+      setEdges([...flow.edges]);
+
+      window.requestAnimationFrame(async () => {
+        await fitView();
+
+        if (!initLayoutFinished) {
+          setInitLayoutFinished(true);
+        }
+      });
+    }
+  }, [nodesInitialized, initLayoutFinished, nodes, edges, setNodes, setEdges, fitView]);
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -74,8 +109,8 @@ export default function Workflow() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          onNodesChange={(changes) => dispatch(updateNodes(changes))}
-          onEdgesChange={(changes) => dispatch(updateEdges(changes))}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
           fitView
           colorMode={theme}
           proOptions={{ hideAttribution: true }}
@@ -101,47 +136,77 @@ export default function Workflow() {
   );
 }
 
-export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
+function getLayoutedElements(pipeline: FlowPipeline) {
+  const g = new Dagre.graphlib.Graph({ compound: true }).setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: 'LR' });
+
+  pipeline.edges.forEach((edge) => g.setEdge(edge.source, edge.target));
+  pipeline.nodes.forEach((node) => {
+    console.log('measured:', node.id, node.parentId, node.measured);
+    g.setNode(node.id, {
+      ...node,
+      width: node.measured?.width ?? 0,
+      height: node.measured?.height ?? 0
+    });
+    if (node.parentId) {
+      g.setParent(node.id, node.parentId);
+    }
+  });
+
+  Dagre.layout(g);
+
+  return {
+    nodes: pipeline.nodes.map((node) => {
+      const position = g.node(node.id);
+
+      // We are shifting the dagre node position (anchor=center center) to the top left
+      // so it matches the React Flow node anchor point (top left).
+      const x = position.x - (node.measured?.width ?? 0) / 2;
+      const y = position.y - (node.measured?.height ?? 0) / 2;
+
+      return { ...node, position: { x, y } };
+    }),
+    edges: pipeline.edges
+  };
+}
+
+function getElements(pipelines: Pipeline[]): FlowPipeline {
   const nodes: PipelineNode[] = [];
   const edges: PipelineEdge[] = [];
   const PIPELINE_VERTICAL_PADDING = 100;
   const PIPELINE_SPACING = 100;
   const PHASE_SPACING_Y = 200;
   const PHASE_PADDING_X = 50;
+  const PHASE_WIDTH = 250;
 
   let currentY = 0;
 
   pipelines.forEach((pipeline, pipelineIndex) => {
     // First pass: calculate max depth and count phases per column
     const phasesByColumn: { [key: number]: number } = {};
-    const maxWidthByColumn: { [key: number]: number } = {};
     let maxDepth = 0;
 
     pipeline.phases.forEach((phase) => {
       const depth = getNodeDepth(phase, pipeline.phases);
       maxDepth = Math.max(maxDepth, depth);
       phasesByColumn[depth] = (phasesByColumn[depth] || 0) + 1;
-      maxWidthByColumn[depth] = Math.max(maxWidthByColumn[depth] || 0, getNodeWidth(phase));
     });
 
     const maxPhasesInColumn = Math.max(...Object.values(phasesByColumn), 1);
     const pipelineHeight = maxPhasesInColumn * PHASE_SPACING_Y + PIPELINE_VERTICAL_PADDING;
 
     // Calculate required width based on deepest node plus padding
-    // const requiredWidth = ((maxDepth + 1) * (3 * PHASE_PADDING_X + PHASE_WIDTH));
-    const requiredWidth = Object.values(maxWidthByColumn).reduce((prev, curr) => {
-      return prev + curr + 2 * PHASE_PADDING_X;
-    }, 0);
+    const requiredWidth = (maxDepth + 1) * (2 * PHASE_PADDING_X + PHASE_WIDTH);
 
     // Add group node
-    const groupNode: PipelineNode = {
+    const groupNode: GroupNode = {
       id: pipeline.name,
       type: 'group',
       position: { x: 0, y: currentY },
       data: { labels: { name: pipeline.name } },
       style: {
-        width: requiredWidth,
-        height: pipelineHeight
+        // width: requiredWidth,
+        // height: pipelineHeight
       }
     };
     nodes.push(groupNode);
@@ -152,20 +217,13 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
       const depth = getNodeDepth(phase, pipeline.phases);
       columnCount[depth] = (columnCount[depth] || 0) + 1;
 
-      // const xPosition = depth * (PHASE_WIDTH + (2 * PHASE_PADDING_X)) + ((depth + 1) * PHASE_PADDING_X);
-      // WTF Typescript - Object.keys (even when object is typed as {[num]:num}) thinks it returns string[]
-      const xPosition =
-        (Object.keys(maxWidthByColumn) as unknown as number[])
-          .sort()
-          .slice(0, depth)
-          .reduce((prev, curr) => {
-            return prev + (maxWidthByColumn[curr] || 0) + 2 * PHASE_PADDING_X;
-          }, 0) + PHASE_PADDING_X;
+      const xPosition = depth * (PHASE_WIDTH + PHASE_PADDING_X) + PHASE_PADDING_X;
 
       const yPosition = PIPELINE_VERTICAL_PADDING / 2 + (columnCount[depth] - 1) * PHASE_SPACING_Y;
 
-      const node: PipelineNode = {
-        id: phase.name,
+      const phaseId = `${pipeline.name}-${phase.name}`;
+      const node: PhaseNode = {
+        id: phaseId,
         type: 'phase',
         position: { x: xPosition, y: yPosition },
         parentId: pipeline.name,
@@ -179,9 +237,9 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
 
       if (phase.depends_on) {
         edges.push({
-          id: `edge-${phase.depends_on}-${phase.name}`,
-          source: phase.depends_on,
-          target: phase.name
+          id: `edge-${pipeline.name}-${phase.depends_on}-${phase.name}`,
+          source: `${pipeline.name}-${phase.depends_on}`,
+          target: phaseId
         });
       }
     });
@@ -198,21 +256,11 @@ export function transformPipelines(pipelines: Pipeline[]): FlowPipeline {
 }
 
 // Helper function to calculate the depth of a phase based on its dependencies
-function getNodeDepth(phase: Pipeline['phases'][0], allPhases: Pipeline['phases']): number {
+function getNodeDepth(phase: Phase, allPhases: Phase[]): number {
   if (!phase.depends_on) return 0;
 
   const parentPhase = allPhases.find((c) => c.name === phase.depends_on);
   if (!parentPhase) return 0;
 
   return 1 + getNodeDepth(parentPhase, allPhases);
-}
-
-function getNodeWidth(phase: Phase): number {
-  let entries = [20, phase.name.length];
-  entries.push(
-    ...Object.entries(phase.labels || {}).map(([key, value]): number => {
-      return `${key}: ${value}`.length;
-    })
-  );
-  return Math.max(...entries) * 10;
 }
