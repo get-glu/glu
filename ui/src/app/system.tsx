@@ -16,12 +16,6 @@ export default function System() {
   useEffect(() => {
     const fetchData = async () => {
       setSystem(await getSystem());
-    };
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
       setPipelines(await listPipelines());
     };
     fetchData();
