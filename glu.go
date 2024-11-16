@@ -290,13 +290,20 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 	var (
 		labels = labels{}
 		all    bool
+		apply  bool
 	)
 
 	set := flag.NewFlagSet("promote", flag.ExitOnError)
 	set.Var(&labels, "label", "selector for filtering phases (format key=value)")
+	set.BoolVar(&apply, "apply", false, "actually run promotions (default dry-run)")
 	set.BoolVar(&all, "all", false, "promote all phases (ignores label filters)")
 	if err := set.Parse(args); err != nil {
 		return err
+	}
+
+	var logArgs []any
+	if !apply {
+		logArgs = append(logArgs, "note", "use --apply for promotion to take effect (dry run)")
 	}
 
 	if all {
@@ -304,13 +311,19 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 		labels = nil
 	}
 
+	for k, v := range labels {
+		logArgs = append(logArgs, k, v)
+	}
+
+	slog.Info("starting promotion", logArgs...)
+
 	if set.NArg() == 0 {
 		if len(labels) == 0 && !all {
 			return errors.New("please pass --all if you want to promote all phases")
 		}
 
 		for _, pipeline := range s.pipelines {
-			if err := promoteAllPhases(ctx, pipeline.Phases()); err != nil {
+			if err := promoteAllPhases(ctx, pipeline.Phases(core.HasAllLabels(labels)), apply); err != nil {
 				return err
 			}
 		}
@@ -325,7 +338,7 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 
 	phases := pipeline.Phases(core.HasAllLabels(labels))
 	if set.NArg() < 2 {
-		return promoteAllPhases(ctx, phases)
+		return promoteAllPhases(ctx, phases, apply)
 	}
 
 	phase, err := pipeline.PhaseByName(set.Arg(1))
@@ -333,7 +346,7 @@ func (s *System) promote(ctx context.Context, args ...string) error {
 		return err
 	}
 
-	if err := phase.Promote(ctx); err != nil {
+	if err := promoteAllPhases(ctx, toIter(phase), apply); err != nil {
 		return err
 	}
 
@@ -345,10 +358,24 @@ type Schedule struct {
 	options  []containers.Option[core.PhaseOptions]
 }
 
-func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase]) error {
+func toIter[V any](v ...V) iter.Seq[V] {
+	return func(yield func(V) bool) {
+		for _, vv := range v {
+			if !yield(vv) {
+				break
+			}
+		}
+	}
+}
+
+func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase], apply bool) error {
 	for phase := range phases {
-		if err := phase.Promote(ctx); err != nil {
-			return err
+		slog.Info("promoting phase", "phase", phase.Metadata().Name, "dry-run", !apply)
+
+		if apply {
+			if err := phase.Promote(ctx); err != nil {
+				return err
+			}
 		}
 	}
 
