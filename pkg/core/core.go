@@ -189,7 +189,7 @@ func (p *Pipeline[R]) Dependencies() map[Phase]Phase {
 }
 
 // hasAllLabels returns true if the provided phase has all the supplied labels
-func hasAllLabels(c Phase, toFind map[string]string) bool {
+func hasAllLabels(c Phase, toFind map[string]string) (found bool) {
 	labels := c.Metadata().Labels
 	for k, v := range toFind {
 		if found, ok := labels[k]; !ok || v != found {
