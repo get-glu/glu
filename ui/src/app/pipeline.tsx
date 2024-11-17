@@ -130,8 +130,10 @@ function getElements(pipeline: Pipeline): FlowPipeline {
       type: 'phase',
       position: { x: 0, y: 0 },
       data: {
+        pipeline: pipeline.name,
         name: phase.name,
-        labels: phase.labels || {}
+        labels: phase.labels || {},
+        depends_on: phase.depends_on
       },
       extent: 'parent'
     };
