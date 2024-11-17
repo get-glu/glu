@@ -4,14 +4,14 @@ import '@xyflow/react/dist/style.css';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { getSystem, listPipelines } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
-import { Pipeline as PipelineComponent } from '@/app/pipeline';
-import { System } from '@/types/system';
-import { Pipeline } from '@/types/pipeline';
+import { Pipeline } from '@/components/pipeline';
+import { System as SystemType } from '@/types/system';
+import { Pipeline as PipelineType } from '@/types/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 
 export default function System() {
-  const [system, setSystem] = useState<System>();
-  const [pipelines, setPipelines] = useState<Pipeline[]>();
+  const [system, setSystem] = useState<SystemType>();
+  const [pipelines, setPipelines] = useState<PipelineType[]>();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,11 +49,11 @@ export default function System() {
       </div>
 
       <div className="flex w-full justify-center">
-        <div className="flex w-3/5 flex-col">
+        <div className="flex w-4/5 flex-col">
           {pipelines &&
-            pipelines.map((pipeline: Pipeline) => (
+            pipelines.map((pipeline: PipelineType) => (
               <ReactFlowProvider key={`provider-${pipeline.name}`}>
-                <PipelineComponent key={pipeline.name} pipeline={pipeline}></PipelineComponent>
+                <Pipeline key={pipeline.name} pipeline={pipeline} />
               </ReactFlowProvider>
             ))}
         </div>

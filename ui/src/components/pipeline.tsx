@@ -12,7 +12,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useTheme } from '@/components/theme-provider';
 import { PhaseNode as PhaseNodeComponent } from '@/components/node';
-import { Pipeline } from '@/types/pipeline';
+import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
 
@@ -20,7 +20,7 @@ const nodeTypes = {
   phase: PhaseNodeComponent
 };
 
-export function Pipeline(props: { pipeline: Pipeline }) {
+export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
   const { fitView } = useReactFlow<PipelineNode, PipelineEdge>();
 
@@ -52,10 +52,8 @@ export function Pipeline(props: { pipeline: Pipeline }) {
 
   return (
     <div key={`pipeline-${pipeline.name}`} className="mb-10 flex h-[500px] w-full flex-col">
-      <div className="mb-5 mt-5 flex bg-background px-2 text-lg font-medium text-muted-foreground">
-        {pipeline.name}
-      </div>
-      <div className="mb-5 flex h-full w-full border-2 border-solid border-black">
+      <div className="mb-5 mt-5 flex bg-background text-lg font-medium">{pipeline.name}</div>
+      <div className="mb-5 flex h-full w-full border border-solid border-black">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -89,7 +87,15 @@ export function Pipeline(props: { pipeline: Pipeline }) {
 
 function getLayoutedElements(pipeline: FlowPipeline) {
   const g = new Dagre.graphlib.Graph({ compound: true }).setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'LR' });
+
+  // Set larger node separation and rank separation
+  g.setGraph({
+    rankdir: 'LR',
+    nodesep: 10, // Horizontal spacing between nodes in the same rank
+    ranksep: 100, // Spacing between ranks (vertical layers)
+    marginx: 10, // Margin from left/right edges
+    marginy: 10 // Margin from top/bottom edges
+  });
 
   pipeline.edges.forEach((edge) => g.setEdge(edge.source, edge.target));
   pipeline.nodes.forEach((node) => {
@@ -120,7 +126,7 @@ function getLayoutedElements(pipeline: FlowPipeline) {
   };
 }
 
-function getElements(pipeline: Pipeline): FlowPipeline {
+function getElements(pipeline: PipelineType): FlowPipeline {
   const nodes: PipelineNode[] = [];
   const edges: PipelineEdge[] = [];
 
