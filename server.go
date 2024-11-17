@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/get-glu/glu/pkg/core"
@@ -85,15 +84,6 @@ type phaseResponse struct {
 	Value     interface{}       `json:"value,omitempty"`
 }
 
-// Helper functions
-func (s *Server) getPipelineByName(name string) (Pipeline, error) {
-	pipeline, ok := s.system.pipelines[name]
-	if !ok {
-		return nil, fmt.Errorf("pipeline not found")
-	}
-	return pipeline, nil
-}
-
 func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Phase]core.Phase) phaseResponse {
 	var (
 		dependsOn string
@@ -117,7 +107,7 @@ func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Pha
 	}
 }
 
-func (s *Server) createPipelineResponse(ctx context.Context, pipeline Pipeline) (pipelineResponse, error) {
+func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipeline) (pipelineResponse, error) {
 	dependencies := pipeline.Dependencies()
 	phases := make([]phaseResponse, 0)
 
@@ -173,7 +163,7 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -189,7 +179,7 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
-	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -223,7 +213,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
-	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

@@ -3,21 +3,21 @@ package glu
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"iter"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
-	"text/tabwriter"
 	"time"
 
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/internal/oci"
+	"github.com/get-glu/glu/pkg/cli"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
@@ -31,8 +31,6 @@ import (
 )
 
 const defaultScheduleInternal = time.Minute
-
-var ErrNotFound = errors.New("not found")
 
 type Metadata = core.Metadata
 
@@ -54,22 +52,11 @@ func Label(k, v string) containers.Option[Metadata] {
 	}
 }
 
-func NewPipeline[R core.Resource](meta Metadata, newFn func() R) *core.Pipeline[R] {
-	return core.NewPipeline(meta, newFn)
-}
-
-type Pipeline interface {
-	Metadata() Metadata
-	PhaseByName(string) (core.Phase, error)
-	Phases(...containers.Option[core.PhaseOptions]) iter.Seq[core.Phase]
-	Dependencies() map[core.Phase]core.Phase
-}
-
 type System struct {
 	ctx       context.Context
 	meta      Metadata
 	conf      *Config
-	pipelines map[string]Pipeline
+	pipelines map[string]core.Pipeline
 	schedules []Schedule
 	err       error
 
@@ -80,7 +67,7 @@ func NewSystem(ctx context.Context, meta Metadata) *System {
 	r := &System{
 		ctx:       ctx,
 		meta:      meta,
-		pipelines: map[string]Pipeline{},
+		pipelines: map[string]core.Pipeline{},
 	}
 
 	r.server = newServer(r)
@@ -88,7 +75,20 @@ func NewSystem(ctx context.Context, meta Metadata) *System {
 	return r
 }
 
-func (s *System) AddPipeline(fn func(context.Context, *Config) (Pipeline, error)) *System {
+func (s *System) GetPipeline(name string) (core.Pipeline, error) {
+	pipeline, ok := s.pipelines[name]
+	if !ok {
+		return nil, fmt.Errorf("pipeline %q: %w", name, core.ErrNotFound)
+	}
+
+	return pipeline, nil
+}
+
+func (s *System) Pipelines() iter.Seq2[string, core.Pipeline] {
+	return maps.All(s.pipelines)
+}
+
+func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, error)) *System {
 	// skip next step if error is not nil
 	if s.err != nil {
 		return s
@@ -143,7 +143,7 @@ func (s *System) Run() error {
 	defer cancel()
 
 	if len(os.Args) > 1 {
-		return s.runOnce(ctx)
+		return cli.Run(ctx, s, os.Args...)
 	}
 
 	var (
@@ -178,208 +178,9 @@ func (s *System) Run() error {
 	return group.Wait()
 }
 
-func (s *System) runOnce(ctx context.Context) error {
-	switch os.Args[1] {
-	case "inspect":
-		return s.inspect(ctx, os.Args[2:]...)
-	case "promote":
-		return s.promote(ctx, os.Args[2:]...)
-	default:
-		return fmt.Errorf("unexpected command %q (expected one of [inspect promote])", os.Args[1])
-	}
-}
-
-func (s *System) getPipeline(name string) (Pipeline, error) {
-	pipeline, ok := s.pipelines[name]
-	if !ok {
-		return nil, fmt.Errorf("pipeline %q: %w", name, ErrNotFound)
-	}
-
-	return pipeline, nil
-}
-
-func (s *System) inspect(ctx context.Context, args ...string) (err error) {
-	wr := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	defer func() {
-		if ferr := wr.Flush(); ferr != nil && err == nil {
-			err = ferr
-		}
-	}()
-
-	if len(args) == 0 {
-		fmt.Fprintln(wr, "NAME")
-		for name := range s.pipelines {
-			fmt.Fprintln(wr, name)
-		}
-		return nil
-	}
-
-	pipeline, err := s.getPipeline(args[0])
-	if err != nil {
-		return err
-	}
-
-	if len(args) == 1 {
-		fmt.Fprintln(wr, "NAME\tDEPENDS_ON")
-		deps := pipeline.Dependencies()
-		for phase := range pipeline.Phases() {
-			dependsName := ""
-			if depends, ok := deps[phase]; ok && depends != nil {
-				dependsName = depends.Metadata().Name
-			}
-
-			fmt.Fprintf(wr, "%s\t%s\n", phase.Metadata().Name, dependsName)
-		}
-		return nil
-	}
-
-	phase, err := pipeline.PhaseByName(args[1])
-	if err != nil {
-		return err
-	}
-
-	inst, err := phase.Get(ctx)
-	if err != nil {
-		return err
-	}
-
-	var extraFields [][2]string
-	fields, ok := inst.(fields)
-	if ok {
-		extraFields = fields.PrinterFields()
-	}
-
-	fmt.Fprint(wr, "NAME")
-	for _, field := range extraFields {
-		fmt.Fprintf(wr, "\t%s", field[0])
-	}
-	fmt.Fprintln(wr)
-
-	meta := phase.Metadata()
-	fmt.Fprintf(wr, "%s", meta.Name)
-	for _, field := range extraFields {
-		fmt.Fprintf(wr, "\t%s", field[1])
-	}
-	fmt.Fprintln(wr)
-
-	return nil
-}
-
-type fields interface {
-	PrinterFields() [][2]string
-}
-
-type labels map[string]string
-
-func (l labels) String() string {
-	return "KEY=VALUE"
-}
-
-func (l labels) Set(v string) error {
-	key, value, match := strings.Cut(v, "=")
-	if !match {
-		return fmt.Errorf("value should be in the form key=value (found %q)", v)
-	}
-
-	l[key] = value
-
-	return nil
-}
-
-func (s *System) promote(ctx context.Context, args ...string) error {
-	var (
-		labels = labels{}
-		all    bool
-		apply  bool
-	)
-
-	set := flag.NewFlagSet("promote", flag.ExitOnError)
-	set.Var(&labels, "label", "selector for filtering phases (format key=value)")
-	set.BoolVar(&apply, "apply", false, "actually run promotions (default dry-run)")
-	set.BoolVar(&all, "all", false, "promote all phases (ignores label filters)")
-	if err := set.Parse(args); err != nil {
-		return err
-	}
-
-	var logArgs []any
-	if !apply {
-		logArgs = append(logArgs, "note", "use --apply for promotion to take effect (dry run)")
-	}
-
-	if all {
-		// ignore labels if the all flag is passed
-		labels = nil
-	}
-
-	for k, v := range labels {
-		logArgs = append(logArgs, k, v)
-	}
-
-	slog.Info("starting promotion", logArgs...)
-
-	if set.NArg() == 0 {
-		if len(labels) == 0 && !all {
-			return errors.New("please pass --all if you want to promote all phases")
-		}
-
-		for _, pipeline := range s.pipelines {
-			if err := promoteAllPhases(ctx, pipeline.Phases(core.HasAllLabels(labels)), apply); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	pipeline, err := s.getPipeline(set.Arg(0))
-	if err != nil {
-		return err
-	}
-
-	phases := pipeline.Phases(core.HasAllLabels(labels))
-	if set.NArg() < 2 {
-		return promoteAllPhases(ctx, phases, apply)
-	}
-
-	phase, err := pipeline.PhaseByName(set.Arg(1))
-	if err != nil {
-		return err
-	}
-
-	if err := promoteAllPhases(ctx, toIter(phase), apply); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 type Schedule struct {
 	interval time.Duration
 	options  []containers.Option[core.PhaseOptions]
-}
-
-func toIter[V any](v ...V) iter.Seq[V] {
-	return func(yield func(V) bool) {
-		for _, vv := range v {
-			if !yield(vv) {
-				break
-			}
-		}
-	}
-}
-
-func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase], apply bool) error {
-	for phase := range phases {
-		slog.Info("promoting phase", "phase", phase.Metadata().Name, "dry-run", !apply)
-
-		if apply {
-			if err := phase.Promote(ctx); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s *System) SchedulePromotion(opts ...containers.Option[Schedule]) *System {
