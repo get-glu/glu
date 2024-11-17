@@ -21,8 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const defaultScheduleInternal = time.Minute
-
 // Metadata is an alias for the core Metadata structure (see core.Metadata)
 type Metadata = core.Metadata
 
@@ -69,7 +67,7 @@ type System struct {
 	meta      Metadata
 	conf      *Config
 	pipelines map[string]core.Pipeline
-	schedules []Schedule
+	triggers  []Trigger
 	err       error
 
 	server *Server
@@ -196,76 +194,39 @@ func (s *System) Run() error {
 	})
 
 	group.Go(func() error {
-		return s.run(ctx)
+		return s.runTriggers(ctx)
 	})
 
 	return group.Wait()
 }
 
-// Schedule is a structure containing details for schedule promotion triggers.
-type Schedule struct {
-	interval time.Duration
-	options  []containers.Option[core.PhaseOptions]
+// Pipelines is a type which can list a set of configured name/Pipeline pairs.
+type Pipelines interface {
+	Pipelines() iter.Seq2[string, core.Pipeline]
 }
 
-// SchedulePromotion creates a schedule for running automated promotion calls.
-func (s *System) SchedulePromotion(opts ...containers.Option[Schedule]) *System {
-	sch := Schedule{
-		interval: defaultScheduleInternal,
-	}
+// Trigger is a type with a blocking function run which can trigger
+// calls to promote phases in a set of pipelines.
+type Trigger interface {
+	Run(context.Context, Pipelines)
+}
 
-	containers.ApplyAll(&sch, opts...)
-
-	s.schedules = append(s.schedules, sch)
+// AddTrigger registers a Trigger to run when the system is invoked in server mode.
+func (s *System) AddTrigger(trigger Trigger) *System {
+	s.triggers = append(s.triggers, trigger)
 
 	return s
 }
 
-// ScheduleInterval sets the interval on a schedule
-func ScheduleInterval(d time.Duration) containers.Option[Schedule] {
-	return func(s *Schedule) {
-		s.interval = d
-	}
-}
-
-// ScheduleMatchesPhase sets a match condition which matches a specific phase
-func ScheduleMatchesPhase(c core.Phase) containers.Option[Schedule] {
-	return func(s *Schedule) {
-		s.options = append(s.options, core.IsPhase(c))
-	}
-}
-
-// ScheduleMatchesLabel sets a match condition which matches any phase with the provided label
-func ScheduleMatchesLabel(k, v string) containers.Option[Schedule] {
-	return func(s *Schedule) {
-		s.options = append(s.options, core.HasLabel(k, v))
-	}
-}
-
-func (s *System) run(ctx context.Context) error {
+func (s *System) runTriggers(ctx context.Context) error {
 	var wg sync.WaitGroup
-	for _, sch := range s.schedules {
+	for _, trigger := range s.triggers {
 		wg.Add(1)
-		go func(sch Schedule) {
+		go func(trigger Trigger) {
 			defer wg.Done()
 
-			ticker := time.NewTicker(sch.interval)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					for _, pipeline := range s.pipelines {
-						for phase := range pipeline.Phases(sch.options...) {
-							if err := phase.Promote(ctx); err != nil {
-								slog.Error("reconciling resource", "name", phase.Metadata().Name, "error", err)
-							}
-						}
-					}
-
-				}
-			}
-		}(sch)
+			trigger.Run(ctx, s)
+		}(trigger)
 	}
 
 	finished := make(chan struct{})

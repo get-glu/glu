@@ -12,6 +12,7 @@ import (
 	"github.com/get-glu/glu/pkg/phases"
 	"github.com/get-glu/glu/pkg/src/git"
 	"github.com/get-glu/glu/pkg/src/oci"
+	"github.com/get-glu/glu/pkg/triggers/schedule"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
 )
@@ -64,11 +65,13 @@ func run(ctx context.Context) error {
 
 			// return configured pipeline to the system
 			return pipeline, nil
-		}).SchedulePromotion(
-		glu.ScheduleInterval(10*time.Second),
-		glu.ScheduleMatchesLabel("env", "staging"),
-		// alternatively, the phase instance can be target directly with:
-		// glu.ScheduleMatchesPhase(gitStaging),
+		}).AddTrigger(
+		schedule.New(
+			schedule.WithInterval(10*time.Second),
+			schedule.MatchesLabel("env", "staging"),
+			// alternatively, the phase instance can be target directly with:
+			// glu.ScheduleMatchesPhase(gitStaging),
+		),
 	).Run()
 }
 
