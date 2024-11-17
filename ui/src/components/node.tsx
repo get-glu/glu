@@ -1,16 +1,11 @@
-import { Handle, Position } from '@xyflow/react';
+import { Handle, NodeProps, Position } from '@xyflow/react';
 import { Package, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { PhaseNode } from '@/types/flow';
 
-interface PhaseData {
-  name: string;
-  type: string;
-  labels?: Record<string, string>;
-}
-
-const PhaseNode = ({ data }: { data: PhaseData }) => {
+const PhaseNode = ({ data }: NodeProps<PhaseNode>) => {
   const getIcon = () => {
-    switch (data.type) {
+    switch (data.labels?.type ?? '') {
       case 'oci':
         return <Package className="h-4 w-4" />;
       default:
@@ -19,7 +14,7 @@ const PhaseNode = ({ data }: { data: PhaseData }) => {
   };
 
   return (
-    <div className="relative min-h-[80px] min-w-[200px] rounded-lg border bg-background p-6 shadow-lg">
+    <div className="relative min-h-[80px] min-w-[100px] rounded-lg border bg-background p-6 shadow-lg">
       <Handle type="source" position={Position.Right} style={{ right: -8 }} />
 
       <div className="flex items-center gap-2">
@@ -27,18 +22,20 @@ const PhaseNode = ({ data }: { data: PhaseData }) => {
         <span className="text-sm font-medium">{data.name}</span>
       </div>
 
-      {data.labels && Object.entries(data.labels).length > 0 && (
-        <div className="mt-3 flex max-w-[180px] flex-wrap gap-1">
-          {Object.entries(data.labels).map(([key, value]) => (
-            <Badge
-              key={`${key}-${value}`}
-              className={`whitespace-nowrap text-xs ${getLabelColor(key, value)}`}
-            >
-              {key}: {value}
-            </Badge>
+      <div className="mt-3 flex w-full flex-col">
+        {data.labels &&
+          Object.entries(data.labels).length > 0 &&
+          Object.entries(data.labels).map(([key, value]) => (
+            <div className="mb-2 flex">
+              <Badge
+                key={`${key}-${value}`}
+                className={`whitespace-nowrap text-xs ${getLabelColor(key, value)}`}
+              >
+                {key}: {value}
+              </Badge>
+            </div>
           ))}
-        </div>
-      )}
+      </div>
 
       <Handle type="target" position={Position.Left} style={{ left: -8 }} />
     </div>
