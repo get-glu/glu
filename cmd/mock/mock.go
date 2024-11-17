@@ -43,7 +43,7 @@ func run(ctx context.Context) error {
 		// OCI phase
 		ociSource := NewMockSource()
 		ociPhase, err := phases.New(
-			glu.Name("oci"),
+			glu.Name("oci", glu.Label("type", "oci")),
 			ccPipeline,
 			ociSource,
 		)
@@ -99,7 +99,7 @@ func run(ctx context.Context) error {
 		// OCI phase
 		fdOciSource := NewMockSource()
 		fdOciPhase, err := phases.New(
-			glu.Name("oci"),
+			glu.Name("oci", glu.Label("type", "oci")),
 			fdPipeline,
 			fdOciSource,
 		)
