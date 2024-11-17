@@ -10,38 +10,35 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/get-glu/glu/internal/git"
-	"github.com/get-glu/glu/internal/oci"
 	"github.com/get-glu/glu/pkg/cli"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/credentials"
-	"github.com/get-glu/glu/pkg/scm/github"
-	srcgit "github.com/get-glu/glu/pkg/src/git"
-	"github.com/go-git/go-git/v5/plumbing/transport"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	giturls "github.com/whilp/git-urls"
 	"golang.org/x/sync/errgroup"
 )
 
 const defaultScheduleInternal = time.Minute
 
+// Metadata is an alias for the core Metadata structure (see core.Metadata)
 type Metadata = core.Metadata
 
+// Resource is an alias for the core Resource interface (see core.Resource)
 type Resource = core.Resource
 
+// Name is a utility for quickly creating an instance of Metadata
+// with a name (required) and optional labels / annotations
 func Name(name string, opts ...containers.Option[Metadata]) Metadata {
 	meta := Metadata{Name: name}
 	containers.ApplyAll(&meta, opts...)
 	return meta
 }
 
+// Label returns a functional option for Metadata which sets
+// a single label k/v pair on the provided Metadata
 func Label(k, v string) containers.Option[Metadata] {
 	return func(m *core.Metadata) {
 		if m.Labels == nil {
@@ -52,6 +49,21 @@ func Label(k, v string) containers.Option[Metadata] {
 	}
 }
 
+// Annotation returns a functional option for Metadata which sets
+// a single annotation k/v pair on the provided Metadata
+func Annotation(k, v string) containers.Option[Metadata] {
+	return func(m *core.Metadata) {
+		if m.Annotations == nil {
+			m.Annotations = map[string]string{}
+		}
+
+		m.Annotations[k] = v
+	}
+}
+
+// System is the primary entrypoint for build a set of Glu pipelines.
+// It supports functions for adding new pipelines, registering triggers
+// running the API server and handly command-line inputs.
 type System struct {
 	ctx       context.Context
 	meta      Metadata
@@ -63,6 +75,7 @@ type System struct {
 	server *Server
 }
 
+// NewSystem constructs and configures a new system with the provided metadata.
 func NewSystem(ctx context.Context, meta Metadata) *System {
 	r := &System{
 		ctx:       ctx,
@@ -75,6 +88,7 @@ func NewSystem(ctx context.Context, meta Metadata) *System {
 	return r
 }
 
+// GetPipeline returns a pipeline by name.
 func (s *System) GetPipeline(name string) (core.Pipeline, error) {
 	pipeline, ok := s.pipelines[name]
 	if !ok {
@@ -84,10 +98,15 @@ func (s *System) GetPipeline(name string) (core.Pipeline, error) {
 	return pipeline, nil
 }
 
+// Pipelines returns an iterator across all name and pipeline pairs
+// previously registered on the system.
 func (s *System) Pipelines() iter.Seq2[string, core.Pipeline] {
 	return maps.All(s.pipelines)
 }
 
+// AddPipeline invokes a pipeline builder function provided by the caller.
+// The function is provided with the systems configuration and (if successful)
+// the system registers the resulting pipeline.
 func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, error)) *System {
 	// skip next step if error is not nil
 	if s.err != nil {
@@ -134,6 +153,11 @@ func (s *System) configuration() (_ *Config, err error) {
 	return s.conf, nil
 }
 
+// Run invokes or serves the entire system.
+// Given command-line arguments are provided then the system is run as a CLI.
+// Otherwise, the system runs in server mode, which means that:
+// - The API is hosted on the configured port
+// - Triggers are setup (schedules etc.)
 func (s *System) Run() error {
 	if s.err != nil {
 		return s.err
@@ -178,11 +202,13 @@ func (s *System) Run() error {
 	return group.Wait()
 }
 
+// Schedule is a structure containing details for schedule promotion triggers.
 type Schedule struct {
 	interval time.Duration
 	options  []containers.Option[core.PhaseOptions]
 }
 
+// SchedulePromotion creates a schedule for running automated promotion calls.
 func (s *System) SchedulePromotion(opts ...containers.Option[Schedule]) *System {
 	sch := Schedule{
 		interval: defaultScheduleInternal,
@@ -195,18 +221,21 @@ func (s *System) SchedulePromotion(opts ...containers.Option[Schedule]) *System 
 	return s
 }
 
+// ScheduleInterval sets the interval on a schedule
 func ScheduleInterval(d time.Duration) containers.Option[Schedule] {
 	return func(s *Schedule) {
 		s.interval = d
 	}
 }
 
+// ScheduleMatchesPhase sets a match condition which matches a specific phase
 func ScheduleMatchesPhase(c core.Phase) containers.Option[Schedule] {
 	return func(s *Schedule) {
 		s.options = append(s.options, core.IsPhase(c))
 	}
 }
 
+// ScheduleMatchesLabel sets a match condition which matches any phase with the provided label
 func ScheduleMatchesLabel(k, v string) containers.Option[Schedule] {
 	return func(s *Schedule) {
 		s.options = append(s.options, core.HasLabel(k, v))
@@ -253,167 +282,4 @@ func (s *System) run(ctx context.Context) error {
 	case <-finished:
 		return ctx.Err()
 	}
-}
-
-type Config struct {
-	conf  *config.Config
-	creds *credentials.CredentialSource
-
-	cache struct {
-		oci      map[string]*oci.Repository
-		repo     map[string]*git.Repository
-		proposer map[string]srcgit.Proposer
-	}
-}
-
-func newConfigSource(conf *config.Config) *Config {
-	c := &Config{
-		conf:  conf,
-		creds: credentials.New(conf.Credentials),
-	}
-
-	c.cache.oci = map[string]*oci.Repository{}
-	c.cache.repo = map[string]*git.Repository{}
-	c.cache.proposer = map[string]srcgit.Proposer{}
-
-	return c
-}
-
-func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer srcgit.Proposer, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("git %q: %w", name, err)
-		}
-	}()
-
-	// check cache for previously built repository
-	if repo, ok := c.cache.repo[name]; ok {
-		return repo, c.cache.proposer[name], nil
-	}
-
-	conf, ok := c.conf.Sources.Git[name]
-	if !ok {
-		return nil, nil, errors.New("configuration not found")
-	}
-
-	var (
-		method  transport.AuthMethod
-		srcOpts = []containers.Option[git.Repository]{
-			git.WithDefaultBranch(conf.DefaultBranch),
-		}
-	)
-
-	if conf.Path != "" {
-		srcOpts = append(srcOpts, git.WithFilesystemStorage(conf.Path))
-	}
-
-	if conf.Remote != nil {
-		slog.Debug("configuring remote", "remote", conf.Remote.Name)
-
-		srcOpts = append(srcOpts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
-
-		if conf.Remote.Credential != "" {
-			creds, err := c.creds.Get(conf.Remote.Credential)
-			if err != nil {
-				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-
-			method, err = creds.GitAuthentication()
-			if err != nil {
-				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
-			}
-		}
-	}
-
-	if method == nil {
-		method, err = ssh.DefaultAuthBuilder("git")
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	repo, err := git.NewRepository(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if conf.Proposals != nil {
-		repoURL, err := giturls.Parse(conf.Remote.URL)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
-		if len(parts) < 2 {
-			return nil, nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
-		}
-
-		var (
-			repoOwner = parts[0]
-			repoName  = strings.TrimSuffix(parts[1], ".git")
-		)
-
-		var proposalsEnabled bool
-		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
-			creds, err := c.creds.Get(conf.Proposals.Credential)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			client, err := creds.GitHubClient(ctx)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			proposer = github.New(
-				client,
-				repoOwner,
-				repoName,
-			)
-		}
-
-		slog.Debug("configured scm proposer",
-			slog.String("owner", repoOwner),
-			slog.String("name", repoName),
-			slog.Bool("proposals_enabled", proposalsEnabled),
-		)
-	}
-
-	c.cache.repo[name] = repo
-	c.cache.proposer[name] = proposer
-
-	return repo, proposer, nil
-}
-
-func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
-	// check cache for previously built repository
-	if repo, ok := c.cache.oci[name]; ok {
-		return repo, nil
-	}
-
-	conf, ok := c.conf.Sources.OCI[name]
-	if !ok {
-		return nil, fmt.Errorf("oci %q: configuration not found", name)
-	}
-
-	var cred *credentials.Credential
-	if conf.Credential != "" {
-		cred, err = c.creds.Get(conf.Credential)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	repo, err := oci.New(conf.Reference, cred)
-	if err != nil {
-		return nil, err
-	}
-
-	c.cache.oci[name] = repo
-
-	return repo, nil
-}
-
-func (c *Config) GetCredential(name string) (*credentials.Credential, error) {
-	return c.creds.Get(name)
 }

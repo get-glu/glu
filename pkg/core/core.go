@@ -24,6 +24,8 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// Pipeline is a collection of phases with potential promotion dependencies
+// relationships between one another.
 type Pipeline interface {
 	Metadata() Metadata
 	PhaseByName(string) (Phase, error)

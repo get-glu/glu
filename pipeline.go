@@ -8,8 +8,10 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 )
 
+// Pipeline is an alias for the core Pipeline interface (see core.Pipeline)
 type Pipeline = core.Pipeline
 
+// Phase is an alias for the core Phase interface (see core.Phase)
 type Phase = core.Phase
 
 type entry[R Resource] struct {
@@ -18,13 +20,14 @@ type entry[R Resource] struct {
 }
 
 // ResourcePipeline is a collection of phases for a given resource type R.
+// It implements the core.Phase interface and is scoped to a single Resource implementation.
 type ResourcePipeline[R Resource] struct {
 	meta  Metadata
 	newFn func() R
 	nodes map[string]entry[R]
 }
 
-// NewPipeline constructs and configures a new instance of Pipeline
+// NewPipeline constructs and configures a new instance of *ResourcePipeline[R]
 func NewPipeline[R Resource](meta Metadata, newFn func() R) *ResourcePipeline[R] {
 	return &ResourcePipeline[R]{
 		meta:  meta,
