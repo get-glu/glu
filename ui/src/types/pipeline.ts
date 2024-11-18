@@ -7,6 +7,7 @@ export interface Pipeline {
 export interface Phase {
   name: string;
   depends_on?: string;
+  source_type?: string;
   labels?: Record<string, string>;
   value?: unknown;
 }

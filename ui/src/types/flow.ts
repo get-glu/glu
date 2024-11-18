@@ -12,6 +12,7 @@ type PhaseNodeData = {
   name: string;
   labels?: Record<string, string>;
   depends_on?: string;
+  source_type?: string;
 };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;

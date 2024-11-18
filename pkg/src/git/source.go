@@ -54,6 +54,10 @@ type Source[A Resource] struct {
 	proposalOptions ProposalOption
 }
 
+func (s Source[A]) Type() string {
+	return "git"
+}
+
 type ProposalOption struct {
 	Labels []string
 }

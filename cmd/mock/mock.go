@@ -24,10 +24,15 @@ func NewMockResource() *MockResource {
 
 // MockSource implements a simple source for our mock resources
 type MockSource struct {
+	typ string
 }
 
-func NewMockSource() *MockSource {
-	return &MockSource{}
+func NewMockSource(typ string) *MockSource {
+	return &MockSource{typ: typ}
+}
+
+func (m *MockSource) Type() string {
+	return m.typ
 }
 
 func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {
@@ -41,9 +46,9 @@ func run(ctx context.Context) error {
 		ccPipeline := glu.NewPipeline(glu.Name("checkout"), NewMockResource)
 
 		// OCI phase
-		ociSource := NewMockSource()
+		ociSource := NewMockSource("oci")
 		ociPhase, err := phases.New(
-			glu.Name("oci", glu.Label("type", "oci")),
+			glu.Name("oci"),
 			ccPipeline,
 			ociSource,
 		)
@@ -52,7 +57,7 @@ func run(ctx context.Context) error {
 		}
 
 		// Staging phase
-		stagingSource := NewMockSource()
+		stagingSource := NewMockSource("git")
 		stagingPhase, err := phases.New(
 			glu.Name("staging",
 				glu.Label("environment", "staging"),
@@ -67,7 +72,7 @@ func run(ctx context.Context) error {
 		}
 
 		// Production phases
-		prodEastSource := NewMockSource()
+		prodEastSource := NewMockSource("git")
 		phases.New(
 			glu.Name("production-east-1",
 				glu.Label("environment", "production"),
@@ -78,7 +83,7 @@ func run(ctx context.Context) error {
 			core.PromotesFrom(stagingPhase),
 		)
 
-		prodWestSource := NewMockSource()
+		prodWestSource := NewMockSource("git")
 		phases.New(
 			glu.Name("production-west-1",
 				glu.Label("environment", "production"),
@@ -97,9 +102,9 @@ func run(ctx context.Context) error {
 		fdPipeline := glu.NewPipeline(glu.Name("billing"), NewMockResource)
 
 		// OCI phase
-		fdOciSource := NewMockSource()
+		fdOciSource := NewMockSource("oci")
 		fdOciPhase, err := phases.New(
-			glu.Name("oci", glu.Label("type", "oci")),
+			glu.Name("oci"),
 			fdPipeline,
 			fdOciSource,
 		)
@@ -108,7 +113,7 @@ func run(ctx context.Context) error {
 		}
 
 		// Staging phase
-		fdStagingSource := NewMockSource()
+		fdStagingSource := NewMockSource("git")
 		fdStagingPhase, err := phases.New(
 			glu.Name("staging",
 				glu.Label("environment", "staging"),
@@ -123,7 +128,7 @@ func run(ctx context.Context) error {
 		}
 
 		// Production phase
-		fdProdSource := NewMockSource()
+		fdProdSource := NewMockSource("git")
 		phases.New(
 			glu.Name("production",
 				glu.Label("environment", "production"),

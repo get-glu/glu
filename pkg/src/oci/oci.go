@@ -29,6 +29,10 @@ func New[R Resource](resolver Resolver) *Source[R] {
 	}
 }
 
+func (s *Source[R]) Type() string {
+	return "oci"
+}
+
 func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 	desc, err := s.resolver.Resolve(ctx)
 	if err != nil {

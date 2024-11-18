@@ -78,10 +78,11 @@ type pipelineResponse struct {
 }
 
 type phaseResponse struct {
-	Name      string            `json:"name"`
-	DependsOn string            `json:"depends_on,omitempty"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Value     interface{}       `json:"value,omitempty"`
+	Name       string            `json:"name"`
+	DependsOn  string            `json:"depends_on,omitempty"`
+	SourceType string            `json:"source_type,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	Value      interface{}       `json:"value,omitempty"`
 }
 
 func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Phase]core.Phase) phaseResponse {
@@ -101,9 +102,10 @@ func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Pha
 	}
 
 	return phaseResponse{
-		Name:      phase.Metadata().Name,
-		DependsOn: dependsOn,
-		Labels:    labels,
+		Name:       phase.Metadata().Name,
+		DependsOn:  dependsOn,
+		Labels:     labels,
+		SourceType: phase.SourceType(),
 	}
 }
 

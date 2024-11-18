@@ -11,6 +11,7 @@ import (
 
 // Source is an interface around storage for resources.
 type Source[R core.Resource] interface {
+	Type() string
 	View(_ context.Context, pipeline, phase core.Metadata, _ R) error
 }
 
@@ -56,6 +57,10 @@ func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[
 
 func (i *Phase[R]) Metadata() core.Metadata {
 	return i.meta
+}
+
+func (i *Phase[R]) SourceType() string {
+	return i.source.Type()
 }
 
 func (i *Phase[R]) Get(ctx context.Context) (any, error) {

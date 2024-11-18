@@ -7,7 +7,7 @@ import { promotePhase } from '@/services/api';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
-    switch (data.labels?.type ?? '') {
+    switch (data.source_type ?? '') {
       case 'oci':
         return <Package className="h-4 w-4" />;
       default:
