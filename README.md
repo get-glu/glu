@@ -1,6 +1,7 @@
 <div>
   <img align="left" src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
   <br>
+  <br>
   <strong>Glu</strong> - Progressive delivery that sticks
   <p>
     Glu is the missing piece in your CI/CD toolbelt.
