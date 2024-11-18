@@ -15,3 +15,10 @@ export const listPipelines = async (): Promise<Pipeline[]> => {
   const response = await api.get<{ pipelines: Pipeline[] }>('/pipelines');
   return response.data.pipelines;
 };
+
+export const promotePhase = async (pipeline: string, phase: string) => {
+  const response = await api.post(`/pipelines/${pipeline}/phase/${phase}/promote`);
+  if (response.status !== 200) {
+    throw new Error(`unexpected status ${response.status}`);
+  }
+};

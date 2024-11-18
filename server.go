@@ -55,6 +55,7 @@ func (s *Server) setupRoutes() {
 		r.Get("/pipelines", s.listPipelines)
 		r.Get("/pipelines/{pipeline}", s.getPipeline)
 		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
+		r.Post("/pipelines/{pipeline}/phases/{phase}/promote", s.promotePhase)
 	})
 }
 
@@ -161,9 +162,12 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: handle pagination
-	json.NewEncoder(w).Encode(listPipelinesResponse{
+	if err := json.NewEncoder(w).Encode(listPipelinesResponse{
 		Pipelines: pipelineResponses,
-	})
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
@@ -212,5 +216,33 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	response := s.createPhaseResponse(phase, pipeline.Dependencies())
 	response.Value = v
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
+	pipeline, err := s.getPipelineByName(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	phaseName := chi.URLParam(r, "phase")
+	phase, err := pipeline.PhaseByName(phaseName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, core.ErrNotFound) {
+			status = http.StatusNotFound
+		}
+
+		http.Error(w, err.Error(), status)
+		return
+	}
+
+	if err := phase.Promote(r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

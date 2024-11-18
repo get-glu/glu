@@ -8,8 +8,10 @@ export interface FlowPipeline {
 export type PipelineNode = PhaseNode;
 
 type PhaseNodeData = {
+  pipeline: string;
   name: string;
   labels?: Record<string, string>;
+  depends_on?: string;
 };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
