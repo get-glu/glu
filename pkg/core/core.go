@@ -45,7 +45,7 @@ type Resource interface {
 type Phase interface {
 	Metadata() Metadata
 	SourceType() string
-	Get(context.Context) (any, error)
+	Get(context.Context) (Resource, error)
 	Promote(context.Context) error
 }
 

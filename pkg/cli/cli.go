@@ -81,14 +81,19 @@ func inspect(ctx context.Context, s System, args ...string) (err error) {
 		extraFields = fields.PrinterFields()
 	}
 
-	fmt.Fprint(wr, "NAME")
+	fmt.Fprint(wr, "NAME\tDIGEST")
 	for _, field := range extraFields {
 		fmt.Fprintf(wr, "\t%s", field[0])
 	}
 	fmt.Fprintln(wr)
 
 	meta := phase.Metadata()
-	fmt.Fprintf(wr, "%s", meta.Name)
+	digest, err := inst.Digest()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(wr, "%s\t%s", meta.Name, digest)
 	for _, field := range extraFields {
 		fmt.Fprintf(wr, "\t%s", field[1])
 	}

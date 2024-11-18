@@ -63,7 +63,7 @@ func (i *Phase[R]) SourceType() string {
 	return i.source.Type()
 }
 
-func (i *Phase[R]) Get(ctx context.Context) (any, error) {
+func (i *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
 	return i.GetResource(ctx)
 }
 
