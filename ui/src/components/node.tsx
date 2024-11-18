@@ -1,11 +1,11 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
 import { Package, GitBranch, CircleArrowUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { PhaseNode } from '@/types/flow';
+import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { promotePhase } from '@/services/api';
 
-const PhaseNode = ({ data }: NodeProps<PhaseNode>) => {
+const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
     switch (data.labels?.type ?? '') {
       case 'oci':
@@ -37,7 +37,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNode>) => {
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content
-                  className="text-violet11 data-[state=delayed-open]:data-[side=bottom]:animate-slideUpAndFade data-[state=delayed-open]:data-[side=left]:animate-slideRightAndFade data-[state=delayed-open]:data-[side=right]:animate-slideLeftAndFade data-[state=delayed-open]:data-[side=top]:animate-slideDownAndFadet select-none rounded bg-white px-[15px] py-2.5 text-[15px] leading-none shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] will-change-[transform,opacity]"
+                  className="data-[state=delayed-open]:data-[side=bottom]:animate-slideUpAndFade data-[state=delayed-open]:data-[side=left]:animate-slideRightAndFade data-[state=delayed-open]:data-[side=right]:animate-slideLeftAndFade data-[state=delayed-open]:data-[side=top]:animate-slideDownAndFadet select-none rounded bg-white px-[15px] py-2.5 text-sm leading-none shadow-[hsl(206_22%_7%_/_35%)_0px_10px_38px_-10px,_hsl(206_22%_7%_/_20%)_0px_10px_20px_-15px] will-change-[transform,opacity]"
                   sideOffset={5}
                 >
                   Promote
@@ -82,7 +82,8 @@ function getLabelColor(key: string, value: string): string {
     'bg-purple-100 text-purple-800 hover:bg-purple-200 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-200',
     'bg-pink-100 text-pink-800 hover:bg-pink-200 dark:bg-pink-900 dark:hover:bg-pink-800 dark:text-pink-200',
     'bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 dark:text-indigo-200',
-    'bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800 dark:text-orange-200'
+    'bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800 dark:text-orange-200',
+    'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200'
   ];
 
   return colors[Math.abs(hash) % colors.length];
