@@ -1,4 +1,4 @@
-# Welcome <!-- {docsify-ignore-all} -->
+# Glu
 
 > Glu is progressive delivery as code
 
@@ -146,6 +146,7 @@ We look to add more in the not-so-distant future. However, these can also be imp
 // These types can be registered on pipelines and can depend upon on another for promotion.
 type Phase interface {
 	Metadata() Metadata
+	SourceType() string
 	Get(context.Context) (any, error)
 	Promote(context.Context) error
 }

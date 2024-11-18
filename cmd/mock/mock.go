@@ -15,7 +15,7 @@ type MockResource struct {
 }
 
 func (m *MockResource) Digest() (string, error) {
-	return "mock-digest", nil
+	return "sha256:5338d5b9949c5e94924b28dbca563a968ae7694209686e5e71ed8fa10c11fce0", nil
 }
 
 func NewMockResource() *MockResource {
