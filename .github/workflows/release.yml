@@ -1,7 +1,7 @@
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   publish:
@@ -9,35 +9,35 @@ jobs:
     permissions:
       contents: write
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v4
-      with:
-        node-version: 20
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-    - run: npm ci
-      working-directory: ui
+      - run: npm ci
+        working-directory: ui
 
-    - name: Remove dist entry from .gitignore
-      run: sed -i '/dist/d' ui/.gitignore
+      - name: Remove dist entry from .gitignore
+        run: sed -i '/dist/d' ui/.gitignore
 
-    - run: npm run build
-      working-directory: ui
+      - run: npm run build
+        working-directory: ui
 
-    - name: Add commit, tag and push changes
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "github-actions@users.noreply.github.com"
+      - name: Add commit, tag and push changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@users.noreply.github.com"
 
-        git add ./ui
+          git add ./ui
 
-        git commit -am "feat: adding generated distributable assets"
+          git commit -am "feat: adding generated distributable assets"
 
-        NEW_TAG=$(echo "${{ github.ref }}" | sed 's#^refs/tags/\(.*\)$#ui/\1#')
+          NEW_TAG=$(echo "${{ github.ref }}" | sed 's#^refs/tags/\(.*\)$#ui/\1#')
 
-        echo "Tagging new version $NEW_TAG"
+          echo "Tagging new version $NEW_TAG"
 
-        git tag $NEW_TAG
+          git tag $NEW_TAG
 
-        git push origin $NEW_TAG
+          git push origin $NEW_TAG

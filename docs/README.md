@@ -1,4 +1,4 @@
-# Welcome <!-- {docsify-ignore-all} -->
+# Welcome <!-- {docsify-ignore} -->
 
 > Glu is progressive delivery as code
 
