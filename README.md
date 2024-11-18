@@ -1,13 +1,18 @@
-<div align="center"j>
-  <img src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
+<div>
+  <img align="left" src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
+  <br>
+  <h3>Glu</h3>
+  <p>
+    <em>
+      Progressive delivery that sticks
+    </em>
+  </p>
+  <p>
+    Glu is the missing piece in your CI/CD toolbelt.
+    It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
+  </p>
+  <br>
 </div>
-
-# Glu
-
-> Progressive delivery that sticks
-
-Glu is the missing piece in your CI/CD toolbelt.
-It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
 
 ## What Is It?
 
