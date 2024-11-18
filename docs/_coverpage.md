@@ -1,4 +1,4 @@
-![stu the mascot for glu](/images/stu.png ':size=20%')
+![stu the mascot for glu](/images/stu.png ":size=20%")
 
 # Glu
 

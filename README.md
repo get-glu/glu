@@ -1,10 +1,25 @@
-Glu - Progressive delivery that sticks
---------------------------------------
+<div align="center"j>
+  <img src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
+</div>
+
+# Glu
+
+> Progressive delivery that sticks
 
 Glu is the missing piece in your CI/CD toolbelt.
 It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
 
-![Glu Illustration Diagram](./glu.svg)
+## What Is It?
+
+Glu is a framework built to enable you to implement your own custom pipelines in code.
+
+Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
+
+## Whats Included
+
+- A CLI for interacting with the state of your pipelines.
+- An API for interacting with the state of your pipelines.
+- An optional UI for visualizing and interacting with the state of your pipelines.
 
 ## Use Cases
 
@@ -13,7 +28,7 @@ Use it to implement anything that involes automating updates to Git repositories
 - ✅ Track new versions of applications in source repositories (OCI, Helm etc) and trigger updates to target configuration repositories (Git).
 - ⌛️ Coordinate any combination of scheduled, event driven or manually triggered promotions from one environment to the next.
 - ⏳ Expose a single pane of glass to compare and manipulating the state of your resources in one environment to the next.
-- 🗓️ Export standardized telemetry which ties together your entire end to end CI/CD and promotion pipeline sequence of events.
+- 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
 
 ## Development
 

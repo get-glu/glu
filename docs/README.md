@@ -3,7 +3,7 @@
 > Glu is progressive delivery as code
 
 Glu is a framework written and consumed in the Go programming language.
-It is intended to glue together configuration repositories and artefact sources using `code`.
+It is intended to glue together configuration repositories and artifact sources using `code`.
 
 ## Goals
 
