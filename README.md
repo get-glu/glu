@@ -1,8 +1,6 @@
 <img align="left" src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
 
-# Glu
-
-> Progressive delivery that sticks
+**Glu** - Progressive delivery that sticks
 
 Glu is the missing piece in your CI/CD toolbelt.
 It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
