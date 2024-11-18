@@ -1,6 +1,4 @@
-<div align="center"j>
-  <img src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
-</div>
+<img align="left" src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
 
 # Glu
 
