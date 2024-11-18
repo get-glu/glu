@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 
 	"github.com/get-glu/glu/pkg/core"
@@ -15,12 +16,14 @@ import (
 type Server struct {
 	system *System
 	router *chi.Mux
+	ui     fs.FS
 }
 
-func newServer(system *System) *Server {
+func newServer(system *System, ui fs.FS) *Server {
 	s := &Server{
 		system: system,
 		router: chi.NewRouter(),
+		ui:     ui,
 	}
 
 	s.setupRoutes()
@@ -34,27 +37,34 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://*", "https://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: false,
-		MaxAge:           300,
-	}))
-	s.router.Use(middleware.SetHeader("Content-Type", "application/json"))
 	s.router.Use(middleware.StripSlashes)
 
-	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	if s.ui != nil {
+		s.router.Mount("/", http.FileServer(http.FS(s.ui)))
+	}
 
-	// API routes
-	s.router.Route("/api/v1", func(r chi.Router) {
-		r.Get("/", s.getRoot)
-		r.Get("/pipelines", s.listPipelines)
-		r.Get("/pipelines/{pipeline}", s.getPipeline)
-		r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
-		r.Post("/pipelines/{pipeline}/phases/{phase}/promote", s.promotePhase)
+	s.router.Group(func(r chi.Router) {
+		r.Use(cors.Handler(cors.Options{
+			AllowedOrigins:   []string{"http://*", "https://*"},
+			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders:   []string{"*"},
+			AllowCredentials: false,
+			MaxAge:           300,
+		}))
+		r.Use(middleware.SetHeader("Content-Type", "application/json"))
+
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// API routes
+		r.Route("/api/v1", func(r chi.Router) {
+			r.Get("/", s.getRoot)
+			r.Get("/pipelines", s.listPipelines)
+			r.Get("/pipelines/{pipeline}", s.getPipeline)
+			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
+			r.Post("/pipelines/{pipeline}/phases/{phase}/promote", s.promotePhase)
+		})
 	})
 }
 
