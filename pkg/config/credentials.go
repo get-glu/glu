@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var _ validate = (*Credentials)(nil)
+var _ validater = (*Credentials)(nil)
 
 type Credentials map[string]Credential
 

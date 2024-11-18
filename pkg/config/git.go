@@ -3,9 +3,9 @@ package config
 import "log/slog"
 
 var (
-	_ validate  = (*GitRepositories)(nil)
+	_ validater = (*GitRepositories)(nil)
 	_ defaulter = (*GitRepositories)(nil)
-	_ validate  = (*Repository)(nil)
+	_ validater = (*Repository)(nil)
 	_ defaulter = (*Repository)(nil)
 )
 

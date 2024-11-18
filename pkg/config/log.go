@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	_ validate  = (*Log)(nil)
+	_ validater = (*Log)(nil)
 	_ defaulter = (*Log)(nil)
 )
 

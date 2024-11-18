@@ -33,12 +33,12 @@ func (c *Config) SetDefaults() error {
 	})
 }
 
-type validate interface {
+type validater interface {
 	validate() error
 }
 
 func (c *Config) Validate() error {
-	return processStruct(reflect.ValueOf(c).Elem(), func(v validate) error {
+	return processStruct(reflect.ValueOf(c).Elem(), func(v validater) error {
 		return v.validate()
 	})
 }

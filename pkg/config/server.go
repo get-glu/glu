@@ -3,7 +3,7 @@ package config
 import "os"
 
 var (
-	_ validate  = (*Server)(nil)
+	_ validater = (*Server)(nil)
 	_ defaulter = (*Server)(nil)
 )
 

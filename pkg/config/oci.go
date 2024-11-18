@@ -5,9 +5,9 @@ import (
 )
 
 var (
-	_ validate  = (*OCIRepositories)(nil)
+	_ validater = (*OCIRepositories)(nil)
 	_ defaulter = (*OCIRepositories)(nil)
-	_ validate  = (*OCIRepository)(nil)
+	_ validater = (*OCIRepository)(nil)
 	_ defaulter = (*OCIRepository)(nil)
 )
 
