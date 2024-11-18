@@ -2,10 +2,11 @@
   <img align="left" src="./.github/images/stu.png" alt="Stu - The Glu mascot" width="200" />
   <br>
   <h3>Glu</h3>
-  <em>
-    Progressive delivery that sticks
-  </em>
-  <br>
+  <p>
+    <em>
+      Progressive delivery that sticks
+    </em>
+  </p>
   <p>
     Glu is the missing piece in your CI/CD toolbelt.
     It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
