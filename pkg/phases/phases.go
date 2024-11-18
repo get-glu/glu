@@ -23,7 +23,7 @@ type UpdatableSource[R core.Resource] interface {
 type Pipeline[R core.Resource] interface {
 	New() R
 	Metadata() core.Metadata
-	Add(r core.ResourcePhase[R], opts ...containers.Option[core.AddOptions[R]]) error
+	Add(r core.ResourcePhase[R], opts ...containers.Option[core.AddPhaseOptions[R]]) error
 	PromotedFrom(core.ResourcePhase[R]) (core.ResourcePhase[R], bool)
 }
 
@@ -34,7 +34,7 @@ type Phase[R core.Resource] struct {
 	source   Source[R]
 }
 
-func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddOptions[R]]) (*Phase[R], error) {
+func New[R core.Resource](meta core.Metadata, pipeline Pipeline[R], repo Source[R], opts ...containers.Option[core.AddPhaseOptions[R]]) (*Phase[R], error) {
 	logger := slog.With("name", meta.Name, "pipeline", pipeline.Metadata().Name)
 	for k, v := range meta.Labels {
 		logger = logger.With(k, v)
