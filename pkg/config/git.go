@@ -2,6 +2,13 @@ package config
 
 import "log/slog"
 
+var (
+	_ validate  = (*GitRepositories)(nil)
+	_ defaulter = (*GitRepositories)(nil)
+	_ validate  = (*Repository)(nil)
+	_ defaulter = (*Repository)(nil)
+)
+
 type GitRepositories map[string]*Repository
 
 func (r GitRepositories) validate() error {

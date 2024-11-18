@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"reflect"
 
 	"github.com/get-glu/glu/internal/config"
 	"gopkg.in/yaml.v3"
@@ -19,38 +20,59 @@ type Config struct {
 		Git GitRepositories `glu:"git"`
 		OCI OCIRepositories `glu:"oci"`
 	} `glu:"sources"`
+	Server Server `glu:"server"`
 }
 
-func (c *Config) setDefaults() error {
-	if err := c.Log.setDefaults(); err != nil {
-		return err
-	}
+type defaulter interface {
+	setDefaults() error
+}
 
-	if err := c.Sources.Git.setDefaults(); err != nil {
-		return err
-	}
+func (c *Config) SetDefaults() error {
+	return processStruct(reflect.ValueOf(c).Elem(), func(d defaulter) error {
+		return d.setDefaults()
+	})
+}
 
-	if err := c.Sources.OCI.setDefaults(); err != nil {
-		return err
-	}
-
-	return nil
+type validate interface {
+	validate() error
 }
 
 func (c *Config) Validate() error {
-	if err := c.Log.validate(); err != nil {
-		return err
+	return processStruct(reflect.ValueOf(c).Elem(), func(v validate) error {
+		return v.validate()
+	})
+}
+
+func processStruct[T any](val reflect.Value, method func(T) error) error {
+	switch val.Kind() {
+	case reflect.Struct:
+		// Need to get addressable value for pointer receiver methods
+		if val.CanAddr() {
+			if impl, ok := val.Addr().Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Recursively process only struct fields
+		for i := 0; i < val.NumField(); i++ {
+			field := val.Field(i)
+			if field.Kind() == reflect.Struct ||
+				(field.Kind() == reflect.Ptr && !field.IsNil() && field.Elem().Kind() == reflect.Struct) {
+				if err := processStruct(field, method); err != nil {
+					return err
+				}
+			}
+		}
+
+	case reflect.Ptr:
+		if !val.IsNil() && val.Elem().Kind() == reflect.Struct {
+			return processStruct(val.Elem(), method)
+		}
 	}
 
-	if err := c.Sources.Git.validate(); err != nil {
-		return err
-	}
-
-	if err := c.Sources.OCI.validate(); err != nil {
-		return err
-	}
-
-	return c.Credentials.validate()
+	return nil
 }
 
 func ReadFromPath(configPath string) (_ *Config, err error) {
@@ -81,7 +103,7 @@ func ReadFromPath(configPath string) (_ *Config, err error) {
 		return nil, err
 	}
 
-	if err := conf.setDefaults(); err != nil {
+	if err := conf.SetDefaults(); err != nil {
 		return nil, err
 	}
 

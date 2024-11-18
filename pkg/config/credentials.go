@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+var _ validate = (*Credentials)(nil)
+
 type Credentials map[string]Credential
 
 func (c Credentials) validate() error {
@@ -43,7 +45,7 @@ func (c *Credential) validate() error {
 		return c.SSH.validate()
 	case CredentialTypeAccessToken:
 		if c.AccessToken == nil || *c.AccessToken == "" {
-			return errors.New("field required: access_token")
+			return errFieldRequired("access_token")
 		}
 	case CredentialTypeGitHubApp:
 		return c.GitHubApp.validate()
@@ -92,7 +94,7 @@ func (a *SSHAuthConfig) validate() (err error) {
 	}
 
 	if a.Password == "" {
-		return errors.New("password required")
+		return errFieldRequired("password")
 	}
 
 	if (a.PrivateKeyBytes == "" && a.PrivateKeyPath == "") || (a.PrivateKeyBytes != "" && a.PrivateKeyPath != "") {
@@ -117,11 +119,11 @@ func (c *GitHubAppConfig) validate() (err error) {
 	}()
 
 	if c.AppID <= 0 {
-		return errors.New("app_id must not be empty")
+		return errFieldRequired("app_id")
 	}
 
 	if c.InstallationID <= 0 {
-		return errors.New("installation_id must not be empty")
+		return errFieldRequired("installation_id")
 	}
 
 	if (c.PrivateKeyBytes == "" && c.PrivateKeyPath == "") || (c.PrivateKeyBytes != "" && c.PrivateKeyPath != "") {

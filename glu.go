@@ -185,9 +185,10 @@ func (s *System) Run() error {
 	}
 
 	var (
+		conf  = s.conf.conf
 		group *errgroup.Group
 		srv   = http.Server{
-			Addr:    ":8080", // TODO: make configurable
+			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
 			Handler: s.server,
 		}
 	)
@@ -203,10 +204,17 @@ func (s *System) Run() error {
 		return srv.Shutdown(shutdownCtx)
 	})
 
+	var serveFunc = srv.ListenAndServe
+	if conf.Server.Protocol == config.ProtocolHTTPS {
+		serveFunc = func() error {
+			return srv.ListenAndServeTLS(conf.Server.CertFile, conf.Server.KeyFile)
+		}
+	}
+
 	group.Go(func() error {
-		slog.Info("starting server", "addr", ":8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			return fmt.Errorf("listen and serve: %w", err)
+		slog.Info("starting server", "addr", fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port))
+		if err := serveFunc(); err != nil && err != http.ErrServerClosed {
+			return err
 		}
 
 		slog.Debug("shutting down")

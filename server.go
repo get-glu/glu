@@ -44,6 +44,7 @@ func (s *Server) setupRoutes() {
 	}
 
 	s.router.Group(func(r chi.Router) {
+		// TODO: make CORS configurable
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   []string{"http://*", "https://*"},
 			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -53,6 +54,7 @@ func (s *Server) setupRoutes() {
 		}))
 		r.Use(middleware.SetHeader("Content-Type", "application/json"))
 
+		// Health check
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
