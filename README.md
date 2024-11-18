@@ -8,6 +8,7 @@
     It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
   </p>
   <br>
+  <br>
 </div>
 
 ## What Is It?
