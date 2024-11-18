@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -22,7 +22,7 @@ const nodeTypes = {
 
 export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
-  const { fitView } = useReactFlow<PipelineNode, PipelineEdge>();
+  const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
 
   const { pipeline } = props;
   const { nodes: initNodes, edges: initEdges } = getElements(pipeline);
@@ -31,24 +31,20 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
 
   const nodesInitialized = useNodesInitialized();
-  const [initLayoutFinished, setInitLayoutFinished] = useState(false);
 
   useEffect(() => {
-    if (nodesInitialized && !initLayoutFinished) {
-      const flow = getLayoutedElements({ nodes, edges });
-
-      setNodes([...flow.nodes]);
-      setEdges([...flow.edges]);
-
-      window.requestAnimationFrame(async () => {
-        await fitView();
-
-        if (!initLayoutFinished) {
-          setInitLayoutFinished(true);
-        }
-      });
+    if (nodesInitialized) {
+      const flow = getLayoutedElements({ nodes: getNodes(), edges: getEdges() });
+      setNodes(flow.nodes);
+      setEdges(flow.edges);
     }
-  }, [nodesInitialized, initLayoutFinished, nodes, edges, setNodes, setEdges, fitView]);
+  }, [nodesInitialized]);
+
+  useEffect(() => {
+    fitView();
+    window.addEventListener('resize', fitView);
+    return () => window.removeEventListener('resize', fitView);
+  }, [nodes, edges, fitView]);
 
   return (
     <div key={`pipeline-${pipeline.name}`} className="mb-10 flex h-[500px] w-full flex-col">
