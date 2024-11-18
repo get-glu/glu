@@ -5,11 +5,11 @@
   <em>
     Progressive delivery that sticks
   </em>
+  <br>
   <p>
     Glu is the missing piece in your CI/CD toolbelt.
     It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
   </p>
-  <br>
   <br>
 </div>
 
