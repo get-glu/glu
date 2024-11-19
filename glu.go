@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"iter"
 	"log/slog"
 	"maps"
@@ -70,18 +71,32 @@ type System struct {
 	triggers  []Trigger
 	err       error
 
+	ui     fs.FS
 	server *Server
 }
 
+// WithUI configures the provided fs.FS implementation to be served as the filesystem
+// mounted on the root path in the API
+//
+// glu.NewSystem(ctx, glu.Name("mysystem"), glu.WithUI(ui.FS()))
+// see: github.com/get-glu/glu/tree/main/ui sub-module for the pre-built default UI.
+func WithUI(ui fs.FS) containers.Option[System] {
+	return func(s *System) {
+		s.ui = ui
+	}
+}
+
 // NewSystem constructs and configures a new system with the provided metadata.
-func NewSystem(ctx context.Context, meta Metadata) *System {
+func NewSystem(ctx context.Context, meta Metadata, opts ...containers.Option[System]) *System {
 	r := &System{
 		ctx:       ctx,
 		meta:      meta,
 		pipelines: map[string]core.Pipeline{},
 	}
 
-	r.server = newServer(r)
+	containers.ApplyAll(r, opts...)
+
+	r.server = newServer(r, r.ui)
 
 	return r
 }
@@ -113,17 +128,18 @@ func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, e
 
 	config, err := s.configuration()
 	if err != nil {
-		s.err = err
+		s.err = fmt.Errorf("configuring pipeline: %w", err)
 		return s
 	}
 
 	pipe, err := fn(s.ctx, config)
 	if err != nil {
-		s.err = err
+		s.err = fmt.Errorf("building pipeline: %w", err)
 		return s
 	}
 
 	s.pipelines[pipe.Metadata().Name] = pipe
+
 	return s
 }
 
@@ -169,27 +185,31 @@ func (s *System) Run() error {
 	}
 
 	var (
-		group errgroup.Group
+		group *errgroup.Group
 		srv   = http.Server{
 			Addr:    ":8080", // TODO: make configurable
 			Handler: s.server,
 		}
 	)
 
+	group, ctx = errgroup.WithContext(ctx)
+
 	group.Go(func() error {
 		<-ctx.Done()
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
+
 		return srv.Shutdown(shutdownCtx)
 	})
 
 	group.Go(func() error {
 		slog.Info("starting server", "addr", ":8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			cancel()
-			return err
+			return fmt.Errorf("listen and serve: %w", err)
 		}
+
+		slog.Debug("shutting down")
 		return nil
 	})
 
@@ -218,7 +238,13 @@ func (s *System) AddTrigger(trigger Trigger) *System {
 	return s
 }
 
-func (s *System) runTriggers(ctx context.Context) error {
+func (s *System) runTriggers(ctx context.Context) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("running triggers: %w", err)
+		}
+	}()
+
 	var wg sync.WaitGroup
 	for _, trigger := range s.triggers {
 		wg.Add(1)
