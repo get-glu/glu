@@ -34,7 +34,11 @@ export default function System() {
                   <>
                     {Object.keys(system.labels).map((key: string) => {
                       return (
-                        <Badge key={`system-label-${key}`} variant={'secondary'}>
+                        <Badge
+                          key={`system-label-${key}`}
+                          variant={'secondary'}
+                          className="whitespace-nowrap text-xs font-light"
+                        >
                           {key}: {(system.labels ?? {})[key]}
                         </Badge>
                       );

@@ -4,6 +4,17 @@ import { Badge } from '@/components/ui/badge';
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { promotePhase } from '@/services/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
@@ -15,24 +26,29 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
     }
   };
 
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const promote = async () => {
+    setDialogOpen(false);
     await promotePhase(data.pipeline, data.name);
   };
 
   return (
-    <div className="relative min-h-[80px] min-w-[120px] rounded-lg border bg-background p-6 shadow-lg">
+    <div className="relative min-h-[80px] min-w-[120px] rounded-lg border bg-background p-4 shadow-lg">
       <Handle type="source" position={Position.Right} style={{ right: -8 }} />
 
       <div className="flex items-center gap-2">
-        {getIcon()}
-        <span className="text-sm font-medium">{data.name}</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {getIcon()}
+          <span className="truncate text-sm font-medium">{data.name}</span>
+        </div>
         {data.depends_on && data.depends_on !== '' && (
           <Tooltip.Provider>
             <Tooltip.Root>
               <Tooltip.Trigger asChild>
                 <CircleArrowUp
-                  className="absolute right-4 m-1 h-4 w-4 cursor-pointer hover:text-green-600"
-                  onClick={promote}
+                  className="ml-2 h-4 w-4 flex-shrink-0 cursor-pointer transition-transform hover:rotate-90 hover:text-green-600"
+                  onClick={() => setDialogOpen(true)}
                 />
               </Tooltip.Trigger>
               <Tooltip.Portal>
@@ -56,7 +72,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
             <div key={`${key}-${value}`} className="mb-2 flex">
               <Badge
                 key={`${key}-${value}`}
-                className={`whitespace-nowrap text-xs ${getLabelColor(key, value)}`}
+                className={`whitespace-nowrap text-xs font-light ${getLabelColor(key, value)}`}
               >
                 {key}: {value}
               </Badge>
@@ -65,6 +81,21 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
       </div>
 
       <Handle type="target" position={Position.Left} style={{ left: -8 }} />
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promote Phase</DialogTitle>
+            <DialogDescription>Are you sure you want to promote this phase?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={promote}>Promote</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
