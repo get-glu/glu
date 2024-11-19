@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+var (
+	_ validater = (*Log)(nil)
+	_ defaulter = (*Log)(nil)
+)
+
 type Log struct {
 	Level string `glu:"level"`
 }

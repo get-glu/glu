@@ -32,33 +32,16 @@ Use it to implement anything that involes automating updates to Git repositories
 
 - ✅ Track new versions of applications in source repositories (OCI, Helm etc) and trigger updates to target configuration repositories (Git).
 - ⌛️ Coordinate any combination of scheduled, event driven or manually triggered promotions from one environment to the next.
-- ⏳ Expose a single pane of glass to compare and manipulating the state of your resources in one environment to the next.
+- 🔍 Expose a single pane of glass to compare and manipulate the state of your resources in one environment to the next.
 - 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
 
 ## Development
 
-### Glu Framework
-
-The core framework is implemented in Go and is designed to be embedded in your own application.
-Glu's documentation site goes into details for integrating it into your own codebase and learning the concepts.
-
-If you want to contribute to Glu, then Go (version 1.23+) is currently the only requirement to get building.
-
-### Glu UI
-
-The Glu UI is a React application that allows you to view and interact with the state of your pipelines.
-
-```
-cd ui
-npm install
-npm start
-```
-
-This will start a local server which can be viewed in your browser at http://localhost:1234.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for more information.
 
 ## Roadmap Ideas
 
-In the future we plan to support more use-case, such as:
+In the future we plan to support more functionality, such as:
 
 - New sources:
   - Helm

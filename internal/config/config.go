@@ -51,16 +51,22 @@ func (d *Decoder[C]) Decode(c *C) error {
 			return strings.EqualFold(stripUnderscore(mapKey), stripUnderscore(fieldName))
 		},
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
 			mapstructure.DecodeHookFuncType(func(from, to reflect.Type, i interface{}) (interface{}, error) {
 				if from.Kind() != reflect.String {
 					return i, nil
 				}
 
-				if to.Kind() != reflect.Int64 {
-					return i, nil
+				if to.Kind() == reflect.Int {
+					val, err := strconv.Atoi(i.(string))
+					return val, err
 				}
 
-				return strconv.ParseInt(i.(string), 10, 64)
+				if to.Kind() == reflect.Int64 {
+					return strconv.ParseInt(i.(string), 10, 64)
+				}
+
+				return i, nil
 			}),
 		),
 	})

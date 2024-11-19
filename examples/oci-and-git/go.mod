@@ -1,6 +1,6 @@
 module glu-oci-and-git
 
-go 1.23.3
+go 1.23.0
 
 require (
 	github.com/get-glu/glu v0.0.0-20241118151935-fc71c29f57de

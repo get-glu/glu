@@ -2,7 +2,12 @@ package config
 
 import "log/slog"
 
-type GitRepositories map[string]*Repository
+var (
+	_ validater = (*GitRepositories)(nil)
+	_ defaulter = (*GitRepositories)(nil)
+)
+
+type GitRepositories map[string]*GitRepository
 
 func (r GitRepositories) validate() error {
 	for _, repo := range r {
@@ -24,18 +29,18 @@ func (r GitRepositories) setDefaults() error {
 	return nil
 }
 
-type Repository struct {
+type GitRepository struct {
 	Path          string     `glu:"path"`
 	DefaultBranch string     `glu:"default_branch"`
 	Remote        *Remote    `glu:"remote"`
 	Proposals     *Proposals `glu:"proposals"`
 }
 
-func (r *Repository) validate() error {
+func (r *GitRepository) validate() error {
 	return nil
 }
 
-func (r *Repository) setDefaults() error {
+func (r *GitRepository) setDefaults() error {
 	if r.DefaultBranch == "" {
 		slog.Debug("setting missing default", "repository.default_branch", "main")
 

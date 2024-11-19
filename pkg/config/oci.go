@@ -1,8 +1,12 @@
 package config
 
 import (
-	"errors"
 	"fmt"
+)
+
+var (
+	_ validater = (*OCIRepositories)(nil)
+	_ defaulter = (*OCIRepositories)(nil)
 )
 
 type OCIRepositories map[string]*OCIRepository
@@ -38,7 +42,7 @@ func (o *OCIRepository) setDefaults() error {
 
 func (o *OCIRepository) validate() error {
 	if o.Reference == "" {
-		return errors.New("field reference is required")
+		return errFieldRequired("reference")
 	}
 
 	return nil

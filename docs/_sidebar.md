@@ -1,0 +1,2 @@
+- [Getting Started](/)
+- [Configuration](/configuration.md)
