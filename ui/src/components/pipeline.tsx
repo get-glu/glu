@@ -82,8 +82,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
                 height: 20,
                 color: 'currentColor'
               },
-              animated: true,
-              selectable: false,
+              selectable: true,
               style: {
                 strokeWidth: 2
               }
@@ -153,8 +152,9 @@ function getElements(pipeline: PipelineType): FlowPipeline {
         name: phase.name,
         labels: phase.labels || {},
         depends_on: phase.depends_on,
-        source_type: phase.source_type
-      },
+        source_type: phase.source_type,
+        value: phase.value
+    },
       extent: 'parent'
     };
     nodes.push(node);

@@ -11,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
@@ -65,7 +64,11 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
         )}
       </div>
 
-      <div className="mt-3 flex w-full flex-col">
+      <div className="mt-2 font-mono text-xs text-muted-foreground">
+        {data.value?.digest?.slice(-12)}
+      </div>
+
+      <div className="mt-2 flex w-full flex-col">
         {data.labels &&
           Object.entries(data.labels).length > 0 &&
           Object.entries(data.labels).map(([key, value]) => (
