@@ -19,8 +19,10 @@ log:
 
 credentials:
   github: # name of the credential to be referenced in the sources
-    type: access_token
-    access_token: ...
+    type: basic
+    basic:
+      username: "your_username"
+      password: "your_personal_access_token"
 
 sources:
   git:
