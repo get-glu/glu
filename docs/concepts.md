@@ -144,8 +144,10 @@ Schedule promotions to run automatically on an interval for phases matching a sp
 
 ```go
 // schedule promotion attempts to staging every 10 seconds
-system.SchedulePromotion(
-    glu.ScheduleInterval(10*time.Second),
-    glu.ScheduleMatchesLabel("env", "staging"),
+system = system.AddTrigger(
+	schedule.New(
+		schedule.WithInterval(10*time.Second),
+		schedule.MatchesLabel("phase", "staging"),
+	)
 )
 ```
