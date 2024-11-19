@@ -28,7 +28,7 @@ type defaulter interface {
 }
 
 func (c *Config) SetDefaults() error {
-	return processStruct(reflect.ValueOf(c).Elem(), func(d defaulter) error {
+	return processValue(reflect.ValueOf(c).Elem(), func(d defaulter) error {
 		return d.setDefaults()
 	})
 }
@@ -38,12 +38,12 @@ type validater interface {
 }
 
 func (c *Config) Validate() error {
-	return processStruct(reflect.ValueOf(c).Elem(), func(v validater) error {
+	return processValue(reflect.ValueOf(c).Elem(), func(v validater) error {
 		return v.validate()
 	})
 }
 
-func processStruct[T any](val reflect.Value, method func(T) error) error {
+func processValue[T any](val reflect.Value, method func(T) error) error {
 	switch val.Kind() {
 	case reflect.Struct:
 		// Need to get addressable value for pointer receiver methods
@@ -57,18 +57,32 @@ func processStruct[T any](val reflect.Value, method func(T) error) error {
 
 		// Recursively process only struct fields
 		for i := 0; i < val.NumField(); i++ {
-			field := val.Field(i)
-			if field.Kind() == reflect.Struct ||
-				(field.Kind() == reflect.Ptr && !field.IsNil() && field.Elem().Kind() == reflect.Struct) {
-				if err := processStruct(field, method); err != nil {
-					return err
-				}
+			if err := processValue(val.Field(i), method); err != nil {
+				return err
 			}
 		}
 
 	case reflect.Ptr:
-		if !val.IsNil() && val.Elem().Kind() == reflect.Struct {
-			return processStruct(val.Elem(), method)
+		if !val.IsNil() {
+			// Try to use the pointer directly first
+			if impl, ok := val.Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
+			// Then recurse into the element for both structs and maps
+			elemKind := val.Elem().Kind()
+			if elemKind == reflect.Struct || elemKind == reflect.Map {
+				return processValue(val.Elem(), method)
+			}
+		}
+	case reflect.Map:
+		if !val.IsNil() {
+			if impl, ok := val.Addr().Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
 		}
 	}
 

@@ -7,8 +7,6 @@ import (
 var (
 	_ validater = (*OCIRepositories)(nil)
 	_ defaulter = (*OCIRepositories)(nil)
-	_ validater = (*OCIRepository)(nil)
-	_ defaulter = (*OCIRepository)(nil)
 )
 
 type OCIRepositories map[string]*OCIRepository
