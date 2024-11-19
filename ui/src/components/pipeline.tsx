@@ -154,7 +154,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
         depends_on: phase.depends_on,
         source_type: phase.source_type,
         value: phase.value
-    },
+      },
       extent: 'parent'
     };
     nodes.push(node);
