@@ -4,12 +4,17 @@ export interface Pipeline {
   phases: Phase[];
 }
 
+type Resource = {
+  digest: string;
+  [key: string]: unknown;
+};
+
 export interface Phase {
   name: string;
   depends_on?: string;
   source_type?: string;
   labels?: Record<string, string>;
-  value?: unknown;
+  value?: Resource;
 }
 
 export interface PipelineGroup {

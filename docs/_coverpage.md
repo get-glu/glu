@@ -2,7 +2,7 @@
 
 # Glu
 
-> Progressive delivery that sticks
+> Progressive Delivery That Sticks
 
 - A framework for orchestrating and introspecting delivery pipelines
 - Integrates with directly with Git, OCI and more (to come)

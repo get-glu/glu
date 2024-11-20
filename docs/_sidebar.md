@@ -1,2 +1,3 @@
 - [Getting Started](/)
+- [Concepts](/concepts.md)
 - [Configuration](/configuration.md)

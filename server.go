@@ -37,13 +37,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupRoutes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.StripSlashes)
+	s.router.Mount("/debug", middleware.Profiler())
 
 	if s.ui != nil {
 		s.router.Mount("/", http.FileServer(http.FS(s.ui)))
 	}
 
 	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.StripSlashes)
 		// TODO: make CORS configurable
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins:   []string{"http://*", "https://*"},
@@ -133,7 +134,6 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipel
 			return pipelineResponse{}, err
 		}
 		response.Value = v
-
 		phases = append(phases, response)
 	}
 
