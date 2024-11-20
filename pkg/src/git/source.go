@@ -54,8 +54,10 @@ type Source[A Resource] struct {
 	proposalOptions ProposalOption
 }
 
-func (*Source[A]) Type() string {
-	return "git"
+func (*Source[A]) Metadata() core.Metadata {
+	return core.Metadata{
+		Name: "git",
+	}
 }
 
 type ProposalOption struct {

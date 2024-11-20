@@ -44,7 +44,7 @@ type Resource interface {
 // These types can be registered on pipelines and can depend upon on another for promotion.
 type Phase interface {
 	Metadata() Metadata
-	SourceType() string
+	Source() Metadata
 	Get(context.Context) (Resource, error)
 	Promote(context.Context) error
 }

@@ -31,8 +31,10 @@ func NewMockSource(typ string) *MockSource {
 	return &MockSource{typ: typ}
 }
 
-func (m *MockSource) Type() string {
-	return m.typ
+func (m *MockSource) Metadata() core.Metadata {
+	return core.Metadata{
+		Name: m.typ,
+	}
 }
 
 func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {

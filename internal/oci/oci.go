@@ -5,9 +5,12 @@ import (
 
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/credentials"
+	"github.com/get-glu/glu/pkg/src/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
 )
+
+var _ oci.Resolver = (*Repository)(nil)
 
 type Repository struct {
 	repo *remote.Repository
@@ -32,4 +35,8 @@ func New(reference string, cred *credentials.Credential) (_ *Repository, err err
 
 func (r *Repository) Resolve(ctx context.Context) (v1.Descriptor, error) {
 	return r.repo.Resolve(ctx, r.repo.Reference.ReferenceOrDefault())
+}
+
+func (r *Repository) Reference() string {
+	return r.repo.Reference.String()
 }

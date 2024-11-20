@@ -8,6 +8,8 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const ANNOTATION_OCI_IMAGE_URL = "dev.getglu.oci.image.url"
+
 var _ phases.Source[Resource] = (*Source[Resource])(nil)
 
 type Resource interface {
@@ -17,6 +19,7 @@ type Resource interface {
 
 type Resolver interface {
 	Resolve(_ context.Context) (v1.Descriptor, error)
+	Reference() string
 }
 
 type Source[R Resource] struct {
@@ -29,8 +32,11 @@ func New[R Resource](resolver Resolver) *Source[R] {
 	}
 }
 
-func (s *Source[R]) Type() string {
-	return "oci"
+func (s *Source[R]) Metadata() core.Metadata {
+	return core.Metadata{
+		Name:        "oci",
+		Annotations: map[string]string{ANNOTATION_OCI_IMAGE_URL: s.resolver.Reference()},
+	}
 }
 
 func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
