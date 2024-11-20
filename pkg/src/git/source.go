@@ -54,7 +54,7 @@ type Source[A Resource] struct {
 	proposalOptions ProposalOption
 }
 
-func (s Source[A]) Type() string {
+func (*Source[A]) Type() string {
 	return "git"
 }
 
@@ -89,12 +89,6 @@ type Branched interface {
 func (g *Source[A]) View(ctx context.Context, _, phase core.Metadata, r A) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-
-	// perform an initial fetch to ensure we're up to date
-	// TODO(georgmac): scope to phase branch and proposal prefix
-	if err := g.repo.Fetch(ctx); err != nil {
-		return err
-	}
 
 	opts := []containers.Option[git.ViewUpdateOptions]{}
 	if branched, ok := core.Resource(r).(Branched); ok {
