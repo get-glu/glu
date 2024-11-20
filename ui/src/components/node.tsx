@@ -35,7 +35,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   };
 
   return (
-    <div className="relative min-h-[80px] min-w-[120px] rounded-lg border bg-background p-4 shadow-lg">
+    <div className="relative min-h-[80px] min-w-[120px] cursor-pointer rounded-lg border bg-background p-4 shadow-lg">
       <Handle type="source" position={Position.Right} style={{ right: -8 }} />
 
       <div className="flex items-center gap-2">

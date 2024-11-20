@@ -19,13 +19,15 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuItem
+  SidebarMenuItem,
+  useSidebar
 } from '@/components/ui/sidebar';
-import { Check, ChevronsUpDown, WorkflowIcon, BookOpen, Github } from 'lucide-react';
+import { Check, ChevronsUpDown, BookOpen, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { toggleSidebar } = useSidebar();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const { data: pipelines, loading } = useAppSelector((state: RootState) => state.pipelines);

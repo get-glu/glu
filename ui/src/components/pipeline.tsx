@@ -16,7 +16,7 @@ import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
-import { NodeDetails } from '@/components/node-details';
+import { NodePanel } from '@/components/node-panel';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
@@ -25,8 +25,8 @@ const nodeTypes = {
 export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
   const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
-  const [isOpen, setIsOpen] = useState(true);
   const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
   const { pipeline } = props;
   const { nodes: initNodes, edges: initEdges } = getElements(pipeline);
@@ -56,34 +56,41 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   };
 
   return (
-    <div className="h-screen w-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        fitView
-        colorMode={theme}
-        proOptions={{ hideAttribution: true }}
-        defaultEdgeOptions={{
-          markerEnd: {
-            type: MarkerType.Arrow,
-            width: 20,
-            height: 20,
-            color: 'currentColor'
-          },
-          selectable: true,
-          style: {
-            strokeWidth: 2
-          }
-        }}
-      >
-        <Background />
-        <Controls />
-      </ReactFlow>
-      <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} />
+    <div className="flex h-screen w-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          fitView
+          className="h-full"
+          colorMode={theme}
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{
+            markerEnd: {
+              type: MarkerType.Arrow,
+              width: 20,
+              height: 20,
+              color: 'currentColor'
+            },
+            selectable: true,
+            style: {
+              strokeWidth: 2
+            }
+          }}
+        >
+          <Background />
+          <Controls />
+        </ReactFlow>
+      </div>
+      <NodePanel
+        node={selectedNode}
+        isExpanded={isPanelExpanded}
+        onToggle={() => setIsPanelExpanded(!isPanelExpanded)}
+      />
     </div>
   );
 }
