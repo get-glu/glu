@@ -56,7 +56,7 @@ func (r *GitRepository) setDefaults() error {
 
 			remote.Name = "origin"
 		}
-		if remote.Interval == 0 {
+		if remote.Interval < 1 {
 			remote.Interval = 10 * time.Second
 		}
 	}
