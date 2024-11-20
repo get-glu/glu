@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"net/http"
 
 	"github.com/get-glu/glu/pkg/core"
@@ -159,6 +160,7 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	for _, pipeline := range s.system.pipelines {
 		response, err := s.createPipelineResponse(ctx, pipeline)
 		if err != nil {
+			slog.Error("building pipeline response", "path", r.URL.Path, "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -169,6 +171,7 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(listPipelinesResponse{
 		Pipelines: pipelineResponses,
 	}); err != nil {
+		slog.Error("encoding pipeline", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -179,12 +182,14 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
+		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	response, err := s.createPipelineResponse(ctx, pipeline)
 	if err != nil {
+		slog.Error("building pipeline response", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -204,6 +209,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, core.ErrNotFound) {
+			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
 			status = http.StatusNotFound
 		}
 
@@ -221,6 +227,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	response.Value = v
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
+		slog.Error("encoding response", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -229,6 +236,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
+		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -238,6 +246,7 @@ func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, core.ErrNotFound) {
+			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
 			status = http.StatusNotFound
 		}
 
@@ -246,6 +255,7 @@ func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := phase.Promote(r.Context()); err != nil {
+		slog.Error("performing promotion", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
