@@ -5,7 +5,7 @@
   "source": "src/index.html",
   "scripts": {
     "start": "parcel --no-cache",
-    "build": "parcel build",
+    "build": "parcel build --no-cache",
     "lint": "eslint --fix .",
     "format": "prettier --write ."
   },
