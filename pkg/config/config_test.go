@@ -2,8 +2,11 @@ package config
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type testDefaulter struct {
@@ -153,5 +156,105 @@ func TestProcessValue(t *testing.T) {
 				tt.verify(t, tt.input)
 			}
 		})
+	}
+}
+
+type testGitExpected struct {
+	remoteName string
+	url        string
+	credential string
+	interval   time.Duration
+}
+
+func TestConfigGit(t *testing.T) {
+	configDir := t.TempDir()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected GitRepository
+	}{
+		{
+			name: "default",
+			input: `sources:
+  git:
+    default:
+      remote:
+        name: upstream
+        url: https://corp-repos/default.git
+  `,
+			expected: GitRepository{
+				Remote: &Remote{
+					Name:     "upstream",
+					URL:      "https://corp-repos/default.git",
+					Interval: 10 * time.Second,
+				},
+				DefaultBranch: "main",
+			},
+		},
+		{
+			name: "custom",
+			input: `sources:
+  git:
+    custom:
+      remote:
+        name: origin
+        url: https://corp-repos/custom
+        credential: vault
+        interval: 1m
+      path: v1
+      default_branch: release-v1
+  `,
+			expected: GitRepository{
+				Remote: &Remote{
+					Name:       "origin",
+					URL:        "https://corp-repos/custom",
+					Credential: "vault",
+					Interval:   time.Minute,
+				},
+				Path:          "v1",
+				DefaultBranch: "release-v1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := filepath.Join(configDir, tt.name+"-glu.yaml")
+			err := os.WriteFile(configPath, []byte(tt.input), 0600)
+			if err != nil {
+				t.Fatalf("failed to write configuration file: %v", err)
+			}
+
+			c, err := ReadFromPath(configPath)
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+			repos := c.Sources.Git
+			if len(repos) == 0 {
+				t.Fatalf("expected at least one repo, got zero")
+			}
+			repo, ok := repos[tt.name]
+			if !ok {
+				t.Fatalf("expected repo %s to exist", tt.name)
+			}
+
+			if !reflect.DeepEqual(tt.expected.Remote, repo.Remote) {
+				t.Errorf("expected remote %v, got %v", tt.expected.Remote, repo.Remote)
+			}
+			if tt.expected.Path != repo.Path {
+				t.Errorf("expected path %v, got %v", tt.expected.Path, repo.Path)
+			}
+			if tt.expected.DefaultBranch != repo.DefaultBranch {
+				t.Errorf("expected default branch %v, got %v", tt.expected.DefaultBranch, repo.DefaultBranch)
+			}
+		})
+	}
+}
+
+func TestReadFromFileWhenNoConfig(t *testing.T) {
+	_, err := ReadFromPath(filepath.Join(t.TempDir(), "non-existent-file.yaml"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 }

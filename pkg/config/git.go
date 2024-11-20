@@ -1,6 +1,9 @@
 package config
 
-import "log/slog"
+import (
+	"log/slog"
+	"time"
+)
 
 var (
 	_ validater = (*GitRepositories)(nil)
@@ -53,15 +56,19 @@ func (r *GitRepository) setDefaults() error {
 
 			remote.Name = "origin"
 		}
+		if remote.Interval < 1 {
+			remote.Interval = 10 * time.Second
+		}
 	}
 
 	return nil
 }
 
 type Remote struct {
-	Name       string `glu:"name"`
-	URL        string `glu:"url"`
-	Credential string `glu:"credential"`
+	Name       string        `glu:"name"`
+	URL        string        `glu:"url"`
+	Credential string        `glu:"credential"`
+	Interval   time.Duration `glu:"interval"`
 }
 
 type Proposals struct {
