@@ -16,6 +16,7 @@
     "@eslint/js": "^9.14.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/react-helmet": "^6.1.11",
     "buffer": "^6.0.3",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
@@ -23,6 +24,7 @@
     "eslint-plugin-react": "^7.37.2",
     "globals": "^15.11.0",
     "parcel": "^2.12.0",
+    "parcel-reporter-static-files-copy": "^1.5.3",
     "postcss": "^8.4.47",
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.8",
@@ -49,8 +51,12 @@
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-helmet": "^6.1.0",
     "react-router-dom": "^6.28.0",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7"
+  },
+  "staticFiles": {
+    "staticPath": "public"
   }
 }

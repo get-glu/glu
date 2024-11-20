@@ -8,6 +8,7 @@ import { fetchSystem } from './store/systemSlice';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Pipeline from './app/pipeline';
 import { RootState } from './store';
+import { Helmet } from 'react-helmet';
 
 const router = createBrowserRouter([
   {
@@ -29,16 +30,28 @@ const router = createBrowserRouter([
 
 export function App() {
   const dispatch = useAppDispatch();
-  const pipelinesState = useAppSelector((state: RootState) => state.pipelines);
+  const system = useAppSelector((state: RootState) => state.system.data?.name);
 
   useEffect(() => {
     dispatch(fetchSystem());
     dispatch(fetchPipelines());
   }, [dispatch]);
 
+  let title = 'Glu';
+  if (system) {
+    title = `Glu - ${system}`;
+  }
+
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <>
+      <Helmet>
+        <meta charSet="utf-8" />
+        <title>{title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </Helmet>
+      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+        <RouterProvider router={router} />
+      </ThemeProvider>
+    </>
   );
 }

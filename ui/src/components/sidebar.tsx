@@ -1,6 +1,7 @@
 import { useAppSelector } from '@/store/hooks';
 import { RootState } from '@/store/index';
 import { Button } from '@/components/ui/button';
+import stu from '@/assets/stu.png';
 import {
   Command,
   CommandEmpty,
@@ -36,7 +37,7 @@ export function Sidebar() {
           <SidebarGroupLabel className="mb-4">
             <Link to="/">
               <div className="flex items-center gap-2">
-                <WorkflowIcon className="h-6 w-6" />
+                <img src={stu} alt="Stu" className="h-8 w-8" />
                 <h1 className="text-lg font-bold">Glu</h1>
               </div>
             </Link>
