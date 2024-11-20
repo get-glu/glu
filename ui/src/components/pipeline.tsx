@@ -153,6 +153,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
         labels: phase.labels || {},
         depends_on: phase.depends_on,
         source_type: phase.source_type,
+        digest: phase.digest,
         value: phase.value
       },
       extent: 'parent'
