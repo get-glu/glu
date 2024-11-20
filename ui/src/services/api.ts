@@ -3,7 +3,7 @@ import { Pipeline } from '@/types/pipeline';
 import { System } from '@/types/system';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api/v1'
+  baseURL: '/api/v1'
 });
 
 export const getSystem = async (): Promise<System> => {

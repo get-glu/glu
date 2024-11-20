@@ -179,6 +179,10 @@ The URL of the remote.
 
 The name of the credential to use for the remote.
 
+#### `sources.<name>.git.<repository>.remote.interval`
+
+The period between automatic fetches from the remote.
+
 #### `sources.<name>.git.<repository>.proposals`
 
 The configuration for the proposals for the git repository.
