@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/internal/oci"
@@ -70,6 +71,7 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		method  transport.AuthMethod
 		srcOpts = []containers.Option[git.Repository]{
 			git.WithDefaultBranch(conf.DefaultBranch),
+			git.WithInterval(10 * time.Second),
 		}
 	)
 
