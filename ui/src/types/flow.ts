@@ -18,6 +18,7 @@ type PhaseNodeData = {
   labels?: Record<string, string>;
   depends_on?: string;
   source_type?: string;
+  digest?: string;
   value?: PhaseNodeValue;
 };
 

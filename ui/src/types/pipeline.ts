@@ -13,6 +13,7 @@ export interface Phase {
   name: string;
   depends_on?: string;
   source_type?: string;
+  digest?: string;
   labels?: Record<string, string>;
   value?: Resource;
 }

@@ -95,11 +95,12 @@ type phaseResponse struct {
 	Name       string            `json:"name"`
 	DependsOn  string            `json:"depends_on,omitempty"`
 	SourceType string            `json:"source_type,omitempty"`
+	Digest     string            `json:"digest,omitempty"`
 	Labels     map[string]string `json:"labels,omitempty"`
 	Value      interface{}       `json:"value,omitempty"`
 }
 
-func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Phase]core.Phase) phaseResponse {
+func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, dependencies map[core.Phase]core.Phase) (phaseResponse, error) {
 	var (
 		dependsOn string
 		labels    map[string]string
@@ -115,12 +116,24 @@ func (s *Server) createPhaseResponse(phase core.Phase, dependencies map[core.Pha
 		labels = phase.Metadata().Labels
 	}
 
+	v, err := phase.Get(ctx)
+	if err != nil {
+		return phaseResponse{}, err
+	}
+
+	digest, err := v.Digest()
+	if err != nil {
+		return phaseResponse{}, err
+	}
+
 	return phaseResponse{
 		Name:       phase.Metadata().Name,
 		DependsOn:  dependsOn,
 		Labels:     labels,
 		SourceType: phase.SourceType(),
-	}
+		Digest:     digest,
+		Value:      v,
+	}, nil
 }
 
 func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipeline) (pipelineResponse, error) {
@@ -128,13 +141,11 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipel
 	phases := make([]phaseResponse, 0)
 
 	for phase := range pipeline.Phases() {
-		response := s.createPhaseResponse(phase, dependencies)
-
-		v, err := phase.Get(ctx)
+		response, err := s.createPhaseResponse(ctx, phase, dependencies)
 		if err != nil {
 			return pipelineResponse{}, err
 		}
-		response.Value = v
+
 		phases = append(phases, response)
 	}
 
@@ -217,14 +228,11 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := phase.Get(r.Context())
+	response, err := s.createPhaseResponse(r.Context(), phase, pipeline.Dependencies())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	response := s.createPhaseResponse(phase, pipeline.Dependencies())
-	response.Value = v
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		slog.Error("encoding response", "path", r.URL.Path, "error", err)

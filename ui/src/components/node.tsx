@@ -64,9 +64,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
         )}
       </div>
 
-      <div className="mt-2 font-mono text-xs text-muted-foreground">
-        {data.value?.digest?.slice(-12)}
-      </div>
+      <div className="mt-2 font-mono text-xs text-muted-foreground">{data.digest?.slice(-12)}</div>
 
       <div className="mt-2 flex w-full flex-col">
         {data.labels &&
