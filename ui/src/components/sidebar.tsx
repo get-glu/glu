@@ -21,7 +21,7 @@ import {
   SidebarMenuItem
 } from '@/components/ui/sidebar';
 import { Check, ChevronsUpDown, WorkflowIcon, BookOpen, Github } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export function Sidebar() {
   const navigate = useNavigate();
@@ -34,10 +34,12 @@ export function Sidebar() {
       <SidebarContent className="flex h-full flex-col justify-between">
         <SidebarGroup>
           <SidebarGroupLabel className="mb-4">
-            <div className="flex items-center gap-2">
-              <WorkflowIcon className="h-6 w-6" />
-              <h1 className="text-lg font-bold">Glu</h1>
-            </div>
+            <Link to="/">
+              <div className="flex items-center gap-2">
+                <WorkflowIcon className="h-6 w-6" />
+                <h1 className="text-lg font-bold">Glu</h1>
+              </div>
+            </Link>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
