@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Node,
   ReactFlow,
   Controls,
   Background,
@@ -15,8 +16,7 @@ import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
+import { NodeDetails } from '@/components/node-details';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
@@ -26,6 +26,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
   const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
   const [isOpen, setIsOpen] = useState(true);
+  const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
 
   const { pipeline } = props;
   const { nodes: initNodes, edges: initEdges } = getElements(pipeline);
@@ -50,6 +51,10 @@ export function Pipeline(props: { pipeline: PipelineType }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes, edges, fitView]);
 
+  const onNodeClick = (event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node as PhaseNode);
+  };
+
   return (
     <div className="h-screen w-full">
       <ReactFlow
@@ -58,6 +63,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
         fitView
         colorMode={theme}
         proOptions={{ hideAttribution: true }}
@@ -77,6 +83,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
         <Background />
         <Controls />
       </ReactFlow>
+      <NodeDetails node={selectedNode} onClose={() => setSelectedNode(null)} />
     </div>
   );
 }
