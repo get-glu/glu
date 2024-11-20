@@ -1,3 +1,5 @@
+import { Metadata } from './metadata';
+
 // Server-side pipeline types
 export interface Pipeline {
   name: string;
@@ -7,10 +9,9 @@ export interface Pipeline {
 export interface Phase {
   name: string;
   depends_on?: string;
-  source_type?: string;
+  source: Metadata;
   digest?: string;
   labels?: Record<string, string>;
-  value?: Record<string, unknown>;
 }
 
 export interface PipelineGroup {

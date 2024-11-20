@@ -14,10 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
-    switch (data.source_type ?? '') {
+    switch (data.source.name ?? '') {
       case 'oci':
         return <Package className="h-4 w-4" />;
       default:
@@ -64,7 +65,24 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
         )}
       </div>
 
-      <div className="mt-2 font-mono text-xs text-muted-foreground">{data.digest?.slice(-12)}</div>
+      <div className="mt-2 flex items-center gap-2 text-xs">
+        <span>Digest:</span>
+        <span className="font-mono text-xs text-muted-foreground">{data.digest?.slice(-12)}</span>
+      </div>
+
+      {data.source.annotations?.[ANNOTATION_OCI_IMAGE_URL] && (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span>Image:</span>
+          <a
+            href={`https://${data.source.annotations[ANNOTATION_OCI_IMAGE_URL]}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="truncate font-mono text-xs text-muted-foreground hover:text-primary hover:underline"
+          >
+            {data.source.annotations[ANNOTATION_OCI_IMAGE_URL]}
+          </a>
+        </div>
+      )}
 
       <div className="mt-2 flex w-full flex-col">
         {data.labels &&
