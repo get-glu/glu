@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/internal/oci"
@@ -71,7 +70,6 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		method  transport.AuthMethod
 		srcOpts = []containers.Option[git.Repository]{
 			git.WithDefaultBranch(conf.DefaultBranch),
-			git.WithInterval(10 * time.Second),
 		}
 	)
 
@@ -82,7 +80,10 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 	if conf.Remote != nil {
 		slog.Debug("configuring remote", "remote", conf.Remote.Name)
 
-		srcOpts = append(srcOpts, git.WithRemote(conf.Remote.Name, conf.Remote.URL))
+		srcOpts = append(srcOpts,
+			git.WithRemote(conf.Remote.Name, conf.Remote.URL),
+			git.WithInterval(conf.Remote.Interval),
+		)
 
 		if conf.Remote.Credential != "" {
 			creds, err := c.creds.Get(conf.Remote.Credential)
