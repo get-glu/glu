@@ -51,49 +51,33 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   }, [nodes, edges, fitView]);
 
   return (
-    <Collapsible
-      key={`pipeline-${pipeline.name}`}
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      className="mb-10 w-full"
-    >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 py-2">
-        <ChevronDown
-          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
-        />
-        <span className="text-lg font-medium">{pipeline.name}</span>
-      </CollapsibleTrigger>
-
-      <CollapsibleContent>
-        <div className="mb-5 flex h-[500px] w-full border border-solid border-black">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            fitView
-            colorMode={theme}
-            proOptions={{ hideAttribution: true }}
-            defaultEdgeOptions={{
-              markerEnd: {
-                type: MarkerType.Arrow,
-                width: 20,
-                height: 20,
-                color: 'currentColor'
-              },
-              selectable: true,
-              style: {
-                strokeWidth: 2
-              }
-            }}
-          >
-            <Background />
-            <Controls />
-          </ReactFlow>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="h-screen w-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        fitView
+        colorMode={theme}
+        proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{
+          markerEnd: {
+            type: MarkerType.Arrow,
+            width: 20,
+            height: 20,
+            color: 'currentColor'
+          },
+          selectable: true,
+          style: {
+            strokeWidth: 2
+          }
+        }}
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
   );
 }
 
