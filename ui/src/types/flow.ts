@@ -7,11 +7,6 @@ export interface FlowPipeline {
 
 export type PipelineNode = PhaseNode;
 
-type PhaseNodeValue = {
-  digest: string;
-  [key: string]: unknown;
-};
-
 type PhaseNodeData = {
   pipeline: string;
   name: string;
@@ -19,7 +14,7 @@ type PhaseNodeData = {
   depends_on?: string;
   source_type?: string;
   digest?: string;
-  value?: PhaseNodeValue;
+  value?: Record<string, unknown>;
 };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
