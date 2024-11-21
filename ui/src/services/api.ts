@@ -23,4 +23,9 @@ export const api = createApi({
   })
 });
 
-export const { useGetSystemQuery, useListPipelinesQuery, useGetPipelineQuery, usePromotePhaseMutation } = api;
+export const {
+  useGetSystemQuery,
+  useListPipelinesQuery,
+  useGetPipelineQuery,
+  usePromotePhaseMutation
+} = api;

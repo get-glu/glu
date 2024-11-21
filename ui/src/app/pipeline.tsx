@@ -12,7 +12,8 @@ export default function Pipeline() {
   const dispatch = useAppDispatch();
 
   const { data: pipeline, isLoading } = useGetPipelineQuery(pipelineId ?? '', {
-    pollingInterval: 5000
+    pollingInterval: 5000,
+    skipPollingIfUnfocused: true
   });
 
   useEffect(() => {

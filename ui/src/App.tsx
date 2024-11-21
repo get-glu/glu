@@ -29,7 +29,7 @@ export function App() {
 
   let title = 'Glu';
   if (system) {
-    title = `Glu - ${system}`;
+    title = `Glu - ${system.name}`;
   }
 
   return (
