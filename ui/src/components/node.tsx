@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
@@ -30,7 +31,8 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
 
   const promote = async () => {
     setDialogOpen(false);
-    await promotePhase(data.pipeline, data.name);
+    //await promotePhase(data.pipeline, data.name);
+    toast.success('Phase promotion scheduled');
   };
 
   return (
@@ -44,18 +46,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
         </div>
         {data.depends_on && data.depends_on !== '' && (
           <>
-            {data.synced ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <CheckCircle className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
-                  </TooltipTrigger>
-                  <TooltipContent sideOffset={5} className="text-xs">
-                    Up to Date
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
+            {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -69,7 +60,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
+            }
           </>
         )}
       </div>
