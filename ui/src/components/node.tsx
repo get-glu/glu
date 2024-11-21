@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
@@ -31,6 +32,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const promote = async () => {
     setDialogOpen(false);
     await promotePhase(data.pipeline, data.name);
+    toast.success('Phase promotion scheduled');
   };
 
   return (
