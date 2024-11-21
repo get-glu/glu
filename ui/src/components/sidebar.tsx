@@ -19,15 +19,14 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuItem,
-  useSidebar
+  SidebarMenuItem
 } from '@/components/ui/sidebar';
 import { Check, ChevronsUpDown, BookOpen, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Pipeline } from '@/types/pipeline';
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { toggleSidebar } = useSidebar();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
   const { data: pipelines, loading } = useAppSelector((state: RootState) => state.pipelines);
@@ -59,7 +58,7 @@ export function Sidebar() {
                       {loading
                         ? 'Loading pipelines...'
                         : value
-                          ? pipelines?.find((pipeline) => pipeline.name === value)?.name
+                          ? pipelines?.find((pipeline: Pipeline) => pipeline.name === value)?.name
                           : 'Select pipeline...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -72,15 +71,16 @@ export function Sidebar() {
                         {loading ? (
                           <CommandItem disabled>Loading pipelines...</CommandItem>
                         ) : (
-                          pipelines?.map((pipeline) => (
+                          pipelines?.map((pipeline: Pipeline) => (
                             <CommandItem
                               key={pipeline.name}
                               value={pipeline.name}
-                              onSelect={(currentValue) => {
+                              onSelect={(currentValue: string) => {
                                 setValue(currentValue === value ? '' : currentValue);
                                 setOpen(false);
                                 navigate(`/pipelines/${currentValue}`);
                               }}
+                              className="truncate"
                             >
                               <Check
                                 className={cn(

@@ -55,27 +55,29 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
               </div>
               <div className="text-sm">
                 <span className="text-muted-foreground">Digest: </span>
-                <span className="truncate font-mono">{node.data.digest}</span>
+                <span className="truncate font-mono text-xs">{node.data.digest}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="space-y-4 overflow-hidden p-4">
-          <div>
-            <h3 className="text-sm font-medium">Labels</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {node.data.labels &&
-                Object.entries(node.data.labels).map(([key, value]) => (
-                  <Badge
-                    key={`${key}-${value}`}
-                    className={`whitespace-nowrap text-xs font-light ${getLabelColor(key, value)}`}
-                  >
-                    {key}: {value}
-                  </Badge>
-                ))}
+          {node.data.labels && Object.keys(node.data.labels).length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium">Labels</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {node.data.labels &&
+                  Object.entries(node.data.labels).map(([key, value]) => (
+                    <Badge
+                      key={`${key}-${value}`}
+                      className={`whitespace-nowrap text-xs font-light ${getLabelColor(key, value)}`}
+                    >
+                      {key}: {value}
+                    </Badge>
+                  ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

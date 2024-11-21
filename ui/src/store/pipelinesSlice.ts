@@ -48,7 +48,7 @@ export const pipelinesSlice = createSlice({
 
 export const selectPipelineByName = (state: RootState, name?: string): Pipeline | undefined => {
   if (!name) return undefined;
-  return state.pipelines.data?.find((pipeline) => pipeline.name === name);
+  return state.pipelines.data?.find((pipeline: Pipeline) => pipeline.name === name);
 };
 
 export const selectSelectedPipeline = (state: RootState): Pipeline | null =>
