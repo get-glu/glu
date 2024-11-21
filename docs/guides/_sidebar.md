@@ -1,0 +1,1 @@
+- [Glu and GitOps](/guides/gitops-example.md)
