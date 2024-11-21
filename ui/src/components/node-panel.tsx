@@ -1,7 +1,14 @@
 import { PhaseNode } from '@/types/flow';
-import { Badge } from './ui/badge';
-import { Package, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
-import { getLabelColor } from '@/lib/utils';
+import {
+  Package,
+  GitBranch,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  CircleArrowUp,
+  CircleAlert
+} from 'lucide-react';
+import { TooltipProvider, TooltipTrigger, Tooltip, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Label } from './label';
@@ -30,6 +37,33 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
         <div className="flex items-center gap-2">
           {getIcon()}
           <h2 className="text-lg font-semibold">{node.data.name}</h2>
+          {node.data.depends_on && node.data.depends_on !== '' && (
+            <>
+              {node.data.synced ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-400" />
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={5} className="text-xs">
+                      Up to Date
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <CircleAlert className="h-4 w-4 flex-shrink-0 cursor-pointer" />
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={5} className="text-xs">
+                      Out of Sync
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </>
+          )}
         </div>
         <Button variant="ghost" size="sm" onClick={onToggle}>
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
