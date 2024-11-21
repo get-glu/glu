@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
@@ -222,14 +223,37 @@ func TestConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			path: "testdata/json",
+			expected: &Config{
+				Log: Log{Level: "info"},
+				Sources: Sources{
+					Git: GitRepositories{
+						"custom": &GitRepository{
+							Remote: &Remote{
+								Name:       "origin",
+								URL:        "https://corp-repos/custom",
+								Credential: "vault",
+								Interval:   time.Minute,
+							},
+							Path:          "v1",
+							DefaultBranch: "release-v1",
+						},
+					},
+				},
+				Server: Server{
+					Port:     8080,
+					Host:     "0.0.0.0",
+					Protocol: "http",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
 			c, err := ReadFromFS(os.DirFS(tt.path))
-			if err != nil {
-				t.Errorf("expected no error, got %v", err)
-			}
+			require.NoError(t, err)
 
 			assert.Equal(t, tt.expected, c)
 		})

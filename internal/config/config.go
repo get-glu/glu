@@ -34,7 +34,7 @@ func (d *Decoder[C]) Decode(c *C) error {
 	}
 
 	m := map[string]any{}
-	if err := d.enc(data, m); err != nil {
+	if err := d.enc(data, &m); err != nil {
 		return fmt.Errorf("unmarshalling configuration: %w", err)
 	}
 
