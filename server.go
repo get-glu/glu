@@ -97,6 +97,7 @@ type phaseResponse struct {
 	Source    core.Metadata     `json:"source,omitempty"`
 	Digest    string            `json:"digest,omitempty"`
 	Labels    map[string]string `json:"labels,omitempty"`
+	Synced    bool              `json:"synced,omitempty"`
 }
 
 func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, dependencies map[core.Phase]core.Phase) (phaseResponse, error) {
@@ -125,12 +126,18 @@ func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, depe
 		return phaseResponse{}, err
 	}
 
+	synced, err := phase.Synced(ctx)
+	if err != nil {
+		return phaseResponse{}, err
+	}
+
 	return phaseResponse{
 		Name:      phase.Metadata().Name,
 		DependsOn: dependsOn,
 		Labels:    labels,
 		Source:    phase.Source(),
 		Digest:    digest,
+		Synced:    synced,
 	}, nil
 }
 
