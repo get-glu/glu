@@ -47,6 +47,7 @@ type Phase interface {
 	Source() Metadata
 	Get(context.Context) (Resource, error)
 	Promote(context.Context) error
+	Synced(context.Context) (bool, error)
 }
 
 // AddPhaseOptions are used to configure the addition of a ResourcePhase to a Pipeline

@@ -151,7 +151,8 @@ function getElements(pipeline: PipelineType): FlowPipeline {
         labels: phase.labels || {},
         depends_on: phase.depends_on,
         source: phase.source,
-        digest: phase.digest
+        digest: phase.digest,
+        synced: phase.synced
       },
       extent: 'parent'
     };

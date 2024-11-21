@@ -122,7 +122,6 @@ func (i *Phase[R]) Promote(ctx context.Context) (err error) {
 
 	if fromDigest == toDigest {
 		i.logger.Debug("skipping promotion", "reason", "UpToDate")
-
 		return nil
 	}
 
@@ -131,4 +130,38 @@ func (i *Phase[R]) Promote(ctx context.Context) (err error) {
 	}
 
 	return nil
+}
+
+func (i *Phase[R]) Synced(ctx context.Context) (bool, error) {
+	from := i.pipeline.New()
+	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, from); err != nil {
+		return false, err
+	}
+
+	dep, ok := i.pipeline.PromotedFrom(i)
+	if !ok {
+		return true, nil
+	}
+
+	to, err := dep.GetResource(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	fromDigest, err := from.Digest()
+	if err != nil {
+		return false, err
+	}
+
+	toDigest, err := to.Digest()
+	if err != nil {
+		return false, err
+	}
+
+	if fromDigest == toDigest {
+
+		return true, nil
+	}
+
+	return false, nil
 }
