@@ -1,17 +1,18 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { systemSlice, SystemState } from './systemSlice';
+import { api } from '@/services/api';
+import { Pipeline } from '@/types/pipeline';
 import { pipelinesSlice, PipelinesState } from './pipelinesSlice';
 
 export interface StoreState {
-  system: SystemState;
   pipelines: PipelinesState;
 }
 
 export const store = configureStore({
   reducer: {
-    system: systemSlice.reducer,
-    pipelines: pipelinesSlice.reducer
-  }
+    pipelines: pipelinesSlice.reducer,
+    [api.reducerPath]: api.reducer
+  },
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware)
 });
 
 export type RootState = StoreState;
