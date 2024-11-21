@@ -148,7 +148,7 @@ func (s *System) configuration() (_ *Config, err error) {
 		return s.conf, nil
 	}
 
-	conf, err := config.ReadFromPath("glu.yaml")
+	conf, err := config.ReadFromFS(os.DirFS("."))
 	if err != nil {
 		return nil, err
 	}

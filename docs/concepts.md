@@ -35,7 +35,7 @@ This is our entrypoint and wrapper for building a Glu configured application.
 
 ```go
 func main() {
-    glu.NewSystem(context.Background()).Run()
+    glu.NewSystem(context.Background(), glu.Name("mysystem")).Run()
 }
 ```
 

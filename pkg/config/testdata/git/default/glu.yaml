@@ -1,0 +1,6 @@
+sources:
+  git:
+    default:
+      remote:
+        name: upstream
+        url: https://corp-repos/default.git

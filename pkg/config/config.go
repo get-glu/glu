@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
-	"os"
 	"path"
 	"reflect"
 
@@ -16,11 +16,13 @@ import (
 type Config struct {
 	Log         Log         `glu:"log"`
 	Credentials Credentials `glu:"credentials"`
-	Sources     struct {
-		Git GitRepositories `glu:"git"`
-		OCI OCIRepositories `glu:"oci"`
-	} `glu:"sources"`
-	Server Server `glu:"server"`
+	Sources     Sources     `glu:"sources"`
+	Server      Server      `glu:"server"`
+}
+
+type Sources struct {
+	Git GitRepositories `glu:"git"`
+	OCI OCIRepositories `glu:"oci"`
 }
 
 type defaulter interface {
@@ -89,29 +91,49 @@ func processValue[T any](val reflect.Value, method func(T) error) error {
 	return nil
 }
 
-func ReadFromPath(configPath string) (_ *Config, err error) {
+func ReadFromFS(filesystem fs.FS) (_ *Config, err error) {
+	statfs, ok := filesystem.(fs.StatFS)
+	if !ok {
+		return nil, errors.New("filesystem provided does not support opening directories")
+	}
+
+	files := []string{"glu.yaml", "glu.yml", "glu.json"}
+	for _, path := range files {
+		if _, err := statfs.Stat(path); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		slog.Debug("configuration found", "path", path)
+
+		return readFromPath(filesystem, path)
+	}
+
+	slog.Debug("could not locate glu configuration file", "attempted", files)
+
+	return readFrom(config.NewDecoder[Config](&emptyReader{}, yaml.Unmarshal))
+}
+
+func readFromPath(fs fs.FS, configPath string) (_ *Config, err error) {
+	fi, err := fs.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer fi.Close()
+
 	encoding := json.Unmarshal
 	switch path.Ext(configPath) {
 	case ".yaml", ".yml":
 		encoding = yaml.Unmarshal
 	}
 
-	var fi io.ReadCloser
-	fi, err = os.Open(configPath)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
+	return readFrom(config.NewDecoder[Config](fi, encoding))
+}
 
-		slog.Warn("could not locate glu.yaml")
-
-		fi = io.NopCloser(&nopReadCloser{})
-	}
-
-	defer fi.Close()
-
-	decoder := config.NewDecoder[Config](fi, encoding)
-
+func readFrom(decoder *config.Decoder[Config]) (_ *Config, err error) {
 	var conf Config
 	if err := decoder.Decode(&conf); err != nil {
 		return nil, err
@@ -128,9 +150,8 @@ func ReadFromPath(configPath string) (_ *Config, err error) {
 	return &conf, nil
 }
 
-type nopReadCloser struct {
-}
+type emptyReader struct{}
 
-func (n nopReadCloser) Read(p []byte) (_ int, err error) {
+func (n emptyReader) Read(p []byte) (_ int, err error) {
 	return 0, io.EOF
 }
