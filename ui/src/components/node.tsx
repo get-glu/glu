@@ -51,7 +51,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <CheckCircle className="ml-2 h-4 w-4 flex-shrink-0 text-green-600" />
+                    <CheckCircle className="ml-2 h-4 w-4 flex-shrink-0 text-green-400" />
                   </TooltipTrigger>
                   <TooltipContent sideOffset={5} className="text-xs">
                     Up to Date
@@ -63,7 +63,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <CircleArrowUp
-                      className="ml-2 h-4 w-4 flex-shrink-0 cursor-pointer transition-transform hover:rotate-90 hover:text-green-600"
+                      className="ml-2 h-4 w-4 flex-shrink-0 cursor-pointer transition-transform hover:rotate-90 hover:text-green-400"
                       onClick={() => setDialogOpen(true)}
                     />
                   </TooltipTrigger>

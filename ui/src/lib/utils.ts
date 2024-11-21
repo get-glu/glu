@@ -11,15 +11,15 @@ export function getLabelColor(key: string, value: string): string {
   }, 0);
 
   const colors = [
-    'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-200',
-    'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-200',
-    'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-200',
-    'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900 dark:hover:bg-yellow-800 dark:text-yellow-200',
-    'bg-purple-100 text-purple-800 hover:bg-purple-200 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-200',
-    'bg-pink-100 text-pink-800 hover:bg-pink-200 dark:bg-pink-900 dark:hover:bg-pink-800 dark:text-pink-200',
-    'bg-indigo-100 text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 dark:text-indigo-200',
-    'bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900 dark:hover:bg-orange-800 dark:text-orange-200',
-    'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200'
+    'bg-red-200 text-red-900 hover:bg-red-300 dark:bg-red-600 dark:hover:bg-red-500 dark:text-red-100',
+    'bg-blue-200 text-blue-900 hover:bg-blue-300 dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-blue-100',
+    'bg-green-200 text-green-900 hover:bg-green-300 dark:bg-green-600 dark:hover:bg-green-500 dark:text-green-100',
+    'bg-yellow-200 text-yellow-900 hover:bg-yellow-300 dark:bg-yellow-600 dark:hover:bg-yellow-500 dark:text-yellow-100',
+    'bg-purple-200 text-purple-900 hover:bg-purple-300 dark:bg-purple-600 dark:hover:bg-purple-500 dark:text-purple-100',
+    'bg-pink-200 text-pink-900 hover:bg-pink-300 dark:bg-pink-600 dark:hover:bg-pink-500 dark:text-pink-100',
+    'bg-indigo-200 text-indigo-900 hover:bg-indigo-300 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:text-indigo-100',
+    'bg-orange-200 text-orange-900 hover:bg-orange-300 dark:bg-orange-600 dark:hover:bg-orange-500 dark:text-orange-100',
+    'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-gray-100'
   ];
 
   return colors[Math.abs(hash) % colors.length];
