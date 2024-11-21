@@ -92,40 +92,29 @@ func processValue[T any](val reflect.Value, method func(T) error) error {
 }
 
 func ReadFromFS(filesystem fs.FS) (_ *Config, err error) {
-	dirfs, ok := filesystem.(fs.ReadDirFS)
+	statfs, ok := filesystem.(fs.StatFS)
 	if !ok {
 		return nil, errors.New("filesystem provided does not support opening directories")
 	}
 
-	entries, err := dirfs.ReadDir(".")
-	if err != nil {
-		return nil, err
-	}
+	files := []string{"glu.yaml", "glu.yml", "glu.json"}
+	for _, path := range files {
+		if _, err := statfs.Stat(path); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
 
-	var configPath string
-
-	for _, ent := range entries {
-		if ent.IsDir() {
-			continue
+			return nil, err
 		}
 
-		switch ent.Name() {
-		case "glu.yaml", "glu.yml", "glu.json":
-			configPath = ent.Name()
+		slog.Debug("configuration found", "path", path)
 
-			slog.Debug("configuration found", "path", configPath)
-
-			break
-		}
+		return readFromPath(filesystem, path)
 	}
 
-	if configPath == "" {
-		slog.Debug("could not locate glu configuration file", "attempted", []string{"glu.yaml", "glu.yml", "glu.json"})
+	slog.Debug("could not locate glu configuration file", "attempted", files)
 
-		return readFrom(config.NewDecoder[Config](&emptyReader{}, yaml.Unmarshal))
-	}
-
-	return readFromPath(filesystem, configPath)
+	return readFrom(config.NewDecoder[Config](&emptyReader{}, yaml.Unmarshal))
 }
 
 func readFromPath(fs fs.FS, configPath string) (_ *Config, err error) {
