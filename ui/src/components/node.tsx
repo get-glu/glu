@@ -16,6 +16,7 @@ import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
     switch (data.source.name ?? '') {
