@@ -119,7 +119,7 @@ func run(ctx context.Context) error {
 		fdStagingPhase, err := phases.New(
 			glu.Name("staging",
 				glu.Label("environment", "staging"),
-				glu.Label("domain", "stage.billing.mycorp.com"),
+				glu.Label("domain", "http://stage.billing.mycorp.com"),
 			),
 			fdPipeline,
 			fdStagingSource,
@@ -134,7 +134,7 @@ func run(ctx context.Context) error {
 		phases.New(
 			glu.Name("production",
 				glu.Label("environment", "production"),
-				glu.Label("domain", "prod.billing.mycorp.com"),
+				glu.Label("domain", "https://prod.billing.mycorp.com"),
 				glu.Label("ssl", "enabled"),
 			),
 			fdPipeline,

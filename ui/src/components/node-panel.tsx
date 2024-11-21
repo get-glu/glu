@@ -4,6 +4,7 @@ import { Package, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
 import { getLabelColor } from '@/lib/utils';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
+import { Label } from './label';
 
 interface NodePanelProps {
   node: PhaseNode | null;
@@ -68,12 +69,7 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
               <div className="mt-2 flex flex-wrap gap-2">
                 {node.data.labels &&
                   Object.entries(node.data.labels).map(([key, value]) => (
-                    <Badge
-                      key={`${key}-${value}`}
-                      className={`whitespace-nowrap text-xs font-light ${getLabelColor(key, value)}`}
-                    >
-                      {key}: {value}
-                    </Badge>
+                    <Label labelKey={key} value={value} />
                   ))}
               </div>
             </div>

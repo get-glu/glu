@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { getLabelColor } from '@/lib/utils';
+import { Label } from './label';
 
 const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
@@ -90,12 +91,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
           Object.entries(data.labels).length > 0 &&
           Object.entries(data.labels).map(([key, value]) => (
             <div key={`${key}-${value}`} className="mb-2 flex">
-              <Badge
-                key={`${key}-${value}`}
-                className={`whitespace-nowrap text-xs font-light ${getLabelColor(key, value)}`}
-              >
-                {key}: {value}
-              </Badge>
+              <Label labelKey={key} value={value} />
             </div>
           ))}
       </div>
