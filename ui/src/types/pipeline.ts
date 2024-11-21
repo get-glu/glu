@@ -12,9 +12,5 @@ export interface Phase {
   source: Metadata;
   digest?: string;
   labels?: Record<string, string>;
-}
-
-export interface PipelineGroup {
-  id: string;
-  name: string;
+  synced?: boolean;
 }

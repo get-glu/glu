@@ -15,6 +15,7 @@ type PhaseNodeData = {
   depends_on?: string;
   source: Metadata;
   digest?: string;
+  synced?: boolean;
 };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
