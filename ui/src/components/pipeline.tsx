@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Node,
   ReactFlow,
   Controls,
   Background,
@@ -15,8 +16,7 @@ import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
+import { NodePanel } from '@/components/node-panel';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
@@ -25,7 +25,8 @@ const nodeTypes = {
 export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
   const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
-  const [isOpen, setIsOpen] = useState(true);
+  const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
   const { pipeline } = props;
   const { nodes: initNodes, edges: initEdges } = getElements(pipeline);
@@ -50,50 +51,47 @@ export function Pipeline(props: { pipeline: PipelineType }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes, edges, fitView]);
 
-  return (
-    <Collapsible
-      key={`pipeline-${pipeline.name}`}
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      className="mb-10 w-full"
-    >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 py-2">
-        <ChevronDown
-          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
-        />
-        <span className="text-lg font-medium">{pipeline.name}</span>
-      </CollapsibleTrigger>
+  const onNodeClick = (event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node as PhaseNode);
+  };
 
-      <CollapsibleContent>
-        <div className="mb-5 flex h-[500px] w-full border border-solid border-black">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            fitView
-            colorMode={theme}
-            proOptions={{ hideAttribution: true }}
-            defaultEdgeOptions={{
-              markerEnd: {
-                type: MarkerType.Arrow,
-                width: 20,
-                height: 20,
-                color: 'currentColor'
-              },
-              selectable: true,
-              style: {
-                strokeWidth: 2
-              }
-            }}
-          >
-            <Background />
-            <Controls />
-          </ReactFlow>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+  return (
+    <div className="flex h-screen w-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          fitView
+          className="h-full"
+          colorMode={theme}
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{
+            markerEnd: {
+              type: MarkerType.Arrow,
+              width: 20,
+              height: 20,
+              color: 'currentColor'
+            },
+            selectable: true,
+            style: {
+              strokeWidth: 2
+            }
+          }}
+        >
+          <Background />
+          <Controls />
+        </ReactFlow>
+      </div>
+      <NodePanel
+        node={selectedNode}
+        isExpanded={isPanelExpanded}
+        onToggle={() => setIsPanelExpanded(!isPanelExpanded)}
+      />
+    </div>
   );
 }
 
