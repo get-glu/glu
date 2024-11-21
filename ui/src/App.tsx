@@ -5,12 +5,12 @@ import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from './store/hooks';
 import { fetchPipelines } from './store/pipelinesSlice';
 import { fetchSystem } from './store/systemSlice';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
 import Pipeline from './app/pipeline';
 import { RootState } from './store';
 import { Helmet } from 'react-helmet';
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     path: '/',
     element: <Layout />,
