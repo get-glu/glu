@@ -1,7 +1,7 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
 import { Package, GitBranch, CircleArrowUp, CheckCircle } from 'lucide-react';
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
-import { promotePhase } from '@/services/api';
+import { usePromotePhaseMutation } from '@/services/api';
 import {
   Dialog,
   DialogContent,
@@ -29,9 +29,10 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
 
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const [promotePhase] = usePromotePhaseMutation();
   const promote = async () => {
     setDialogOpen(false);
-    await promotePhase(data.pipeline, data.name);
+    await promotePhase({ pipeline: data.pipeline, phase: data.name }).unwrap();
     toast.success('Phase promotion scheduled');
   };
 

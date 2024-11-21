@@ -1,24 +1,26 @@
-import axios from 'axios';
 import { Pipeline } from '@/types/pipeline';
 import { System } from '@/types/system';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const api = axios.create({
-  baseURL: '/api/v1'
+export const api = createApi({
+  baseQuery: fetchBaseQuery({ baseUrl: '/api/v1' }),
+  endpoints: (builder) => ({
+    getSystem: builder.query<System, void>({
+      query: () => '/'
+    }),
+    listPipelines: builder.query<{ pipelines: Pipeline[] }, void>({
+      query: () => '/pipelines'
+    }),
+    getPipeline: builder.query<Pipeline, string>({
+      query: (pipeline) => `/pipelines/${pipeline}`
+    }),
+    promotePhase: builder.mutation<void, { pipeline: string; phase: string }>({
+      query: ({ pipeline, phase }) => ({
+        url: `/pipelines/${pipeline}/phases/${phase}/promote`,
+        method: 'POST'
+      })
+    })
+  })
 });
 
-export const getSystem = async (): Promise<System> => {
-  const response = await api.get<System>('/');
-  return response.data;
-};
-
-export const listPipelines = async (): Promise<Pipeline[]> => {
-  const response = await api.get<{ pipelines: Pipeline[] }>('/pipelines');
-  return response.data.pipelines;
-};
-
-export const promotePhase = async (pipeline: string, phase: string) => {
-  const response = await api.post(`/pipelines/${pipeline}/phases/${phase}/promote`);
-  if (response.status !== 200) {
-    throw new Error(`unexpected status ${response.status}`);
-  }
-};
+export const { useGetSystemQuery, useListPipelinesQuery, useGetPipelineQuery, usePromotePhaseMutation } = api;

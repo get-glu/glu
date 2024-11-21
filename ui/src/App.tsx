@@ -1,14 +1,10 @@
 import Layout from './app/layout';
 import Root from './app/root';
 import { ThemeProvider } from './components/theme-provider';
-import { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from './store/hooks';
-import { fetchPipelines } from './store/pipelinesSlice';
-import { fetchSystem } from './store/systemSlice';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import Pipeline from './app/pipeline';
-import { RootState } from './store';
 import { Helmet } from 'react-helmet';
+import { useGetSystemQuery } from './services/api';
 
 const router = createHashRouter([
   {
@@ -29,13 +25,7 @@ const router = createHashRouter([
 ]);
 
 export function App() {
-  const dispatch = useAppDispatch();
-  const system = useAppSelector((state: RootState) => state.system.data?.name);
-
-  useEffect(() => {
-    dispatch(fetchSystem());
-    dispatch(fetchPipelines());
-  }, [dispatch]);
+  const { data: system } = useGetSystemQuery();
 
   let title = 'Glu';
   if (system) {

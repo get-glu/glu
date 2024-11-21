@@ -1,5 +1,3 @@
-import { useAppSelector } from '@/store/hooks';
-import { RootState } from '@/store/index';
 import { Button } from '@/components/ui/button';
 import stu from '@/assets/stu.png';
 import {
@@ -24,12 +22,13 @@ import {
 import { Check, ChevronsUpDown, BookOpen, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Pipeline } from '@/types/pipeline';
+import { useListPipelinesQuery } from '@/services/api';
 
 export function Sidebar() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState('');
-  const { data: pipelines, loading } = useAppSelector((state: RootState) => state.pipelines);
+  const { data: pipelinesData, isLoading } = useListPipelinesQuery();
 
   return (
     <SidebarComponent>
@@ -53,12 +52,14 @@ export function Sidebar() {
                       role="combobox"
                       aria-expanded={open}
                       className="mt-2 w-full justify-between"
-                      disabled={loading}
+                      disabled={isLoading}
                     >
-                      {loading
+                      {isLoading
                         ? 'Loading pipelines...'
                         : value
-                          ? pipelines?.find((pipeline: Pipeline) => pipeline.name === value)?.name
+                          ? pipelinesData?.pipelines?.find(
+                              (pipeline: Pipeline) => pipeline.name === value
+                            )?.name
                           : 'Select pipeline...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -68,10 +69,10 @@ export function Sidebar() {
                       <CommandInput placeholder="Search pipelines..." />
                       <CommandEmpty>No pipeline found.</CommandEmpty>
                       <CommandGroup>
-                        {loading ? (
+                        {isLoading ? (
                           <CommandItem disabled>Loading pipelines...</CommandItem>
                         ) : (
-                          pipelines?.map((pipeline: Pipeline) => (
+                          pipelinesData?.pipelines?.map((pipeline: Pipeline) => (
                             <CommandItem
                               key={pipeline.name}
                               value={pipeline.name}

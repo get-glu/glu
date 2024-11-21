@@ -2,18 +2,18 @@ import '@xyflow/react/dist/style.css';
 import { Pipeline as PipelineComponent } from '@/components/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useParams } from 'react-router-dom';
-import { useAppSelector } from '@/store/hooks';
-import { selectPipelineByName, setSelectedPipeline } from '@/store/pipelinesSlice';
-import { RootState } from '@/store';
+import { setSelectedPipeline } from '@/store/pipelinesSlice';
 import { useEffect } from 'react';
 import { useAppDispatch } from '@/store/hooks';
+import { useGetPipelineQuery } from '@/services/api';
 
 export default function Pipeline() {
   const { pipelineId } = useParams();
   const dispatch = useAppDispatch();
 
-  const { data: pipelines, loading } = useAppSelector((state: RootState) => state.pipelines);
-  const pipeline = useAppSelector((state: RootState) => selectPipelineByName(state, pipelineId));
+  const { data: pipeline, isLoading } = useGetPipelineQuery(pipelineId ?? '', {
+    pollingInterval: 5000
+  });
 
   useEffect(() => {
     if (pipeline) {
@@ -24,7 +24,7 @@ export default function Pipeline() {
     };
   }, [pipeline, dispatch]);
 
-  if (loading || !pipelines) {
+  if (isLoading || !pipeline) {
     return <div>Loading pipeline...</div>;
   }
 
