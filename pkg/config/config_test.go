@@ -2,12 +2,22 @@ package config
 
 import (
 	"errors"
+	"log/slog"
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
+	os.Exit(m.Run())
+}
 
 type testDefaulter struct {
 	called bool
@@ -159,101 +169,75 @@ func TestProcessValue(t *testing.T) {
 	}
 }
 
-type testGitExpected struct {
-	remoteName string
-	url        string
-	credential string
-	interval   time.Duration
-}
-
-func TestConfigGit(t *testing.T) {
-	configDir := t.TempDir()
-
+func TestConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		expected GitRepository
+		path     string
+		expected *Config
 	}{
 		{
-			name: "default",
-			input: `sources:
-  git:
-    default:
-      remote:
-        name: upstream
-        url: https://corp-repos/default.git
-  `,
-			expected: GitRepository{
-				Remote: &Remote{
-					Name:     "upstream",
-					URL:      "https://corp-repos/default.git",
-					Interval: 10 * time.Second,
+			path: "testdata/git/default",
+			expected: &Config{
+				Log: Log{Level: "info"},
+				Sources: Sources{
+					Git: GitRepositories{
+						"default": &GitRepository{
+							Remote: &Remote{
+								Name:     "upstream",
+								URL:      "https://corp-repos/default.git",
+								Interval: 10 * time.Second,
+							},
+							DefaultBranch: "main",
+						},
+					},
 				},
-				DefaultBranch: "main",
+				Server: Server{
+					Port:     8080,
+					Host:     "0.0.0.0",
+					Protocol: "http",
+				},
 			},
 		},
 		{
-			name: "custom",
-			input: `sources:
-  git:
-    custom:
-      remote:
-        name: origin
-        url: https://corp-repos/custom
-        credential: vault
-        interval: 1m
-      path: v1
-      default_branch: release-v1
-  `,
-			expected: GitRepository{
-				Remote: &Remote{
-					Name:       "origin",
-					URL:        "https://corp-repos/custom",
-					Credential: "vault",
-					Interval:   time.Minute,
+			path: "testdata/git/custom",
+			expected: &Config{
+				Log: Log{Level: "info"},
+				Sources: Sources{
+					Git: GitRepositories{
+						"custom": &GitRepository{
+							Remote: &Remote{
+								Name:       "origin",
+								URL:        "https://corp-repos/custom",
+								Credential: "vault",
+								Interval:   time.Minute,
+							},
+							Path:          "v1",
+							DefaultBranch: "release-v1",
+						},
+					},
 				},
-				Path:          "v1",
-				DefaultBranch: "release-v1",
+				Server: Server{
+					Port:     8080,
+					Host:     "0.0.0.0",
+					Protocol: "http",
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			configPath := filepath.Join(configDir, tt.name+"-glu.yaml")
-			err := os.WriteFile(configPath, []byte(tt.input), 0600)
-			if err != nil {
-				t.Fatalf("failed to write configuration file: %v", err)
-			}
-
-			c, err := ReadFromPath(configPath)
+		t.Run(tt.path, func(t *testing.T) {
+			c, err := ReadFromFS(os.DirFS(tt.path))
 			if err != nil {
 				t.Errorf("expected no error, got %v", err)
 			}
-			repos := c.Sources.Git
-			if len(repos) == 0 {
-				t.Fatalf("expected at least one repo, got zero")
-			}
-			repo, ok := repos[tt.name]
-			if !ok {
-				t.Fatalf("expected repo %s to exist", tt.name)
-			}
 
-			if !reflect.DeepEqual(tt.expected.Remote, repo.Remote) {
-				t.Errorf("expected remote %v, got %v", tt.expected.Remote, repo.Remote)
-			}
-			if tt.expected.Path != repo.Path {
-				t.Errorf("expected path %v, got %v", tt.expected.Path, repo.Path)
-			}
-			if tt.expected.DefaultBranch != repo.DefaultBranch {
-				t.Errorf("expected default branch %v, got %v", tt.expected.DefaultBranch, repo.DefaultBranch)
-			}
+			assert.Equal(t, tt.expected, c)
 		})
 	}
 }
 
 func TestReadFromFileWhenNoConfig(t *testing.T) {
-	_, err := ReadFromPath(filepath.Join(t.TempDir(), "non-existent-file.yaml"))
+	_, err := ReadFromFS(os.DirFS("."))
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
