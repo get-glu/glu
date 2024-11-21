@@ -2,6 +2,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { Sidebar } from '@/components/sidebar';
 import { Outlet } from 'react-router-dom';
 import { Header } from '@/components/header';
+import { Toaster } from '@/components/ui/sonner';
 
 export default function Layout() {
   return (
@@ -14,6 +15,7 @@ export default function Layout() {
             <Outlet />
           </div>
         </main>
+        <Toaster />
       </SidebarInset>
     </SidebarProvider>
   );
