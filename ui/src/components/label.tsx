@@ -14,7 +14,7 @@ export function Label({ labelKey, value }: LabelProps) {
     >
       {labelKey}:{' '}
       {value.match('^https?://.*') ? (
-        <a className="ml-1 hover:underline" href={value} target="_blank">
+        <a className="ml-1 hover:underline" href={value} target="_blank" rel="noreferrer">
           {value}
         </a>
       ) : (
