@@ -5,6 +5,9 @@ import { createHashRouter, RouterProvider } from 'react-router-dom';
 import Pipeline from './app/pipeline';
 import { Helmet } from 'react-helmet';
 import { useGetSystemQuery } from './services/api';
+import { Toaster } from '@/components/ui/toaster';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 const router = createHashRouter([
   {
@@ -25,7 +28,17 @@ const router = createHashRouter([
 ]);
 
 export function App() {
-  const { data: system } = useGetSystemQuery();
+  const { data: system, isError, error } = useGetSystemQuery();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (isError) {
+      toast({
+        variant: 'destructive',
+        description: error.data
+      });
+    }
+  }, [error, isError]);
 
   let title = 'Glu';
   if (system) {
@@ -41,6 +54,7 @@ export function App() {
       </Helmet>
       <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
         <RouterProvider router={router} />
+        <Toaster />
       </ThemeProvider>
     </>
   );
