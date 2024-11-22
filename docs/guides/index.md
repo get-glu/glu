@@ -4,10 +4,10 @@ This section contains guides for exploring pre-built Glu pipelines in action.
 
 ## Glu Orchestrated GitOps Pipeline
 
-In this guide we will create a GitOps pipeline for deploying some simple applications to multiple "environments".
-For the purposes of keeping the illustration simple to create (and destroy) our environments are simply two separate pods in the same cluster. However, Glu can definitely extend to multiple namespaces, clusters or even non-Kubernetes deployment environments.
+In this guide, we will create a GitOps pipeline for deploying some simple applications to multiple "environments".
+For the purposes of keeping the illustration simple to create (and destroy), our environments are simply two separate pods in the same cluster. However, Glu can extend to multiple namespaces, clusters, or even non-Kubernetes deployment environments.
 
-In this guide we will:
+In this guide, we will:
 
 - Deploy a bunch of applications and CD components to a Kubernetes-in-Docker cluster on our local machine.
 - Visit our applications in their different "environments" to see what is deployed.
@@ -20,11 +20,11 @@ You can follow the README there, however, we will go over the steps again here i
 
 The repository contains a script, which will:
 
-- Spin up a Kind cluster to run all of our components in.
+- Spin up a Kind cluster to run all of our components.
 - Deploy FluxCD into the cluster to perform CD for our environments.
-- Add two Flux Git sources pointed at two seperate "environment" folders (`staging` and `production`).
-- Flux will then deploy our demo application into both these "environments".
-- Deploy a Glu implemented pipeline for visualizing and progressing promotions across our environments.
+- Add two Flux Git sources pointed at two separate "environment" folders (`staging` and `production`).
+- Flux will then deploy our demo application into both of these "environments".
+- Deploy a Glu-implemented pipeline for visualizing and progressing promotions across our environments.
 
 ### Requirements
 
@@ -42,13 +42,13 @@ Before you get started you're going to want to do the following:
 
 1. Fork [this repo](https://github.com/get-glu/gitops-example)!
 2. Clone your fork locally.
-3. Make a note of your forks GitHub URL (likely `https://github.com/{your_username}/gitops-example`).
+3. Make a note of your fork's GitHub URL (likely `https://github.com/{your_username}/gitops-example`).
 4. Generate a [GitHub Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) (if you want to experiment with promotions).
 
-> You will need at-least read and write contents scope (`contents:write`).
+> You will need at least read and write contents scope (`contents:write`).
 
 Once you have done the above, you can run the start script found in the root of your local fork.
-The script will prompt you for your forks repository URL and access token (given you want to perform promotions).
+The script will prompt you for your fork's repository URL and access token (given you want to perform promotions).
 
 ```console
 ./start.sh
