@@ -17,14 +17,14 @@ It includes an optional UI for visualizing and interacting with your deployment 
 ## Why Glu?
 
 - Deployment pipelines today are increasingly complex and brittle. Deployment scripts are often written in a variety of languages (Bash, Python, etc.) and are difficult to maintain.
-- Tracking deployments across multiple environments is difficult. Answering questions like "what is deployed where?" is cumbersome.
-- Tools such as ArgoCD, Flux, and others exist, but they solve a small part of the problem, are often very opinionated and are Kubernetes centric.
+- Tracking deployments across multiple environments is difficult. Answering questions like "What is deployed where?" is cumbersome.
+- Tools such as ArgoCD, Flux, and others exist, but they solve a small part of the problem, are often very opinionated, and are Kubernetes-centric.
 - YAML sucks for defining deployment pipelines.
 
 ## Goals
 
 The goals outlined here are defined to set a target for the project to work towards.
-Glu has not yet reached all of these goals, but hopefully it gives an idea of our intended direction.
+Glu has not yet reached all of these goals, but hopefully, it gives an idea of our intended direction.
 
 They're also not immutable and we would love your help in shaping them.
 
