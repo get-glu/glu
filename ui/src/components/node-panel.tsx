@@ -1,13 +1,5 @@
 import { PhaseNode } from '@/types/flow';
-import {
-  Package,
-  GitBranch,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle,
-  CircleArrowUp,
-  CircleAlert
-} from 'lucide-react';
+import { Package, GitBranch, ChevronDown, ChevronUp, CheckCircle, CircleAlert } from 'lucide-react';
 import { TooltipProvider, TooltipTrigger, Tooltip, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -103,7 +95,7 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
               <div className="mt-2 flex flex-wrap gap-2">
                 {node.data.labels &&
                   Object.entries(node.data.labels).map(([key, value]) => (
-                    <Label labelKey={key} value={value} />
+                    <Label key={key} labelKey={key} value={value} />
                   ))}
               </div>
             </div>
