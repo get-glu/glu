@@ -1,6 +1,6 @@
 # Welcome <!-- {docsify-ignore-all} -->
 
-> Glu is progressive delivery as code. Build and test your pipelines locally, then deploy them to your environments.
+> Glu is progressive delivery as code. Build, test, and visualize your pipelines locally, then deploy them to your environments.
 
 
 Glu is a framework written and consumed in the Go programming language.
