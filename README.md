@@ -14,9 +14,16 @@
   <br>
 </div>
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/get-glu/glu.svg)](https://pkg.go.dev/github.com/get-glu/glu)
+
+
 ## What Is It?
 
 Glu is a framework built to enable you to implement your own custom pipelines in code.
+
+<p align="center">
+<img src=".github/images/dashboard.png" alt="Glu Dashboard" title="Glu Dashboard" width="75%" />
+</p>
 
 Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
 
@@ -34,6 +41,18 @@ Use it to implement anything that involes automating updates to Git repositories
 - ⌛️ Coordinate any combination of scheduled, event driven or manually triggered promotions from one environment to the next.
 - 🔍 Expose a single pane of glass to compare and manipulate the state of your resources in one environment to the next.
 - 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
+
+## Getting Started
+
+1. Install Glu
+
+```
+go get github.com/get-glu/glu
+```
+
+2. Follow the [GitOps Example Repository](https://github.com/get-glu/gitops-example) to see Glu in action.
+
+3. Implement your own pipelines using the [Glu SDK](https://pkg.go.dev/github.com/get-glu/glu).
 
 ## Development
 
