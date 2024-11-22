@@ -6,6 +6,8 @@ import Pipeline from './app/pipeline';
 import { Helmet } from 'react-helmet';
 import { useGetSystemQuery } from './services/api';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
+import { getErrorMessage } from '@/lib/utils';
 
 const router = createHashRouter([
   {
@@ -27,11 +29,10 @@ const router = createHashRouter([
 
 export function App() {
   const { data: system, isError, error } = useGetSystemQuery();
-  const { toast } = useToast();
 
   useEffect(() => {
     if (isError) {
-      toast.error(error.data);
+      toast.error(getErrorMessage(error));
     }
   }, [error, isError]);
 

@@ -1,3 +1,5 @@
+import { SerializedError } from '@reduxjs/toolkit';
+import { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -23,4 +25,14 @@ export function getLabelColor(key: string, value: string): string {
   ];
 
   return colors[Math.abs(hash) % colors.length];
+}
+
+export function getErrorMessage(error: SerializedError | FetchBaseQueryError): string {
+  if ('data' in error) {
+    return error.data as string;
+  }
+  if ('message' in error) {
+    return error.message as string;
+  }
+  return 'An unknown error occurred';
 }
