@@ -23,18 +23,20 @@ import { Check, ChevronsUpDown, BookOpen, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Pipeline } from '@/types/pipeline';
 import { useListPipelinesQuery } from '@/services/api';
+import { useParams } from 'react-router-dom';
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { pipelineId } = useParams();
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(pipelineId);
   const { data: pipelinesData, isLoading } = useListPipelinesQuery();
 
   return (
     <SidebarComponent>
       <SidebarContent className="flex h-full flex-col justify-between">
         <SidebarGroup>
-          <SidebarGroupLabel className="mb-4">
+          <SidebarGroupLabel className="mb-2">
             <Link to="/">
               <div className="flex items-center gap-2">
                 <img src={stu} alt="Stu" className="h-8 w-8" />
