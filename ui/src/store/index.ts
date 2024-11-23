@@ -1,6 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { api } from '@/services/api';
-import { Pipeline } from '@/types/pipeline';
 import { pipelinesSlice, PipelinesState } from './pipelinesSlice';
 
 export interface StoreState {

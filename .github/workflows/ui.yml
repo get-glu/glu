@@ -1,0 +1,29 @@
+name: UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ui/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+      - name: Setup
+        run: npm ci
+        working-directory: ui
+      - name: Lint
+        run: npm run lint
+        working-directory: ui
