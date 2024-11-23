@@ -26,7 +26,7 @@ This will start a local server which can be viewed in your browser at http://loc
 
 ## Conventional Commits
 
-Flipt uses [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. This allows us to automatically generate changelogs and releases. To help with this, we use [pre-commit](https://pre-commit.com/) to automatically lint commit messages. To install pre-commit, run:
+Glu uses [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for commit messages. This allows us to automatically generate changelogs and releases. To help with this, we use [pre-commit](https://pre-commit.com/) to automatically lint commit messages. To install pre-commit, run:
 
 `pip install pre-commit` or `brew install pre-commit` (if you're on a Mac)
 
