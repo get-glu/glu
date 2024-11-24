@@ -29,7 +29,6 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { pipelineId } = useParams();
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(pipelineId);
   const { data: pipelinesData, isLoading } = useListPipelinesQuery();
 
   return (
@@ -58,9 +57,9 @@ export function Sidebar() {
                     >
                       {isLoading
                         ? 'Loading pipelines...'
-                        : value
+                        : pipelineId
                           ? pipelinesData?.pipelines?.find(
-                              (pipeline: Pipeline) => pipeline.name === value
+                              (pipeline: Pipeline) => pipeline.name === pipelineId
                             )?.name
                           : 'Select pipeline...'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -79,7 +78,6 @@ export function Sidebar() {
                               key={pipeline.name}
                               value={pipeline.name}
                               onSelect={(currentValue: string) => {
-                                setValue(currentValue === value ? '' : currentValue);
                                 setOpen(false);
                                 navigate(`/pipelines/${currentValue}`);
                               }}
@@ -88,7 +86,7 @@ export function Sidebar() {
                               <Check
                                 className={cn(
                                   'mr-2 h-4 w-4',
-                                  value === pipeline.name ? 'opacity-100' : 'opacity-0'
+                                  pipelineId === pipeline.name ? 'opacity-100' : 'opacity-0'
                                 )}
                               />
                               {pipeline.name}
