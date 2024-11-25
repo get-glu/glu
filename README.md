@@ -16,7 +16,6 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/get-glu/glu.svg)](https://pkg.go.dev/github.com/get-glu/glu)
 
-
 ## What Is It?
 
 Glu is a framework built to enable you to implement your own custom pipelines in code.
@@ -73,3 +72,7 @@ In the future, we plan to support more functionality, such as:
   - Ability to view past states for phases
   - Be able to pin phases to current or manually overridden states
   - Rollback phases to previously known states
+
+## Built By
+
+The team at [Flipt](https://flipt.io). We built Glu to power our own internal promotion pipelines and open sourced it so that others can benefit from it.
