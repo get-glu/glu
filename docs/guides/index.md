@@ -12,7 +12,7 @@ In this guide, we will:
 - Deploy a bunch of applications and CD components to a Kubernetes-in-Docker cluster on our local machine.
 - Visit our applications in their different "environments" to see what is deployed.
 - Look at the Glu pipeline UI to see the latest version of our application, as well as the versions deployed to each environment.
-- Trigger a promotion in the UI to update one target environment, to version it is configured to promote from.
+- Trigger a promotion in the UI to update one target environment, to the version it is configured to promote from.
 - Observe that our promoted environment has updated to the new version.
 
 All the content in this guide works around our [GitOps Example Repository](https://github.com/get-glu/gitops-example).
@@ -24,7 +24,7 @@ The repository contains a script, which will:
 - Deploy FluxCD into the cluster to perform CD for our environments.
 - Add two Flux Git sources pointed at two separate "environment" folders (`staging` and `production`).
 - Flux will then deploy our demo application into both of these "environments".
-- Deploy a Glu-implemented pipeline for visualizing and progressing promotions across our environments.
+- Deploy a Glu-implemented pipeline to visualize and progress promotions across our environments.
 
 ### Requirements
 
@@ -75,12 +75,12 @@ From here, we need to select a pipeline to get started.
 
 <img src="/images/guides/gitops-pipeline/dashboard-welcome.png" alt="Dashboard Welcome Screen" />
 
-Head to the pipeline drop down at the top-left of the dashboard.
+Head to the pipeline dropdown at the top-left of the dashboard.
 Then select the `gitops-example-app` pipeline.
 
 <img src="/images/guides/gitops-pipeline/pipeline-selection-dropdown.png" alt="Pipeline selection dropdown" />
 
-You will notice there are three phase "oci", "staging" and "production".
+You will notice there are three phases "oci", "staging" and "production".
 
 <img src="/images/guides/gitops-pipeline/pipeline-dashboard-view.png" alt="Pipeline dashboard view" />
 
@@ -123,7 +123,7 @@ Click on `Promote` to trigger a promotion from "staging" to "production".
 This will have triggered a promotion to take place.
 In this particular example, this will have updated a manifest in our forked Git repository.
 Try navigating in your browser to your forked repository in GitHub.
-You should see a new commit labelled `Update production`.
+You should see a new commit labeled `Update production`.
 Clicking on this, you should see a git patch similar to the following.
 
 <img src="/images/guides/gitops-pipeline/git-diff-production.png" alt="Git patch to production deployment manifest" />
