@@ -424,6 +424,23 @@ Finally, we're rewriting our target file with the new updated contents of our de
 
 ## The Triggers
 
+Triggers are used to automate promotions based on some event or schedule.
+Currently, scheduled triggers are the only prebuilt triggers available (we intend to add more, e.g. on oci or git push).
+
+```go
+system.AddTrigger(
+	schedule.New(
+		schedule.WithInterval(10*time.Second),
+		schedule.MatchesLabel("env", "staging"),
+		// alternatively, the phase instance can be target directly with:
+		// glu.ScheduleMatchesPhase(stagingPhase),
+	),
+)
+```
+
+Here, we configure the system to attempt a promotion on any phase with particular label pair (`"env" == "staging"`) every `10s`.
+Remember, a phase will only perform a real promotion if the resource derived from the two source differs (based on comparing the result of `Digest()`).
+
 ## Now Run
 
 Finally, we can now run our pipeline.
