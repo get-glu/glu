@@ -134,4 +134,4 @@ Eventually, once FluxCD has caught up with a new revision you should see it take
 This guide has walked through an interactive example of a pipeline implemented in Glu.
 In the next guide, we will look into how this particular pipeline is implemented in Go, using the Glu framework.
 
-TODO(georgemac): Write the guide and link it here.
+Next: [GitOps and Glu: Implementation](/guides/gitops-implementation)
