@@ -16,7 +16,6 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/get-glu/glu.svg)](https://pkg.go.dev/github.com/get-glu/glu)
 
-
 ## What Is It?
 
 Glu is a framework built to enable you to implement your own custom pipelines in code.
@@ -60,7 +59,7 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md) for more information.
 
 ## Roadmap Ideas
 
-In the future we plan to support more functionality, such as:
+In the future, we plan to support more functionality, such as:
 
 - New sources:
   - Helm
@@ -69,7 +68,11 @@ In the future we plan to support more functionality, such as:
 - Progressive delivery (think Kargo / Argo Rollouts)
   - Ability to guard promotion with condition checks on resource status
   - Expose status via Go function definitions on resource types
-- Pinning, history and rollback
+- Pinning, history, and rollback
   - Ability to view past states for phases
   - Be able to pin phases to current or manually overridden states
-  - Rollback phases to previous known states
+  - Rollback phases to previously known states
+
+## Built By
+
+The team at [Flipt](https://flipt.io). We built Glu to power our own internal promotion pipelines and open sourced it so that others can benefit from it.
