@@ -11,7 +11,6 @@ import (
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/get-glu/glu/pkg/phases"
 	"github.com/get-glu/glu/pkg/src/git"
-	"github.com/get-glu/glu/pkg/src/oci"
 	"github.com/get-glu/glu/pkg/triggers/schedule"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"gopkg.in/yaml.v3"
@@ -19,27 +18,23 @@ import (
 
 func run(ctx context.Context) error {
 	return glu.NewSystem(ctx, glu.Name("mypipelines")).
-		AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
-			// fetch the configured OCI repositority source named "checkout"
-			ociRepo, err := config.OCIRepository("checkout")
-			if err != nil {
-				return nil, err
-			}
-
-			ociSource := oci.New[*CheckoutResource](ociRepo)
-
-			// fetch the configured Git repository source named "checkout"
-			gitRepo, gitProposer, err := config.GitRepository(ctx, "checkout")
-			if err != nil {
-				return nil, err
-			}
-
-			gitSource := git.NewSource(gitRepo, gitProposer, git.ProposeChanges[*CheckoutResource](git.ProposalOption{
-				Labels: []string{"automerge"},
-			}))
-
+		AddPipeline(glu.BuilderFunc(func(builder *glu.PipelineBuilder[*CheckoutResource]) (glu.Pipeline, error) {
 			// create initial (empty) pipeline
 			pipeline := glu.NewPipeline(glu.Name("checkout"), NewCheckoutResource)
+
+			// fetch the configured OCI repositority source named "checkout"
+			ociSource, err := glu.OCISource(builder, "checkout")
+			if err != nil {
+				return nil, err
+			}
+
+			// fetch the configured Git repository source named "checkout"
+			gitSource, err := glu.GitSource(builder, "checkout", git.ProposeChanges[*CheckoutResource](git.ProposalOption{
+				Labels: []string{"automerge"},
+			}))
+			if err != nil {
+				return nil, err
+			}
 
 			// build a phase which sources from the OCI repository
 			ociPhase, err := phases.New(glu.Name("oci"), pipeline, ociSource)
@@ -65,7 +60,7 @@ func run(ctx context.Context) error {
 
 			// return configured pipeline to the system
 			return pipeline, nil
-		}).AddTrigger(
+		})).AddTrigger(
 		schedule.New(
 			schedule.WithInterval(10*time.Second),
 			schedule.MatchesLabel("env", "staging"),

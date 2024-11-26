@@ -71,17 +71,18 @@ In this example, we have a single pipeline we have chosen to call `gitops-exampl
 To add a new pipeline, we call `AddPipeline()`, which takes a function that returns a Pipeline for some provided configuration:
 
 ```go
-system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+system.AddPipeline(glu.BuilderFunc(func(builder *glu.PipelineBuilder[*AppResource]) (glu.Pipeline, error) {
   // ...
-})
+}))
 ```
 
 It is up to the implementer to build a pipeline using the provided configuration.
 The returned pipeline from this function will be registered on the system.
 In this function, we're expected to define our pipeline and all its child phases and their promotion dependencies on one another.
 
-The provided configuration has lots of useful conventions baked into it for the built-in phase types.
-Our pipeline phases will interact with both OCI and Git sources of truth to make everything work.
+Here, we're using a utility function `glu.BuilderFunc`.
+This has some nice out of the box typed wrappers for quickly getting configured Git and OCI source clients.
+Notice this type called `*AppResource`. We won't get into this right now (we will learn about this in [The Resource](#the-resource) section), however, this type is intrinsic for defining _what_ flows through our pipeline and _how_ it is represented in our target **sources**.
 
 ### Definition
 
@@ -94,37 +95,31 @@ pipeline := glu.NewPipeline(glu.Name("gitops-example-app"), func() *AppResource 
 ```
 
 As with our system, pipelines require some metadata.
-Notice this type called `*AppResource`. We won't get into this right now (we will learn about this in [The Resource](#the-resource) section), however, this type is intrinsic for defining _what_ flows through our pipeline and _how_ it is represented in our target **sources**.
 
 Before we can define our phases, each phase will likely need to source its state from somewhere (e.g. OCI or Git).
 We can use the config argument passed to the builder function to make this process easier.
+Notice this function also takes a function which returns our `*AppResource` from before.
+The pipeline will use this function to instantiate new, default versions of our resource when fetching state from sources.
 
 ### Config: OCI
 
 ```go
-// fetch the configured OCI repository source named "app"
-ociRepo, err := config.OCIRepository("app")
+// fetch the configured OCI source named "app"
+ociSource, err := glu.OCISource(builder, "app")
 if err != nil {
     return nil, err
 }
-
-ociSource := oci.New[*AppResource](ociRepo)
 ```
 
-The `OCIRepository` method fetches a pre-configured OCI repository client.
-This client implementation is intended for the `github.com/get-glu/glu/pkg/src/oci.Source` implementation.
+The `OCISource` method fetches a pre-configured OCI source client.
 Notice we provide the name `"app"` when creating the repository.
-
-> Notice again the type `*AppResource` supplied as a type argument this time.
-> Ignore this for now, we will come to that later on in this guide.
-
-Remember, Glu brings some conventions around configuration.
 You can now provide OCI-specific configuration for this source repository by using the same name `"app"` in a `glu.yaml` (or this can alternatively be supplied via environment variables).
+This is key to how Glu brings conventions around configuration.
 
 ```yaml
 sources:
   oci:
-    app: # this is where our config.OCIRepository("app") argument comes in
+    app: # this is where our "app" name argument comes in
       reference: "ghcr.io/get-glu/gitops-example/app:latest"
       credential: "github"
 
@@ -140,21 +135,14 @@ credentials:
 
 ```go
 // fetch the configured Git repository source named "gitopsexample"
-gitRepo, gitProposer, err := config.GitRepository(ctx, "gitopsexample")
+gitSource, err := config.GitSource(builder, "gitopsexample")
 if err != nil {
     return nil, err
 }
-
-gitSource := git.NewSource[*AppResource](gitRepo, gitProposer)
 ```
 
-As with OCI, Git has a similar convenience function for getting a pre-configured Git repository.
-Here, we ask for configuration for a git repository with the name `"gitopsexample"`.
-
-In its current form, this returns both a repository and a proposer.
-We can ignore the proposer as an implementation detail for now.
-However, for future reference, the proposer is so that we can support opening pull or merge requests in target SCMs (e.g. GitHub).
-
+As with OCI, Git has a similar convenience function for getting a pre-configured Git source.
+Here, we ask for configuration for a git source configured with the name `"gitopsexample"`.
 Again, as with the OCI source, we can now configure this named repository in our `glu.yaml` or via environment variables.
 
 ```yaml

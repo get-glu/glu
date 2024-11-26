@@ -117,8 +117,8 @@ While phases handle the lifecycle of promotion, sources interface with your reso
 
 Currently, Glu has implementations for the following sources:
 
-- OCI
-- Git
+- [OCI](../pkg/src/oci)
+- [Git](../pkg/src/git)
 
 We look to add more in the not-so-distant future. However, these can also be implemented by hand via the following interfaces:
 

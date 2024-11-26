@@ -14,14 +14,16 @@ import (
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/scm/github"
 	srcgit "github.com/get-glu/glu/pkg/src/git"
+	srcoci "github.com/get-glu/glu/pkg/src/oci"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	giturls "github.com/whilp/git-urls"
 )
 
-// Config is a utility for extracting configured sources by their name
+// PipelineBuilder is a utility for extracting configured sources by their name
 // derived from glu's conventional configuration format.
-type Config struct {
+type PipelineBuilder[R Resource] struct {
+	ctx   context.Context
 	conf  *config.Config
 	creds *credentials.CredentialSource
 
@@ -32,24 +34,31 @@ type Config struct {
 	}
 }
 
-func newConfigSource(conf *config.Config) *Config {
-	c := &Config{
-		conf:  conf,
-		creds: credentials.New(conf.Credentials),
+// BuilderFunc returns a pipeline building function suitable for system.AddPipeline.
+// It adapts the provided function into the type PipelineBuilder which can be
+// passed to both GitSource and OCISource.
+// This is a convenience wrapper for typed pipelines.
+func BuilderFunc[R Resource](fn func(*PipelineBuilder[R]) (Pipeline, error)) func(ctx context.Context, conf *config.Config) (Pipeline, error) {
+	return func(ctx context.Context, conf *config.Config) (Pipeline, error) {
+		c := &PipelineBuilder[R]{
+			ctx:   ctx,
+			conf:  conf,
+			creds: credentials.New(conf.Credentials),
+		}
+
+		c.cache.oci = map[string]*oci.Repository{}
+		c.cache.repo = map[string]*git.Repository{}
+		c.cache.proposer = map[string]srcgit.Proposer{}
+
+		return fn(c)
 	}
-
-	c.cache.oci = map[string]*oci.Repository{}
-	c.cache.repo = map[string]*git.Repository{}
-	c.cache.proposer = map[string]srcgit.Proposer{}
-
-	return c
 }
 
-// GitRepository constructs and configures an instance of a *git.Repository
+// GitSource constructs and configures an instance of a *git.Source
 // using the name to lookup the relevant configuration.
 // It caches built instances and returns the same instance for subsequent
 // calls with the same name.
-func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer srcgit.Proposer, err error) {
+func GitSource[R srcgit.Resource](b *PipelineBuilder[R], name string, opts ...containers.Option[srcgit.Source[R]]) (_ *srcgit.Source[R], err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("git %q: %w", name, err)
@@ -57,13 +66,14 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 	}()
 
 	// check cache for previously built repository
-	if repo, ok := c.cache.repo[name]; ok {
-		return repo, c.cache.proposer[name], nil
+	if repo, ok := b.cache.repo[name]; ok {
+		proposer := b.cache.proposer[name]
+		return srcgit.NewSource(repo, proposer, opts...), nil
 	}
 
-	conf, ok := c.conf.Sources.Git[name]
+	conf, ok := b.conf.Sources.Git[name]
 	if !ok {
-		return nil, nil, errors.New("configuration not found")
+		return nil, errors.New("configuration not found")
 	}
 
 	var (
@@ -86,14 +96,14 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		)
 
 		if conf.Remote.Credential != "" {
-			creds, err := c.creds.Get(conf.Remote.Credential)
+			creds, err := b.creds.Get(conf.Remote.Credential)
 			if err != nil {
-				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
+				return nil, fmt.Errorf("repository %q: %w", name, err)
 			}
 
 			method, err = creds.GitAuthentication()
 			if err != nil {
-				return nil, nil, fmt.Errorf("repository %q: %w", name, err)
+				return nil, fmt.Errorf("repository %q: %w", name, err)
 			}
 		}
 	}
@@ -101,24 +111,25 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 	if method == nil {
 		method, err = ssh.DefaultAuthBuilder("git")
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
-	repo, err := git.NewRepository(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
+	repo, err := git.NewRepository(b.ctx, slog.Default(), append(srcOpts, git.WithAuth(method))...)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
+	var proposer srcgit.Proposer
 	if conf.Proposals != nil {
 		repoURL, err := giturls.Parse(conf.Remote.URL)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
 		if len(parts) < 2 {
-			return nil, nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
+			return nil, fmt.Errorf("unexpected repository URL path: %q", repoURL.Path)
 		}
 
 		var (
@@ -128,14 +139,14 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 
 		var proposalsEnabled bool
 		if proposalsEnabled = conf.Proposals.Credential != ""; proposalsEnabled {
-			creds, err := c.creds.Get(conf.Proposals.Credential)
+			creds, err := b.creds.Get(conf.Proposals.Credential)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
-			client, err := creds.GitHubClient(ctx)
+			client, err := creds.GitHubClient(b.ctx)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
 			proposer = github.New(
@@ -152,30 +163,30 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		)
 	}
 
-	c.cache.repo[name] = repo
-	c.cache.proposer[name] = proposer
+	b.cache.repo[name] = repo
+	b.cache.proposer[name] = proposer
 
-	return repo, proposer, nil
+	return srcgit.NewSource(repo, proposer, opts...), nil
 }
 
-// OCIRepository constructs and configures an instance of a *oci.Repository
+// OCISource constructs and configures an instance of a *oci.Source
 // using the name to lookup the relevant configuration.
 // It caches built instances and returns the same instance for subsequent
 // calls with the same name.
-func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
+func OCISource[R srcoci.Resource](b *PipelineBuilder[R], name string) (_ *srcoci.Source[R], err error) {
 	// check cache for previously built repository
-	if repo, ok := c.cache.oci[name]; ok {
-		return repo, nil
+	if repo, ok := b.cache.oci[name]; ok {
+		return srcoci.New[R](repo), nil
 	}
 
-	conf, ok := c.conf.Sources.OCI[name]
+	conf, ok := b.conf.Sources.OCI[name]
 	if !ok {
 		return nil, fmt.Errorf("oci %q: configuration not found", name)
 	}
 
 	var cred *credentials.Credential
 	if conf.Credential != "" {
-		cred, err = c.creds.Get(conf.Credential)
+		cred, err = b.creds.Get(conf.Credential)
 		if err != nil {
 			return nil, err
 		}
@@ -186,13 +197,7 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 		return nil, err
 	}
 
-	c.cache.oci[name] = repo
+	b.cache.oci[name] = repo
 
-	return repo, nil
-}
-
-// GetCredential delegates to an underlying credential source
-// built using the same underlying credential configuration.
-func (c *Config) GetCredential(name string) (*credentials.Credential, error) {
-	return c.creds.Get(name)
+	return srcoci.New[R](repo), nil
 }

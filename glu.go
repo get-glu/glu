@@ -66,7 +66,7 @@ func Annotation(k, v string) containers.Option[Metadata] {
 type System struct {
 	ctx       context.Context
 	meta      Metadata
-	conf      *Config
+	conf      *config.Config
 	pipelines map[string]core.Pipeline
 	triggers  []Trigger
 	err       error
@@ -120,7 +120,7 @@ func (s *System) Pipelines() iter.Seq2[string, core.Pipeline] {
 // AddPipeline invokes a pipeline builder function provided by the caller.
 // The function is provided with the systems configuration and (if successful)
 // the system registers the resulting pipeline.
-func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, error)) *System {
+func (s *System) AddPipeline(fn func(context.Context, *config.Config) (core.Pipeline, error)) *System {
 	// skip next step if error is not nil
 	if s.err != nil {
 		return s
@@ -143,7 +143,7 @@ func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, e
 	return s
 }
 
-func (s *System) configuration() (_ *Config, err error) {
+func (s *System) configuration() (_ *config.Config, err error) {
 	if s.conf != nil {
 		return s.conf, nil
 	}
@@ -161,8 +161,6 @@ func (s *System) configuration() (_ *Config, err error) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
 	})))
-
-	s.conf = newConfigSource(conf)
 
 	return s.conf, nil
 }
@@ -185,7 +183,7 @@ func (s *System) Run() error {
 	}
 
 	var (
-		conf  = s.conf.conf
+		conf  = s.conf
 		group *errgroup.Group
 		srv   = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),

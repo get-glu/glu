@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/phases"
 )
@@ -43,7 +44,7 @@ func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource
 
 func run(ctx context.Context) error {
 	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")))
-	system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+	system.AddPipeline(func(ctx context.Context, config *config.Config) (glu.Pipeline, error) {
 		// Create cloud-controller pipeline
 		ccPipeline := glu.NewPipeline(glu.Name("checkout"), NewMockResource)
 
@@ -99,7 +100,7 @@ func run(ctx context.Context) error {
 		return ccPipeline, nil
 	})
 
-	system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+	system.AddPipeline(func(ctx context.Context, config *config.Config) (glu.Pipeline, error) {
 		// Create frontdoor pipeline
 		fdPipeline := glu.NewPipeline(glu.Name("billing"), NewMockResource)
 
