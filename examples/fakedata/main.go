@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/builder"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/phases"
 )
 
 // MockResource represents our mock resource state
@@ -42,110 +42,95 @@ func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource
 }
 
 func run(ctx context.Context) error {
-	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")))
-	system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
-		// Create cloud-controller pipeline
-		ccPipeline := glu.NewPipeline(glu.Name("checkout"), NewMockResource)
-
+	return builder.New[*MockResource](
+		glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce"))),
+	).BuildPipeline(glu.Name("checkout"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
 		// OCI phase
 		ociSource := NewMockSource("oci")
-		ociPhase, err := phases.New(
+		ociPhase, err := b.NewPhase(
 			glu.Name("oci"),
-			ccPipeline,
 			ociSource,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Staging phase
 		stagingSource := NewMockSource("git")
-		stagingPhase, err := phases.New(
+		stagingPhase, err := b.NewPhase(
 			glu.Name("staging",
 				glu.Label("environment", "staging"),
 				glu.Label("region", "us-east-1"),
 			),
-			ccPipeline,
 			stagingSource,
 			core.PromotesFrom(ociPhase),
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Production phases
 		prodEastSource := NewMockSource("git")
-		phases.New(
+		b.NewPhase(
 			glu.Name("production-east-1",
 				glu.Label("environment", "production"),
 				glu.Label("region", "us-east-1"),
 			),
-			ccPipeline,
 			prodEastSource,
 			core.PromotesFrom(stagingPhase),
 		)
 
 		prodWestSource := NewMockSource("git")
-		phases.New(
+		b.NewPhase(
 			glu.Name("production-west-1",
 				glu.Label("environment", "production"),
 				glu.Label("region", "us-west-1"),
 			),
-			ccPipeline,
 			prodWestSource,
 			core.PromotesFrom(stagingPhase),
 		)
 
-		return ccPipeline, nil
-	})
-
-	system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
-		// Create frontdoor pipeline
-		fdPipeline := glu.NewPipeline(glu.Name("billing"), NewMockResource)
+		return nil
+	}).BuildPipeline(glu.Name("billing"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
 
 		// OCI phase
 		fdOciSource := NewMockSource("oci")
-		fdOciPhase, err := phases.New(
+		fdOciPhase, err := b.NewPhase(
 			glu.Name("oci"),
-			fdPipeline,
 			fdOciSource,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Staging phase
 		fdStagingSource := NewMockSource("git")
-		fdStagingPhase, err := phases.New(
+		fdStagingPhase, err := b.NewPhase(
 			glu.Name("staging",
 				glu.Label("environment", "staging"),
 				glu.Label("domain", "http://stage.billing.mycorp.com"),
 			),
-			fdPipeline,
 			fdStagingSource,
 			core.PromotesFrom(fdOciPhase),
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Production phase
 		fdProdSource := NewMockSource("git")
-		phases.New(
+		b.NewPhase(
 			glu.Name("production",
 				glu.Label("environment", "production"),
 				glu.Label("domain", "https://prod.billing.mycorp.com"),
 				glu.Label("ssl", "enabled"),
 			),
-			fdPipeline,
 			fdProdSource,
 			core.PromotesFrom(fdStagingPhase),
 		)
 
-		return fdPipeline, nil
-	})
-
-	return system.Run()
+		return nil
+	}).Run()
 }
 
 func main() {

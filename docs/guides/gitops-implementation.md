@@ -30,7 +30,11 @@ env
 Glu doesn't perform deployments directly (we're using FluxCD for that in this situation).
 However, it instead keeps changes flowing in an orderly fashion from OCI through Git.
 
-In Glu, we will implement a _system_, with a single release _pipeline_, consisting of three phases _oci_ (to mode the source of new versions), _staging_ and _production_.
+In Glu, we will:
+
+1. Implement a _system_
+2. Add a single release _pipeline_
+3. Define three phases _oci_ (to mode the source of new versions), _staging_ and _production_
 
 At the end, we will add a trigger for the staging phase to attempt promotions based on a schedule.
 
@@ -44,11 +48,32 @@ This `run()` function is where we first get introduced to our new glu system ins
 
 ```go
 func run(ctx context.Context) error {
-	return glu.NewSystem(ctx, glu.Name("gitops-example"), glu.WithUI(ui.FS())).
     // ...
+}
 ```
 
-A glu system needs some metadata (a container for a name and optional labels/annotations), as well as some optional extras.
+### Builder package
+
+```go
+import "github.com/get-glu/glu/pkg/builder"
+```
+
+Glu comes with a handy `builder` package for creating pipelines, which are strongly typed and easy to compose.
+The package provides lots of useful convenience functions for quickly building integrations with e.g. Git and OCI.
+The `*builder.Builder` type embeds the system and can be used in a similar fashion as a `*glu.System`.
+
+Its purpose and goal is to provide a form of cached dependency injection for system and pipeline composition.
+
+```go
+return builder.New[*AppResource](glu.NewSystem(ctx, glu.Name("gitops-example"), glu.WithUI(ui.FS()))).
+```
+
+> Notice that type called `*AppResource`?
+> We won't get into this right now (we will learn about this in the [Resources](#resources) section).
+> However, this type is intrinsic for defining _what_ flows through our pipeline and _how_ it is represented in our target **sources**.
+
+Here, we're creating a system and immediately passing it to `builder.New()`.
+The glu system needs some metadata (a container for a name and optional labels/annotations), as well as some optional extras.
 `glu.Name` is a handy utility for creating an instance of `glu.Metadata` with the required field `name` set to the first argument passed.
 We happen to want the UI, which is distributed as its own separate Go module:
 
@@ -60,41 +85,39 @@ import "github.com/get-glu/glu/ui"
 > Keeping it as a separate module means that you don't have to include all the assets in your resulting pipeline to use Glu.
 > The UI module bundles in a pre-built React/Typescript app as an instance of Go's `fs.FS`.
 
-The `System` type exposes a few functions for adding new pipelines (`AddPipeline`), declaring triggers (`AddTrigger`), and running the entire system (`Run`).
+The result of this function is a `*builder.SystemBuilder`.
+As we read on, the benefits of this type should hopefully become more apparent, over using the base system.
 
-## The Pipeline
+## Pipelines
 
 In this example, we have a single pipeline we have chosen to call `gitops-example-app`.
 
 > We tend to model our pipelines around the particular applications they deliver.
 
-To add a new pipeline, we call `AddPipeline()`, which takes a function that returns a Pipeline for some provided configuration:
+To add a new pipeline, we call `AddPipeline()`, which takes an instance of the `glu.Pipeline` interface.
 
 ```go
-system.AddPipeline(func(ctx context.Context, config *glu.Config) (glu.Pipeline, error) {
+system.AddPipeline(glu.Pipeline)
+```
+
+It is up to the implementer to build a pipeline using the provided configuration.
+### Definition
+
+```go
+BuildPipeline(glu.Name("gitops-example-app"), func() *AppResource {
+    return &AppResource{
+        Image: "ghcr.io/get-glu/gitops-example/app",
+    }
+}, func(b builder.PipelineBuilder[*AppResource]) error {
   // ...
 })
 ```
 
-It is up to the implementer to build a pipeline using the provided configuration.
-The returned pipeline from this function will be registered on the system.
-In this function, we're expected to define our pipeline and all its child phases and their promotion dependencies on one another.
+The pipeline builder exposes a convenience method `BuildPipeline(...)`.
+This method takes metadata for identifying the pipeline, a constructor for new instances of a resource type (we talk about this later) and a function which is provided with a pipeline builder.
 
-The provided configuration has lots of useful conventions baked into it for the built-in phase types.
-Our pipeline phases will interact with both OCI and Git sources of truth to make everything work.
-
-### Definition
-
-```go
-pipeline := glu.NewPipeline(glu.Name("gitops-example-app"), func() *AppResource {
-    return &AppResource{
-        Image: "ghcr.io/get-glu/gitops-example/app",
-    }
-})
-```
-
-As with our system, pipelines require some metadata.
-Notice this type called `*AppResource`. We won't get into this right now (we will learn about this in [The Resource](#the-resource) section), however, this type is intrinsic for defining _what_ flows through our pipeline and _how_ it is represented in our target **sources**.
+The pipeline builder type abstracts away a number of fiddly configuration parameters.
+It exposes access to the system configuration, and a method for creating phases.
 
 Before we can define our phases, each phase will likely need to source its state from somewhere (e.g. OCI or Git).
 We can use the config argument passed to the builder function to make this process easier.
@@ -102,29 +125,22 @@ We can use the config argument passed to the builder function to make this proce
 ### Config: OCI
 
 ```go
-// fetch the configured OCI repository source named "app"
-ociRepo, err := config.OCIRepository("app")
+// fetch the configured OCI source named "app"
+ociSource, err := builder.OCISource(b, "app")
 if err != nil {
     return nil, err
 }
-
-ociSource := oci.New[*AppResource](ociRepo)
 ```
 
-The `OCIRepository` method fetches a pre-configured OCI repository client.
-This client implementation is intended for the `github.com/get-glu/glu/pkg/src/oci.Source` implementation.
+The `builder.OCISource` function fetches a pre-configured OCI source repository client using the builders configuration and a name.
+
 Notice we provide the name `"app"` when creating the repository.
-
-> Notice again the type `*AppResource` supplied as a type argument this time.
-> Ignore this for now, we will come to that later on in this guide.
-
-Remember, Glu brings some conventions around configuration.
 You can now provide OCI-specific configuration for this source repository by using the same name `"app"` in a `glu.yaml` (or this can alternatively be supplied via environment variables).
 
 ```yaml
 sources:
   oci:
-    app: # this is where our config.OCIRepository("app") argument comes in
+    app: # this is where our "app" argument comes in
       reference: "ghcr.io/get-glu/gitops-example/app:latest"
       credential: "github"
 
@@ -139,28 +155,22 @@ credentials:
 ### Config: Git
 
 ```go
-// fetch the configured Git repository source named "gitopsexample"
-gitRepo, gitProposer, err := config.GitRepository(ctx, "gitopsexample")
+// fetch the configured Git source named "gitopsexample"
+gitSource, err := builder.GitSource(b, "gitopsexample")
 if err != nil {
     return nil, err
 }
-
-gitSource := git.NewSource[*AppResource](gitRepo, gitProposer)
 ```
 
-As with OCI, Git has a similar convenience function for getting a pre-configured Git repository.
-Here, we ask for configuration for a git repository with the name `"gitopsexample"`.
-
-In its current form, this returns both a repository and a proposer.
-We can ignore the proposer as an implementation detail for now.
-However, for future reference, the proposer is so that we can support opening pull or merge requests in target SCMs (e.g. GitHub).
+As with OCI, Git has a similar convenience function in the `builder` package for getting a pre-configured Git client.
+Here, we ask for a git source with the name `"gitopsexample"`.
 
 Again, as with the OCI source, we can now configure this named repository in our `glu.yaml` or via environment variables.
 
 ```yaml
 sources:
   git:
-    gitopsexample: # this is where our config.GitRepository("gitopsexample") argument comes in
+    gitopsexample: # this is where our "gitopsexample" argument comes in
       remote:
         name: "origin"
         url: "https://github.com/get-glu/gitops-example.git"
@@ -188,13 +198,13 @@ Remember, we said that we plan to define three phases:
 
 ```go
 // build a phase which sources from the OCI repository
-ociPhase, err := phases.New(glu.Name("oci"), pipeline, ociSource)
+ociPhase, err := b.NewPhase(glu.Name("oci"), ociSource)
 if err != nil {
     return nil, err
 }
 ```
 
-The initial phase is nice and simple. We're going to use the `phases` package to make a new phase using our pipeline and our source.
+The initial phase is nice and simple. We're going to use the `NewPhase` method on the builder to make a new phase using our source.
 As with our pipeline and system, we need to give it some metadata (name and optional labels/annotations).
 
 ### Staging (Git)
@@ -202,8 +212,8 @@ As with our pipeline and system, we need to give it some metadata (name and opti
 ```go
 // build a phase for the staging environment which sources from the git repository
 // configure it to promote from the OCI phase
-stagingPhase, err := phases.New(glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")),
-    pipeline, gitSource, core.PromotesFrom(ociPhase))
+stagingPhase, err := b.NewPhase(glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")),
+    gitSource, core.PromotesFrom(ociPhase))
 if err != nil {
     return nil, err
 }
@@ -221,8 +231,8 @@ This is how we create the promotion paths from one phase to the next in Glu.
 ```go
 // build a phase for the production environment which sources from the git repository
 // configure it to promote from the staging git phase
-_, err = phases.New(glu.Name("production", glu.Label("url", "http://0.0.0.0:30082")),
-    pipeline, gitSource, core.PromotesFrom(stagingPhase))
+_, err = b.NewPhase(glu.Name("production", glu.Label("url", "http://0.0.0.0:30082")),
+    gitSource, core.PromotesFrom(stagingPhase))
 if err != nil {
     return nil, err
 }
@@ -233,7 +243,7 @@ Finally, we describe our _production_ phase. As with staging, we pass metadata, 
 Now we have described our entire end-to-end _phase_.
 However, it is crucial to now understand more about the `*AppResource`.
 
-## The Resource
+## Resources
 
 Remember that `*AppResource` type that has been floating around?
 

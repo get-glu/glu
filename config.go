@@ -22,6 +22,7 @@ import (
 // Config is a utility for extracting configured sources by their name
 // derived from glu's conventional configuration format.
 type Config struct {
+	ctx   context.Context
 	conf  *config.Config
 	creds *credentials.CredentialSource
 
@@ -32,8 +33,9 @@ type Config struct {
 	}
 }
 
-func newConfigSource(conf *config.Config) *Config {
+func newConfigSource(ctx context.Context, conf *config.Config) *Config {
 	c := &Config{
+		ctx:   ctx,
 		conf:  conf,
 		creds: credentials.New(conf.Credentials),
 	}
@@ -49,7 +51,7 @@ func newConfigSource(conf *config.Config) *Config {
 // using the name to lookup the relevant configuration.
 // It caches built instances and returns the same instance for subsequent
 // calls with the same name.
-func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Repository, proposer srcgit.Proposer, err error) {
+func (c *Config) GitRepository(name string) (_ *git.Repository, proposer srcgit.Proposer, err error) {
 	defer func() {
 		if err != nil {
 			err = fmt.Errorf("git %q: %w", name, err)
@@ -105,7 +107,7 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 		}
 	}
 
-	repo, err := git.NewRepository(context.Background(), slog.Default(), append(srcOpts, git.WithAuth(method))...)
+	repo, err := git.NewRepository(c.ctx, slog.Default(), append(srcOpts, git.WithAuth(method))...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -133,7 +135,7 @@ func (c *Config) GitRepository(ctx context.Context, name string) (_ *git.Reposit
 				return nil, nil, err
 			}
 
-			client, err := creds.GitHubClient(ctx)
+			client, err := creds.GitHubClient(c.ctx)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -189,10 +191,4 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 	c.cache.oci[name] = repo
 
 	return repo, nil
-}
-
-// GetCredential delegates to an underlying credential source
-// built using the same underlying credential configuration.
-func (c *Config) GetCredential(name string) (*credentials.Credential, error) {
-	return c.creds.Get(name)
 }
