@@ -29,6 +29,12 @@ type PipelineBuilder[R glu.Resource] interface {
 	NewPhase(meta glu.Metadata, source phases.Source[R], _ ...containers.Option[core.AddPhaseOptions[R]]) (*phases.Phase[R], error)
 }
 
+// AddTrigger delegates to the underlying system but returns the system builder.
+func (b *SystemBuilder[R]) AddTrigger(t glu.Trigger) *SystemBuilder[R] {
+	b.System.AddTrigger(t)
+	return b
+}
+
 // Run delegates to the underlying system Run method after checking for any
 // previously observed errors.
 func (b *SystemBuilder[R]) Run() error {
