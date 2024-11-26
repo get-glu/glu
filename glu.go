@@ -120,30 +120,13 @@ func (s *System) Pipelines() iter.Seq2[string, core.Pipeline] {
 // AddPipeline invokes a pipeline builder function provided by the caller.
 // The function is provided with the systems configuration and (if successful)
 // the system registers the resulting pipeline.
-func (s *System) AddPipeline(fn func(context.Context, *Config) (core.Pipeline, error)) *System {
-	// skip next step if error is not nil
-	if s.err != nil {
-		return s
-	}
-
-	config, err := s.configuration()
-	if err != nil {
-		s.err = fmt.Errorf("configuring pipeline: %w", err)
-		return s
-	}
-
-	pipe, err := fn(s.ctx, config)
-	if err != nil {
-		s.err = fmt.Errorf("building pipeline: %w", err)
-		return s
-	}
-
-	s.pipelines[pipe.Metadata().Name] = pipe
+func (s *System) AddPipeline(pipeline core.Pipeline) *System {
+	s.pipelines[pipeline.Metadata().Name] = pipeline
 
 	return s
 }
 
-func (s *System) configuration() (_ *Config, err error) {
+func (s *System) Configuration() (_ *Config, err error) {
 	if s.conf != nil {
 		return s.conf, nil
 	}
@@ -162,7 +145,7 @@ func (s *System) configuration() (_ *Config, err error) {
 		Level: level,
 	})))
 
-	s.conf = newConfigSource(conf)
+	s.conf = newConfigSource(s.ctx, conf)
 
 	return s.conf, nil
 }
