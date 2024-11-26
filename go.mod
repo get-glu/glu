@@ -11,7 +11,7 @@ require (
 	github.com/google/go-github/v64 v64.0.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/opencontainers/image-spec v1.1.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/crypto v0.29.0
 	golang.org/x/oauth2 v0.24.0
