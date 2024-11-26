@@ -71,6 +71,7 @@ type ResourcePhase[R Resource] interface {
 // PhaseOptions scopes a call to get phases from a pipeline.
 type PhaseOptions struct {
 	phase  Phase
+	name   string
 	labels map[string]string
 }
 
@@ -90,6 +91,13 @@ func (p *PhaseOptions) Matches(phase Phase) bool {
 func IsPhase(p Phase) containers.Option[PhaseOptions] {
 	return func(co *PhaseOptions) {
 		co.phase = p
+	}
+}
+
+// HasLabel causes a call to Phases to list any phase with the matching name.
+func HasName(name string) containers.Option[PhaseOptions] {
+	return func(co *PhaseOptions) {
+		co.name = name
 	}
 }
 

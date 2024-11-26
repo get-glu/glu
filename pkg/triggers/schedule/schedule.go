@@ -67,6 +67,13 @@ func MatchesPhase(c core.Phase) containers.Option[Trigger] {
 	}
 }
 
+// MatchesName sets a match condition which matches a specific phase name
+func MatchesName(name string) containers.Option[Trigger] {
+	return func(t *Trigger) {
+		t.options = append(t.options, core.HasName(name))
+	}
+}
+
 // MatchesLabel sets a match condition which matches any phase with the provided label
 func MatchesLabel(k, v string) containers.Option[Trigger] {
 	return func(t *Trigger) {
