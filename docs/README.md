@@ -1,12 +1,11 @@
 # Welcome <!-- {docsify-ignore-all} -->
 
-> Glu is progressive delivery as code. Build, test, and visualize your pipelines locally, then deploy them to your environments.
-
+> Glu is a deployment pipeline framework implemented as code. Build, test, and visualize your pipelines locally, then deploy them to your environments.
 
 Glu is a framework written and consumed in the Go programming language.
 It is intended to glue together configuration repositories and artifact sources using code. You write your deployment pipelines in code and Glu will orchestrate them across your environments.
 
-It runs in your existing CI/CD environments (GitHub Actions, GitLab CI, etc.) and integrates with your existing source control management systems (Git).
+It can run in your existing CI/CD environments (GitHub Actions, GitLab CI, etc.), or on your own infrastructure and integrates with your existing source control management systems (Git).
 
 <p align="center">
   <img src="/images/dashboard.png" alt="Glu Dashboard" title="Glu Dashboard" width="75%" />
@@ -31,6 +30,7 @@ They're also not immutable and we would love your help in shaping them.
 - Allow engineers to define application delivery across multiple environments as `code`.
 - Create a single pane of glass for inspecting and interacting with promotion pipelines.
 - Support defining complex rules to guard automated promotion using strategies such as smoke testing and performance evaluation.
+- Enable progressive delivery by advancing targetting rules and scale definitions committed directly to Git.
 - Simple and quick integration with common existing CI/CD and source control management platforms.
 - Expose standardized telemetry for the entire end-to-end delivery of changes in your system.
 

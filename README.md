@@ -4,12 +4,12 @@
   <h3>Glu</h3>
   <p>
     <em>
-      Progressive delivery that sticks
+      A Deployment pipeline framework that sticks
     </em>
   </p>
   <p>
     Glu is the missing piece in your CI/CD toolbelt.
-    It is a framework for orchestrating, manipulating and introspecting the state of configuration Git repositories.
+    It is a framework for orchestrating, manipulating and introspecting deployment configuration stored in version control.
   </p>
   <br>
 </div>
@@ -18,7 +18,7 @@
 
 ## What Is It?
 
-Glu is a framework built to enable you to implement your own custom pipelines in code.
+Glu is a framework built to help manage and coordinate multi-environment deployments using configuration stored in Git.
 
 <p align="center">
 <img src=".github/images/dashboard.png" alt="Glu Dashboard" title="Glu Dashboard" width="75%" />
