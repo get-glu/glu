@@ -139,6 +139,13 @@ func (c *Credential) GitAuthentication() (auth transport.AuthMethod, err error) 
 }
 
 func (c *Credential) OCIClient(registry string) (_ *auth.Client, err error) {
+	if registry == "docker.io" {
+		// it is expected that traffic targeting "docker.io" will be redirected
+		// to "registry-1.docker.io"
+		// reference: https://github.com/moby/moby/blob/v24.0.0-beta.2/registry/config.go#L25-L48
+		registry = "registry-1.docker.io"
+	}
+
 	var creds auth.CredentialFunc
 	switch c.config.Type {
 	case config.CredentialTypeBasic:
@@ -157,6 +164,27 @@ func (c *Credential) OCIClient(registry string) (_ *auth.Client, err error) {
 		}
 
 		creds = credentials.Credential(store)
+	case config.CredentialTypeGitHubApp:
+		transport, err := c.githubInstallationTransport()
+		if err != nil {
+			return nil, err
+		}
+
+		creds = auth.CredentialFunc(func(ctx context.Context, hostport string) (auth.Credential, error) {
+			token, err := transport.Token(context.Background())
+			if err != nil {
+				return auth.EmptyCredential, err
+			}
+
+			if hostport == registry {
+				return auth.Credential{
+					Username: "x-access-token",
+					Password: token,
+				}, nil
+			}
+
+			return auth.EmptyCredential, nil
+		})
 	default:
 		return nil, fmt.Errorf("oci: unxpected credential type: %q", c.config.Type)
 	}
