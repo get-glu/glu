@@ -142,17 +142,15 @@ function getElements(pipeline: PipelineType): FlowPipeline {
 
   pipeline.phases.forEach((phase) => {
     const node: PhaseNode = {
-      id: phase.name,
+      id: phase.metadata.name,
       type: 'phase',
       position: { x: 0, y: 0 },
       data: {
         pipeline: pipeline.name,
-        name: phase.name,
-        labels: phase.labels || {},
-        depends_on: phase.depends_on,
+        metadata: phase.metadata,
         source: phase.source,
-        digest: phase.digest,
-        synced: phase.synced
+        resource: phase.resource,
+        depends_on: phase.depends_on
       },
       extent: 'parent'
     };
@@ -160,9 +158,9 @@ function getElements(pipeline: PipelineType): FlowPipeline {
 
     if (phase.depends_on) {
       edges.push({
-        id: `edge-${phase.depends_on}-${phase.name}`,
+        id: `edge-${phase.depends_on}-${phase.metadata.name}`,
         source: phase.depends_on,
-        target: phase.name
+        target: phase.metadata.name
       });
     }
   });

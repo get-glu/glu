@@ -5,6 +5,7 @@ import (
 
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/phases"
+	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -46,4 +47,27 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 	}
 
 	return r.ReadFromOCIDescriptor(desc)
+}
+
+type BaseResource struct {
+	// ImageName   string // TODO: add this when we have a use case for it
+	ImageDigest digest.Digest
+	annotations map[string]string
+}
+
+func (r *BaseResource) Digest() (string, error) {
+	return r.ImageDigest.Encoded(), nil
+}
+
+func (r *BaseResource) Annotations() map[string]string {
+	return r.annotations
+}
+
+func (r *BaseResource) ReadFromOCIDescriptor(desc v1.Descriptor) error {
+	r.ImageDigest = desc.Digest
+	for k, v := range desc.Annotations {
+		r.annotations[k] = v
+	}
+
+	return nil
 }

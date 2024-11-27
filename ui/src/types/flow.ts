@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { Metadata } from './metadata';
+import { Phase } from './pipeline';
 
 export interface FlowPipeline {
   nodes: PipelineNode[];
@@ -8,15 +9,10 @@ export interface FlowPipeline {
 
 export type PipelineNode = PhaseNode;
 
-type PhaseNodeData = {
-  pipeline: string;
-  name: string;
-  labels?: Record<string, string>;
-  depends_on?: string;
-  source: Metadata;
-  digest?: string;
-  synced?: boolean;
-};
+type PhaseNodeData = Phase &
+  Record<string, unknown> & {
+    pipeline: string;
+  };
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
 
