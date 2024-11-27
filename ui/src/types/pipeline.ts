@@ -1,4 +1,5 @@
 import { Metadata } from './metadata';
+import { Resource } from './resource';
 
 // Server-side pipeline types
 export interface Pipeline {
@@ -7,10 +8,8 @@ export interface Pipeline {
 }
 
 export interface Phase {
-  name: string;
-  depends_on?: string;
+  metadata: Metadata;
   source: Metadata;
-  digest?: string;
-  labels?: Record<string, string>;
-  synced?: boolean;
+  depends_on?: string;
+  resource: Resource;
 }

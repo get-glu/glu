@@ -92,19 +92,20 @@ type pipelineResponse struct {
 }
 
 type phaseResponse struct {
-	Name      string            `json:"name"`
-	DependsOn string            `json:"depends_on,omitempty"`
-	Source    core.Metadata     `json:"source,omitempty"`
-	Digest    string            `json:"digest,omitempty"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Synced    bool              `json:"synced,omitempty"`
+	Metadata  core.Metadata    `json:"metadata,omitempty"`
+	DependsOn string           `json:"depends_on,omitempty"`
+	Source    core.Metadata    `json:"source,omitempty"`
+	Resource  resourceResponse `json:"resource,omitempty"`
+}
+
+type resourceResponse struct {
+	Synced      bool              `json:"synced,omitempty"`
+	Digest      string            `json:"digest,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, dependencies map[core.Phase]core.Phase) (phaseResponse, error) {
-	var (
-		dependsOn string
-		labels    map[string]string
-	)
+	var dependsOn string
 
 	if dependencies != nil {
 		if d, ok := dependencies[phase]; ok && d != nil {
@@ -112,13 +113,14 @@ func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, depe
 		}
 	}
 
-	if phase.Metadata().Labels != nil {
-		labels = phase.Metadata().Labels
-	}
-
 	v, err := phase.Get(ctx)
 	if err != nil {
 		return phaseResponse{}, err
+	}
+
+	var annotations map[string]string
+	if r, ok := v.(core.ResourceWithAnnotations); ok {
+		annotations = r.Annotations()
 	}
 
 	digest, err := v.Digest()
@@ -132,12 +134,14 @@ func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, depe
 	}
 
 	return phaseResponse{
-		Name:      phase.Metadata().Name,
+		Metadata:  phase.Metadata(),
 		DependsOn: dependsOn,
-		Labels:    labels,
 		Source:    phase.Source(),
-		Digest:    digest,
-		Synced:    synced,
+		Resource: resourceResponse{
+			Digest:      digest,
+			Annotations: annotations,
+			Synced:      synced,
+		},
 	}, nil
 }
 

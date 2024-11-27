@@ -28,10 +28,10 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
       <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-2">
           {getIcon()}
-          <h2 className="text-lg font-semibold">{node.data.name}</h2>
+          <h2 className="text-lg font-semibold">{node.data.metadata.name}</h2>
           {node.data.depends_on && node.data.depends_on !== '' && (
             <>
-              {node.data.synced ? (
+              {node.data.resource.synced ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -82,19 +82,19 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
               </div>
               <div className="text-sm">
                 <span className="text-muted-foreground">Digest: </span>
-                <span className="truncate font-mono text-xs">{node.data.digest}</span>
+                <span className="truncate font-mono text-xs">{node.data.resource.digest}</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="space-y-4 overflow-hidden p-4">
-          {node.data.labels && Object.keys(node.data.labels).length > 0 && (
+          {node.data.metadata.labels && Object.keys(node.data.metadata.labels).length > 0 && (
             <div>
               <h3 className="text-sm font-medium">Labels</h3>
               <div className="mt-2 flex flex-wrap gap-2">
-                {node.data.labels &&
-                  Object.entries(node.data.labels).map(([key, value]) => (
+                {node.data.metadata.labels &&
+                  Object.entries(node.data.metadata.labels).map(([key, value]) => (
                     <Label key={key} labelKey={key} value={value} />
                   ))}
               </div>

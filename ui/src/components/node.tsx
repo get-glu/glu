@@ -17,9 +17,9 @@ import { Label } from './label';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
-const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
+const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
-    switch (data.source.name ?? '') {
+    switch (phase.source.name ?? '') {
       case 'oci':
         return <Package className="h-4 w-4" />;
       default:
@@ -32,7 +32,7 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
   const [promotePhase] = usePromotePhaseMutation();
   const promote = async () => {
     setDialogOpen(false);
-    await promotePhase({ pipeline: data.pipeline, phase: data.name }).unwrap();
+    await promotePhase({ pipeline: phase.pipeline, phase: phase.metadata.name }).unwrap();
     toast.success('Phase promotion scheduled');
   };
 
@@ -43,11 +43,11 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {getIcon()}
-          <span className="truncate text-sm font-medium">{data.name}</span>
+          <span className="truncate text-sm font-medium">{phase.metadata.name}</span>
         </div>
-        {data.depends_on && data.depends_on !== '' && (
+        {phase.depends_on && phase.depends_on !== '' && (
           <>
-            {data.synced ? (
+            {phase.resource.synced ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -79,27 +79,29 @@ const PhaseNode = ({ data }: NodeProps<PhaseNodeType>) => {
 
       <div className="mt-2 flex items-center gap-2 text-xs">
         <span>Digest:</span>
-        <span className="font-mono text-xs text-muted-foreground">{data.digest?.slice(-12)}</span>
+        <span className="font-mono text-xs text-muted-foreground">
+          {phase.resource.digest?.slice(-12)}
+        </span>
       </div>
 
-      {data.source.annotations?.[ANNOTATION_OCI_IMAGE_URL] && (
+      {phase.source.annotations?.[ANNOTATION_OCI_IMAGE_URL] && (
         <div className="mt-2 flex items-center gap-2 text-xs">
           <span>Image:</span>
           <a
-            href={`https://${data.source.annotations[ANNOTATION_OCI_IMAGE_URL]}`}
+            href={`https://${phase.source.annotations[ANNOTATION_OCI_IMAGE_URL]}`}
             target="_blank"
             rel="noopener noreferrer"
             className="truncate font-mono text-xs text-muted-foreground hover:text-primary hover:underline"
           >
-            {data.source.annotations[ANNOTATION_OCI_IMAGE_URL]}
+            {phase.source.annotations[ANNOTATION_OCI_IMAGE_URL]}
           </a>
         </div>
       )}
 
       <div className="mt-2 flex w-full flex-col">
-        {data.labels &&
-          Object.entries(data.labels).length > 0 &&
-          Object.entries(data.labels).map(([key, value]) => (
+        {phase.metadata.labels &&
+          Object.entries(phase.metadata.labels).length > 0 &&
+          Object.entries(phase.metadata.labels).map(([key, value]) => (
             <div key={`${key}-${value}`} className="mb-2 flex">
               <Label labelKey={key} value={value} />
             </div>
