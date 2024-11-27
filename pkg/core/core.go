@@ -40,6 +40,11 @@ type Resource interface {
 	Digest() (string, error)
 }
 
+type ResourceWithAnnotations interface {
+	Resource
+	Annotations() map[string]string
+}
+
 // Phase is the core interface for resource sourcing and management.
 // These types can be registered on pipelines and can depend upon on another for promotion.
 type Phase interface {
