@@ -1,5 +1,4 @@
 import type { Edge, Node } from '@xyflow/react';
-import { Metadata } from './metadata';
 import { Phase } from './pipeline';
 
 export interface FlowPipeline {
