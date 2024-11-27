@@ -153,6 +153,10 @@ func (c *Credential) OCIClient(registry string) (_ *auth.Client, err error) {
 			Username: c.config.Basic.Username,
 			Password: c.config.Basic.Password,
 		})
+	case config.CredentialTypeAccessToken:
+		creds = auth.StaticCredential(registry, auth.Credential{
+			AccessToken: *c.config.AccessToken,
+		})
 	case config.CredentialTypeDockerLocal:
 		store, err := credentials.NewStoreFromDocker(credentials.StoreOptions{})
 		if err != nil {
