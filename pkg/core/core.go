@@ -84,6 +84,10 @@ func (p *PhaseOptions) Matches(phase Phase) bool {
 		return false
 	}
 
+	if p.name != "" && p.name != phase.Metadata().Name {
+		return false
+	}
+
 	return true
 }
 
