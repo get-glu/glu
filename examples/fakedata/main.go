@@ -11,8 +11,7 @@ import (
 )
 
 // MockResource represents our mock resource state
-type MockResource struct {
-}
+type MockResource struct{}
 
 func (m *MockResource) Digest() (string, error) {
 	return "mock-digest", nil
@@ -45,6 +44,10 @@ func run(ctx context.Context) error {
 	return builder.New[*MockResource](
 		glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce"))),
 	).BuildPipeline(glu.Name("checkout"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
+		_, err := b.Configuration()
+		if err != nil {
+			return err
+		}
 		// OCI phase
 		ociSource := NewMockSource("oci")
 		ociPhase, err := b.NewPhase(
@@ -92,7 +95,6 @@ func run(ctx context.Context) error {
 
 		return nil
 	}).BuildPipeline(glu.Name("billing"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
-
 		// OCI phase
 		fdOciSource := NewMockSource("oci")
 		fdOciPhase, err := b.NewPhase(
