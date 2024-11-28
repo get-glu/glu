@@ -44,7 +44,7 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
       message = (
         <p>
           Phase promotion proposed:{' '}
-          <a className="underline" href={proposalURL} target="_blank">
+          <a className="underline" href={proposalURL} target="_blank" rel="noopener noreferrer">
             {proposalURL}
           </a>
         </p>
