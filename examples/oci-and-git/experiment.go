@@ -11,8 +11,9 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/get-glu/glu/pkg/src/git"
+	"github.com/get-glu/glu/pkg/src/oci"
 	"github.com/get-glu/glu/pkg/triggers/schedule"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/go-digest"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,23 +71,13 @@ func run(ctx context.Context) error {
 // CheckoutResource is a custom envelope for carrying our specific repository configuration
 // from one source to the next in our pipeline.
 type CheckoutResource struct {
-	ImageDigest string `json:"digest"`
+	oci.BaseResource
 }
 
 // NewCheckoutResource constructs a new instance of the CheckoutResource.
 // This function is required for creating a new pipeline.
 func NewCheckoutResource() *CheckoutResource {
 	return &CheckoutResource{}
-}
-
-// Digest is a core required function for implementing glu.Resource
-// It should return a unique digest for the state of the resource.
-// In this instance we happen to be reading a unique digest from the source
-// and so we can lean into that.
-// This will be used for comparisons in the phase to decided whether or not
-// a change has occurred when deciding if to update the target source.
-func (c *CheckoutResource) Digest() (string, error) {
-	return c.ImageDigest, nil
 }
 
 // CommitMessage is an optional git specific method for overriding generated commit messages.
@@ -108,14 +99,6 @@ func (c *CheckoutResource) ProposalBody(meta glu.Metadata, r *CheckoutResource) 
 | -------- | ---- | -- |
 | checkout | %s | %s |
 `, r.ImageDigest, c.ImageDigest), nil
-}
-
-// ReadFromOCIDescriptor is an OCI specific resource requirement.
-// Its purpose is to read the resources state from a target OCI metadata descriptor.
-// Here we're reading out the images digest from the metadata.
-func (c *CheckoutResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
-	c.ImageDigest = d.Digest.String()
-	return nil
 }
 
 // ReadFrom is a Git specific resource requirement.
@@ -143,7 +126,7 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs
 		return err
 	}
 
-	c.ImageDigest = manifest.Digest
+	c.ImageDigest = digest.Digest(manifest.Digest)
 
 	return nil
 }

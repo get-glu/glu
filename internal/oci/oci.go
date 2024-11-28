@@ -2,6 +2,7 @@ package oci
 
 import (
 	"context"
+	"io"
 
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/credentials"
@@ -33,8 +34,8 @@ func New(reference string, cred *credentials.Credential) (_ *Repository, err err
 	return &Repository{repo: repo}, nil
 }
 
-func (r *Repository) Resolve(ctx context.Context) (v1.Descriptor, error) {
-	return r.repo.Resolve(ctx, r.repo.Reference.ReferenceOrDefault())
+func (r *Repository) Resolve(ctx context.Context) (v1.Descriptor, io.ReadCloser, error) {
+	return r.repo.FetchReference(ctx, r.repo.Reference.ReferenceOrDefault())
 }
 
 func (r *Repository) Reference() string {
