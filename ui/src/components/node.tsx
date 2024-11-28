@@ -102,7 +102,7 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
       <div className="mt-2 flex items-center gap-2 text-xs">
         <span>Digest:</span>
         <span className="font-mono text-xs text-muted-foreground">
-          {phase.resource.digest?.slice(-12)}
+          {phase.resource.digest?.slice(0, 12)}
         </span>
       </div>
 

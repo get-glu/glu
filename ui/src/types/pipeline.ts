@@ -15,5 +15,5 @@ export interface Phase {
 }
 
 export interface Promotion {
-  annotations: Record<string, string>
+  annotations: Record<string, string>;
 }
