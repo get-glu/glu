@@ -28,18 +28,21 @@ https://github.com/user-attachments/assets/b6f4d20b-e166-4ec9-8aa3-0c4d5e0cf410
 
 Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
 
+📖 Check out our introductory [blog post](https://blog.flipt.io/introducing-glu/) to learn more about why we built Glu.
+
 ## What's Included
 
+- An engine for orchestrating the progression of resources across environments by opening pull requests in your Git repositories (optional).
 - A CLI for interacting with the state of your pipelines.
 - An API for interacting with the state of your pipelines.
-- An optional UI for visualizing and interacting with the state of your pipelines.
+- An (optional) UI for visualizing and interacting with the state of your pipelines.
 
 ## Use Cases
 
 Use it to implement anything that involves automating updates to Git repositories via commits and pull requests.
 
 - ✅ Track new versions of applications in source repositories (OCI, Helm, etc) and trigger updates to target configuration repositories (Git).
-⌛️ Coordinate any combination of scheduled, event-driven, or manually triggered promotions from one environment to the next.
+  ⌛️ Coordinate any combination of scheduled, event-driven, or manually triggered promotions from one environment to the next.
 - 🔍 Expose a single pane of glass to compare and manipulate the state of your resources in one environment to the next.
 - 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
 
