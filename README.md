@@ -4,12 +4,12 @@
   <h3>Glu</h3>
   <p>
     <em>
-      A Deployment pipeline framework that sticks
+      A deployment pipeline framework that sticks
     </em>
   </p>
   <p>
     Glu is the missing piece in your CI/CD toolbelt.
-    It is a framework for orchestrating, manipulating and introspecting deployment configuration stored in version control.
+    It is a framework for orchestrating, manipulating, and introspecting deployment configuration stored in version control.
   </p>
   <br>
 </div>
@@ -28,18 +28,21 @@ https://github.com/user-attachments/assets/b6f4d20b-e166-4ec9-8aa3-0c4d5e0cf410
 
 Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
 
-## Whats Included
+📖 Check out our introductory [blog post](https://blog.flipt.io/introducing-glu/) to learn more about why we built Glu.
 
+## What's Included
+
+- An engine for orchestrating the progression of resources across environments by opening pull requests in your Git repositories (optional).
 - A CLI for interacting with the state of your pipelines.
 - An API for interacting with the state of your pipelines.
-- An optional UI for visualizing and interacting with the state of your pipelines.
+- An (optional) UI for visualizing and interacting with the state of your pipelines.
 
 ## Use Cases
 
-Use it to implement anything that involes automating updates to Git repositories via commits and pull-requests.
+Use it to implement anything that involves automating updates to Git repositories via commits and pull requests.
 
-- ✅ Track new versions of applications in source repositories (OCI, Helm etc) and trigger updates to target configuration repositories (Git).
-- ⌛️ Coordinate any combination of scheduled, event driven or manually triggered promotions from one environment to the next.
+- ✅ Track new versions of applications in source repositories (OCI, Helm, etc) and trigger updates to target configuration repositories (Git).
+  ⌛️ Coordinate any combination of scheduled, event-driven, or manually triggered promotions from one environment to the next.
 - 🔍 Expose a single pane of glass to compare and manipulate the state of your resources in one environment to the next.
 - 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
 
@@ -77,4 +80,4 @@ In the future, we plan to support more functionality, such as:
 
 ## Built By
 
-The team at [Flipt](https://flipt.io). We built Glu to power our own internal promotion pipelines and open sourced it so that others can benefit from it.
+The team at [Flipt](https://flipt.io). We built Glu to power our own internal promotion pipelines and open-sourced it so that others can benefit from it.
