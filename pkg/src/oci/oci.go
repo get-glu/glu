@@ -9,6 +9,7 @@ import (
 	"github.com/get-glu/glu/pkg/phases"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"oras.land/oras-go/v2/content"
 )
 
 const ANNOTATION_OCI_IMAGE_URL = "dev.getglu.oci.image.url"
@@ -92,6 +93,15 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 	default:
 	}
 
+	rest, err := content.ReadAll(reader, desc)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(rest, &desc); err != nil {
+		return err
+	}
+
 	return r.ReadFromOCIDescriptor(desc)
 }
 
@@ -116,6 +126,7 @@ func (r *BaseResource) Annotations() map[string]string {
 
 func (r *BaseResource) ReadFromOCIDescriptor(desc v1.Descriptor) error {
 	r.ImageDigest = desc.Digest
+	r.annotations = desc.Annotations
 	return nil
 }
 
