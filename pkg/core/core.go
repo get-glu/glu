@@ -14,6 +14,8 @@ var (
 	// ErrAlreadyExists is returned when an attempt is made to create a resource
 	// which already exists
 	ErrAlreadyExists = errors.New("already exists")
+	// ErrNoChange is returned when an update produced zero changes
+	ErrNoChange = errors.New("update produced no change")
 )
 
 // Metadata contains the unique information used to identify
@@ -51,8 +53,12 @@ type Phase interface {
 	Metadata() Metadata
 	Source() Metadata
 	Get(context.Context) (Resource, error)
-	Promote(context.Context) error
+	Promote(context.Context) (PromotionResult, error)
 	Synced(context.Context) (bool, error)
+}
+
+type PromotionResult struct {
+	Annotations map[string]string `json:"annotations"`
 }
 
 // AddPhaseOptions are used to configure the addition of a ResourcePhase to a Pipeline

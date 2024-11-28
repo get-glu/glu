@@ -205,7 +205,7 @@ func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase], apply bo
 		slog.Info("promoting phase", "phase", phase.Metadata().Name, "dry-run", !apply)
 
 		if apply {
-			if err := phase.Promote(ctx); err != nil {
+			if _, err := phase.Promote(ctx); err != nil {
 				return err
 			}
 		}

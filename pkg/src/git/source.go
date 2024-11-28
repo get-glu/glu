@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path"
 	"sync"
 
@@ -16,9 +17,19 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-var ErrProposalNotFound = errors.New("proposal not found")
+const (
+	AnnotationGitBaseRefKey     = "dev.getglu.git.base_ref"
+	AnnotationGitHeadSHAKey     = "dev.getglu.git.head_sha"
+	AnnotationProposalNumberKey = "dev.getglu.git.proposal.number"
+	AnnotationProposalURLKey    = "dev.getglu.git.proposal.url"
+)
 
-var _ phases.Source[Resource] = (*Source[Resource])(nil)
+var (
+	// ErrProposalNotFound is returned when a proposal cannot be located
+	ErrProposalNotFound = errors.New("proposal not found")
+
+	_ phases.Source[Resource] = (*Source[Resource])(nil)
+)
 
 type Resource interface {
 	core.Resource
@@ -39,11 +50,12 @@ type Proposal struct {
 	BaseRevision string
 	BaseBranch   string
 	Branch       string
+	HeadRevision string
 	Digest       string
 	Title        string
 	Body         string
 
-	ExternalMetadata map[string]any
+	Annotations map[string]string
 }
 
 type Source[A Resource] struct {
@@ -120,33 +132,15 @@ type proposalBody[A Resource] interface {
 	ProposalBody(meta core.Metadata, from A) (string, error)
 }
 
-func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, from, to A) error {
+func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, from, to A) (map[string]string, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-
-	slog := slog.With("name", phase.Name)
 
 	// perform an initial fetch to ensure we're up to date
 	// TODO(georgmac): scope to phase branch and proposal prefix
 	err := g.repo.Fetch(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching upstream during update: %w", err)
-	}
-
-	message := fmt.Sprintf("Update %s", phase.Name)
-	if m, ok := core.Resource(to).(commitMessage[A]); ok {
-		message, err = m.CommitMessage(phase, from)
-		if err != nil {
-			return fmt.Errorf("overriding commit message during update: %w", err)
-		}
-	}
-
-	update := func(fs fs.Filesystem) (string, error) {
-		if err := to.WriteTo(ctx, phase, fs); err != nil {
-			return "", err
-		}
-
-		return message, nil
+		return nil, fmt.Errorf("fetching upstream during update: %w", err)
 	}
 
 	// use the target resources branch if it implementes an override
@@ -155,32 +149,70 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 		baseBranch = branched.Branch()
 	}
 
+	annotations := map[string]string{
+		AnnotationGitBaseRefKey: baseBranch,
+	}
+
 	if !g.proposeChange {
-		if _, err := g.repo.UpdateAndPush(ctx, update, git.WithBranch(baseBranch)); err != nil {
-			if errors.Is(err, git.ErrEmptyCommit) {
-				slog.Info("promotion produced no changes")
-
-				return nil
-			}
-
-			return err
+		annotations[AnnotationGitHeadSHAKey], err = g.updateAndPush(ctx, phase, from, to, git.WithBranch(baseBranch))
+		if err != nil {
+			return nil, err
 		}
 
-		return nil
+		return annotations, nil
 	}
 
 	if g.proposer == nil {
-		return errors.New("proposal requested but not configured")
+		return nil, errors.New("proposal requested but not configured")
 	}
+
+	return g.propose(ctx, pipeline, phase, from, to, baseBranch)
+}
+
+func (g *Source[A]) updateAndPush(ctx context.Context, phase core.Metadata, from, to A, opts ...containers.Option[git.ViewUpdateOptions]) (string, error) {
+	slog := slog.With("name", phase.Name)
+
+	update := func(fs fs.Filesystem) (message string, err error) {
+		message = fmt.Sprintf("Update %s", phase.Name)
+		if m, ok := core.Resource(to).(commitMessage[A]); ok {
+			message, err = m.CommitMessage(phase, from)
+			if err != nil {
+				return "", fmt.Errorf("overriding commit message during update: %w", err)
+			}
+		}
+
+		if err := to.WriteTo(ctx, phase, fs); err != nil {
+			return "", err
+		}
+
+		return message, nil
+	}
+
+	head, err := g.repo.UpdateAndPush(ctx, update, opts...)
+	if err != nil {
+		if errors.Is(err, git.ErrEmptyCommit) {
+			slog.Debug("promotion produced no changes")
+
+			return "", core.ErrNoChange
+		}
+
+		return "", err
+	}
+
+	return head.String(), nil
+}
+
+func (g *Source[A]) propose(ctx context.Context, pipeline, phase core.Metadata, from, to A, baseBranch string) (map[string]string, error) {
+	slog := slog.With("name", phase.Name)
 
 	baseRev, err := g.repo.Resolve(baseBranch)
 	if err != nil {
-		return fmt.Errorf("resolving base branch %q: %w", baseBranch, err)
+		return nil, fmt.Errorf("resolving base branch %q: %w", baseBranch, err)
 	}
 
 	digest, err := to.Digest()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// create branch name and check if this phase, resource and state has previously been observed
@@ -191,13 +223,13 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 
 	// ensure branch exists locally either way
 	if err := g.repo.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
-		return err
+		return nil, err
 	}
 
 	proposal, err := g.proposer.GetCurrentProposal(ctx, baseBranch, branchPrefix)
 	if err != nil {
 		if !errors.Is(err, ErrProposalNotFound) {
-			return err
+			return nil, err
 		}
 
 		slog.Debug("proposal not found")
@@ -210,48 +242,51 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 		if proposal.BaseRevision != baseRev.String() {
 			// we're potentially going to force update the branch to move the base
 			options = append(options, git.WithForce)
-		} else {
-			if proposal.Digest == digest {
-				// nothing has changed since the last promotion and proposals
-				slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
+		} else if proposal.Digest == digest {
+			// nothing has changed since the last promotion and proposals
+			slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
 
-				return nil
-			}
+			return annotations(proposal), nil
 		}
 
-		if _, err := g.repo.UpdateAndPush(ctx, update, options...); err != nil {
-			if errors.Is(err, git.ErrEmptyCommit) {
-				slog.Debug("skipping proposal", "reason", "UpdateProducedNoChange")
-
-				return nil
-			}
-
-			return fmt.Errorf("updating existing proposal: %w", err)
+		head, err := g.updateAndPush(ctx, phase, from, to, options...)
+		if err != nil {
+			return nil, fmt.Errorf("updating existing proposal: %w", err)
 		}
 
-		return nil
+		// we're updating the head position of an existing proposal
+		// so we need to update the value of head in the returned annotations
+		annotations := annotations(proposal)
+		annotations[AnnotationGitHeadSHAKey] = head
+
+		return annotations, nil
 	}
 
-	if _, err := g.repo.UpdateAndPush(ctx, update, options...); err != nil {
-		if errors.Is(err, git.ErrEmptyCommit) {
-			slog.Info("promotion produced no changes")
-
-			return nil
+	if head, err := g.updateAndPush(ctx, phase, from, to, options...); err != nil {
+		if !errors.Is(err, core.ErrNoChange) {
+			return nil, err
 		}
 
-		return err
+		// we check here to see if the update produced no changes due to either
+		// the branch previously existing and had been advanced already or
+		// the branch was just created and matches the base after update
+		// if it is the latter then our update produces no change
+		// otherwise, we just need to open the pull request again and continue
+		if baseRev.String() == head {
+			return nil, core.ErrNoChange
+		}
 	}
 
 	fromDigest, err := from.Digest()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	title := message
+	title := fmt.Sprintf("Update %s", phase.Name)
 	if p, ok := core.Resource(to).(proposalTitle[A]); ok {
 		title, err = p.ProposalTitle(phase, from)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -262,7 +297,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 	if b, ok := core.Resource(to).(proposalBody[A]); ok {
 		body, err = b.ProposalBody(phase, from)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -275,8 +310,18 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 	}
 
 	if err := g.proposer.CreateProposal(ctx, proposal, g.proposalOptions); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return annotations(proposal), nil
+}
+
+func annotations(proposal *Proposal) map[string]string {
+	a := map[string]string{
+		AnnotationGitBaseRefKey: proposal.BaseBranch,
+		AnnotationGitHeadSHAKey: proposal.HeadRevision,
+	}
+
+	maps.Insert(a, maps.All(proposal.Annotations))
+	return a
 }
