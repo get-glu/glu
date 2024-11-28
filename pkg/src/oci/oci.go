@@ -18,7 +18,17 @@ var _ phases.Source[Resource] = (*Source[Resource])(nil)
 
 type Resource interface {
 	core.Resource
-	ReadFromOCIDescriptor(v1.Descriptor, io.ReadCloser) error
+	ReadFromOCIDescriptor(v1.Descriptor) error
+}
+
+type ResourceFromManifest interface {
+	Resource
+	ReadFromOCIManifest(v1.Descriptor, v1.Manifest) error
+}
+
+type ResourceFromIndex interface {
+	Resource
+	ReadFromOCIIndex(v1.Descriptor, v1.Index) error
 }
 
 type Resolver interface {
@@ -49,8 +59,56 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 		return err
 	}
 
-	return r.ReadFromOCIDescriptor(desc, reader)
+	defer func() {
+		// discard reader contents and close before returning
+		io.Copy(io.Discard, reader)
+		reader.Close()
+	}()
+
+	switch desc.MediaType {
+	case v1.MediaTypeImageIndex:
+		ri, ok := Resource(r).(ResourceFromIndex)
+		if !ok {
+			break
+		}
+
+		var index v1.Index
+		if err := json.NewDecoder(reader).Decode(&index); err != nil {
+			return err
+		}
+
+		return ri.ReadFromOCIIndex(desc, index)
+	case v1.MediaTypeImageManifest:
+		rm, ok := Resource(r).(ResourceFromManifest)
+		if !ok {
+			break
+		}
+
+		var manifest v1.Manifest
+		if err := json.NewDecoder(reader).Decode(&manifest); err != nil {
+			return err
+		}
+
+		return rm.ReadFromOCIManifest(desc, manifest)
+	default:
+	}
+
+	rest, err := content.ReadAll(reader, desc)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(rest, &desc); err != nil {
+		return err
+	}
+
+	return r.ReadFromOCIDescriptor(desc)
 }
+
+var (
+	_ ResourceFromIndex    = (*BaseResource)(nil)
+	_ ResourceFromManifest = (*BaseResource)(nil)
+)
 
 type BaseResource struct {
 	// ImageName   string // TODO: add this when we have a use case for it
@@ -66,20 +124,21 @@ func (r *BaseResource) Annotations() map[string]string {
 	return r.annotations
 }
 
-func (r *BaseResource) ReadFromOCIDescriptor(desc v1.Descriptor, reader io.ReadCloser) error {
+func (r *BaseResource) ReadFromOCIDescriptor(desc v1.Descriptor) error {
 	r.ImageDigest = desc.Digest
-
-	defer reader.Close()
-
-	b, err := content.ReadAll(reader, desc)
-	if err != nil {
-		return err
-	}
-
-	if err := json.Unmarshal(b, &desc); err != nil {
-		return err
-	}
-
 	r.annotations = desc.Annotations
+	return nil
+}
+
+func (r *BaseResource) ReadFromOCIManifest(desc v1.Descriptor, manifest v1.Manifest) error {
+	r.ImageDigest = desc.Digest
+	r.annotations = manifest.Annotations
+
+	return nil
+}
+
+func (r *BaseResource) ReadFromOCIIndex(desc v1.Descriptor, index v1.Index) error {
+	r.ImageDigest = desc.Digest
+	r.annotations = index.Annotations
 	return nil
 }
