@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"github.com/get-glu/glu/pkg/src/git"
 	"github.com/google/go-github/v64/github"
-)
-
-const (
-	GitHubPRNumberField = "github.pr.number"
 )
 
 var _ git.Proposer = (*SCM)(nil)
@@ -37,12 +34,14 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix s
 		parts := strings.Split(pr.Head.GetRef(), "/")
 		if strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
 			proposal = &git.Proposal{
-				BaseRevision: pr.Base.GetSHA(),
 				BaseBranch:   pr.Base.GetRef(),
+				BaseRevision: pr.Base.GetSHA(),
 				Branch:       pr.Head.GetRef(),
+				HeadRevision: pr.Head.GetSHA(),
 				Digest:       parts[len(parts)-1],
-				ExternalMetadata: map[string]any{
-					GitHubPRNumberField: pr.GetNumber(),
+				Annotations: map[string]string{
+					git.AnnotationProposalNumberKey: strconv.Itoa(pr.GetNumber()),
+					git.AnnotationProposalURLKey:    pr.GetHTMLURL(),
 				},
 			}
 			break
@@ -73,8 +72,11 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts g
 
 	slog.Info("proposal created", "scm_type", "github", "proposal_url", pr.GetHTMLURL())
 
-	proposal.ExternalMetadata = map[string]any{
-		GitHubPRNumberField: pr.GetNumber(),
+	proposal.BaseRevision = pr.Base.GetSHA()
+	proposal.HeadRevision = pr.Head.GetSHA()
+	proposal.Annotations = map[string]string{
+		git.AnnotationProposalNumberKey: strconv.Itoa(pr.GetNumber()),
+		git.AnnotationProposalURLKey:    pr.GetHTMLURL(),
 	}
 
 	if len(opts.Labels) > 0 {
@@ -87,13 +89,13 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts g
 }
 
 func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
-	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
-	if !ok {
-		slog.Warn("could not close pr", "reason", "missing PR number on proposal")
+	number, err := strconv.Atoi(proposal.Annotations[git.AnnotationProposalNumberKey])
+	if err != nil {
+		slog.Warn("could not close pr", "reason", "missing PR number on proposal", "error", err)
 		return nil
 	}
 
-	_, _, err := s.client.PullRequests.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
+	_, _, err = s.client.PullRequests.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
 		MergeMethod: "merge",
 	})
 
@@ -101,13 +103,13 @@ func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
 }
 
 func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
-	number, ok := proposal.ExternalMetadata[GitHubPRNumberField].(int)
-	if !ok {
-		slog.Warn("could not close pr", "reason", "missing PR number on proposal")
+	number, err := strconv.Atoi(proposal.Annotations[git.AnnotationProposalNumberKey])
+	if err != nil {
+		slog.Warn("could not close pr", "reason", "missing PR number on proposal", "error", err)
 		return nil
 	}
 
-	_, _, err := s.client.PullRequests.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
+	_, _, err = s.client.PullRequests.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
 		State: github.String("closed"),
 	})
 

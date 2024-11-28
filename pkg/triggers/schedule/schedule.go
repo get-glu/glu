@@ -43,9 +43,12 @@ func (t *Trigger) Run(ctx context.Context, p glu.Pipelines) {
 		case <-ticker.C:
 			for _, pipeline := range p.Pipelines() {
 				for phase := range pipeline.Phases(t.options...) {
-					if err := phase.Promote(ctx); err != nil {
+					result, err := phase.Promote(ctx)
+					if err != nil {
 						slog.Error("promoting resource", "name", phase.Metadata().Name, "error", err)
 					}
+
+					slog.Info("promotion succeeded", "annotations", result.Annotations)
 				}
 			}
 

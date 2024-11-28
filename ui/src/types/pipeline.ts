@@ -13,3 +13,7 @@ export interface Phase {
   depends_on?: string;
   resource: Resource;
 }
+
+export interface Promotion {
+  annotations: Record<string, string>;
+}

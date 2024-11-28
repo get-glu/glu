@@ -1,5 +1,5 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { Package, GitBranch, CircleArrowUp, CheckCircle } from 'lucide-react';
+import { Package, GitBranch, CircleArrowUp, CheckCircle, Loader2 } from 'lucide-react';
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import { usePromotePhaseMutation } from '@/services/api';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
+import { ANNOTATION_GIT_PROPOSAL_URL, ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
@@ -28,12 +28,34 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   };
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
 
   const [promotePhase] = usePromotePhaseMutation();
   const promote = async () => {
+    setIsPromoting(true);
+
+    let message = <p>Phase promotion scheduled</p>;
+    const result = await promotePhase({
+      pipeline: phase.pipeline,
+      phase: phase.metadata.name
+    }).unwrap();
+    const proposalURL = result?.annotations[ANNOTATION_GIT_PROPOSAL_URL];
+    if (proposalURL) {
+      message = (
+        <p>
+          Phase promotion proposed:{' '}
+          <a className="underline" href={proposalURL} target="_blank" rel="noopener noreferrer">
+            {proposalURL}
+          </a>
+        </p>
+      );
+    }
+
+    setIsPromoting(false);
+
+    toast.success(message);
+
     setDialogOpen(false);
-    await promotePhase({ pipeline: phase.pipeline, phase: phase.metadata.name }).unwrap();
-    toast.success('Phase promotion scheduled');
   };
 
   return (
@@ -80,7 +102,7 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
       <div className="mt-2 flex items-center gap-2 text-xs">
         <span>Digest:</span>
         <span className="font-mono text-xs text-muted-foreground">
-          {phase.resource.digest?.slice(-12)}
+          {phase.resource.digest?.slice(0, 12)}
         </span>
       </div>
 
@@ -120,7 +142,15 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={promote}>Promote</Button>
+            <Button onClick={promote}>
+              {isPromoting ? (
+                <>
+                  <Loader2 className="animate-spin" /> Please Wait{' '}
+                </>
+              ) : (
+                'Promote'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

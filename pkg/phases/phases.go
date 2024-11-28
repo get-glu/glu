@@ -17,7 +17,7 @@ type Source[R core.Resource] interface {
 
 type UpdatableSource[R core.Resource] interface {
 	Source[R]
-	Update(_ context.Context, pipeline, phase core.Metadata, from, to R) error
+	Update(_ context.Context, pipeline, phase core.Metadata, from, to R) (map[string]string, error)
 }
 
 // Pipeline is a set of phase with promotion dependencies between one another.
@@ -81,7 +81,7 @@ func (i *Phase[R]) GetResource(ctx context.Context) (a R, err error) {
 // If there is no promotion phase, this process is skipped.
 // The phase fetches both its current resource state, and that of the promotion source phase.
 // If the resources differ, then the phase updates its source to match the promoted version.
-func (i *Phase[R]) Promote(ctx context.Context) (err error) {
+func (i *Phase[R]) Promote(ctx context.Context) (r core.PromotionResult, err error) {
 	i.logger.Debug("Promotion started")
 	defer func() {
 		i.logger.Debug("Promotion finished")
@@ -92,44 +92,44 @@ func (i *Phase[R]) Promote(ctx context.Context) (err error) {
 
 	updatable, ok := i.source.(UpdatableSource[R])
 	if !ok {
-		return nil
+		return r, nil
 	}
 
 	from := i.pipeline.New()
 	if err := i.source.View(ctx, i.pipeline.Metadata(), i.meta, from); err != nil {
-		return err
+		return r, err
 	}
 
 	dep, ok := i.pipeline.PromotedFrom(i)
 	if !ok {
-		return nil
+		return r, nil
 	}
 
 	to, err := dep.GetResource(ctx)
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	fromDigest, err := from.Digest()
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	toDigest, err := to.Digest()
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	if fromDigest == toDigest {
 		i.logger.Debug("skipping promotion", "reason", "UpToDate")
-		return nil
+		return r, nil
 	}
 
-	if err := updatable.Update(ctx, i.pipeline.Metadata(), i.meta, from, to); err != nil {
-		return fmt.Errorf("updating from %q to %q: %w", fromDigest, toDigest, err)
+	if r.Annotations, err = updatable.Update(ctx, i.pipeline.Metadata(), i.meta, from, to); err != nil {
+		return r, fmt.Errorf("updating from %q to %q: %w", fromDigest, toDigest, err)
 	}
 
-	return nil
+	return r, nil
 }
 
 func (i *Phase[R]) Synced(ctx context.Context) (bool, error) {

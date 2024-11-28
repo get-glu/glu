@@ -271,8 +271,21 @@ func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := phase.Promote(r.Context()); err != nil {
+	result, err := phase.Promote(r.Context())
+	if err != nil {
+		if errors.Is(err, core.ErrNoChange) {
+			slog.Debug("promotion produced no change")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		slog.Error("performing promotion", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(&result); err != nil {
+		slog.Error("encoding response", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

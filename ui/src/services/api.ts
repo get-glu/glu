@@ -1,4 +1,4 @@
-import { Pipeline } from '@/types/pipeline';
+import { Pipeline, Promotion } from '@/types/pipeline';
 import { System } from '@/types/system';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
@@ -14,7 +14,7 @@ export const api = createApi({
     getPipeline: builder.query<Pipeline, string>({
       query: (pipeline) => `/pipelines/${pipeline}`
     }),
-    promotePhase: builder.mutation<void, { pipeline: string; phase: string }>({
+    promotePhase: builder.mutation<Promotion, { pipeline: string; phase: string }>({
       query: ({ pipeline, phase }) => ({
         url: `/pipelines/${pipeline}/phases/${phase}/promote`,
         method: 'POST'
