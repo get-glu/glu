@@ -21,7 +21,9 @@
 Glu is a framework built to help manage and coordinate multi-environment deployments using configuration stored in Git.
 
 <p align="center">
-<img src=".github/images/dashboard.png" alt="Glu Dashboard" title="Glu Dashboard" width="75%" />
+
+https://github.com/user-attachments/assets/b6f4d20b-e166-4ec9-8aa3-0c4d5e0cf410
+
 </p>
 
 Glu has an opinionated set of models and abstractions, which when combined, allow you to build consistent command-line and server processes for orchestrating the progression of applications and configuration across target environments.
