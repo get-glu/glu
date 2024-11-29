@@ -8,37 +8,8 @@ import (
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/builder"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/phases"
 )
-
-// MockResource represents our mock resource state
-type MockResource struct{}
-
-func (m *MockResource) Digest() (string, error) {
-	return "mock-digest", nil
-}
-
-func NewMockResource() *MockResource {
-	return &MockResource{}
-}
-
-// MockSource implements a simple source for our mock resources
-type MockSource struct {
-	typ string
-}
-
-func NewMockSource(typ string) *MockSource {
-	return &MockSource{typ: typ}
-}
-
-func (m *MockSource) Metadata() core.Metadata {
-	return core.Metadata{
-		Name: m.typ,
-	}
-}
-
-func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {
-	return nil
-}
 
 func run(ctx context.Context) error {
 	return builder.New[*MockResource](
@@ -66,7 +37,7 @@ func run(ctx context.Context) error {
 				glu.Label("region", "us-east-1"),
 			),
 			stagingSource,
-			core.PromotesFrom(ociPhase),
+			phases.PromotesFrom(ociPhase),
 		)
 		if err != nil {
 			return err
@@ -80,7 +51,7 @@ func run(ctx context.Context) error {
 				glu.Label("region", "us-east-1"),
 			),
 			prodEastSource,
-			core.PromotesFrom(stagingPhase),
+			phases.PromotesFrom(stagingPhase),
 		)
 
 		prodWestSource := NewMockSource("git")
@@ -90,7 +61,7 @@ func run(ctx context.Context) error {
 				glu.Label("region", "us-west-1"),
 			),
 			prodWestSource,
-			core.PromotesFrom(stagingPhase),
+			phases.PromotesFrom(stagingPhase),
 		)
 
 		return nil
@@ -113,7 +84,7 @@ func run(ctx context.Context) error {
 				glu.Label("domain", "http://stage.billing.mycorp.com"),
 			),
 			fdStagingSource,
-			core.PromotesFrom(fdOciPhase),
+			phases.PromotesFrom(fdOciPhase),
 		)
 		if err != nil {
 			return err
@@ -128,7 +99,7 @@ func run(ctx context.Context) error {
 				glu.Label("ssl", "enabled"),
 			),
 			fdProdSource,
-			core.PromotesFrom(fdStagingPhase),
+			phases.PromotesFrom(fdStagingPhase),
 		)
 
 		return nil
@@ -140,4 +111,38 @@ func main() {
 		slog.Error("error running mock server", "error", err)
 		os.Exit(1)
 	}
+}
+
+// MockResource represents our mock resource state
+type MockResource struct{}
+
+func (m *MockResource) Digest() (string, error) {
+	return "mock-digest", nil
+}
+
+func NewMockResource() *MockResource {
+	return &MockResource{}
+}
+
+// MockSource implements a simple source for our mock resources
+type MockSource struct {
+	typ string
+}
+
+func NewMockSource(typ string) *MockSource {
+	return &MockSource{typ: typ}
+}
+
+func (m *MockSource) Metadata() core.Metadata {
+	return core.Metadata{
+		Name: m.typ,
+	}
+}
+
+func (m *MockSource) Subscribe(pipeline, phase core.Metadata, newFn func() *MockResource, record func(*MockResource, map[string]string)) {
+	return
+}
+
+func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {
+	return nil
 }

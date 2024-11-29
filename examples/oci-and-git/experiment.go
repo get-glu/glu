@@ -10,6 +10,7 @@ import (
 	"github.com/get-glu/glu/pkg/builder"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/phases"
 	"github.com/get-glu/glu/pkg/src/git"
 	"github.com/get-glu/glu/pkg/src/oci"
 	"github.com/get-glu/glu/pkg/triggers/schedule"
@@ -43,7 +44,7 @@ func run(ctx context.Context) error {
 			// build a phase for the staging environment which source from the git repository
 			// configure it to promote from the OCI phase
 			staging, err := b.NewPhase(glu.Name("staging", glu.Label("env", "staging")),
-				gitSource, core.PromotesFrom(ociPhase))
+				gitSource, phases.PromotesFrom(ociPhase))
 			if err != nil {
 				return err
 			}
@@ -51,7 +52,7 @@ func run(ctx context.Context) error {
 			// build a phase for the production environment which source from the git repository
 			// configure it to promote from the staging git phase
 			_, err = b.NewPhase(glu.Name("production", glu.Label("env", "production")),
-				gitSource, core.PromotesFrom(staging))
+				gitSource, phases.PromotesFrom(staging))
 			if err != nil {
 				return err
 			}

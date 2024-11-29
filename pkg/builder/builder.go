@@ -3,7 +3,6 @@ package builder
 import (
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/containers"
-	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/phases"
 	srcgit "github.com/get-glu/glu/pkg/src/git"
 	srcoci "github.com/get-glu/glu/pkg/src/oci"
@@ -26,7 +25,7 @@ func New[R glu.Resource](system *glu.System) *SystemBuilder[R] {
 type PipelineBuilder[R glu.Resource] interface {
 	Configuration() (*glu.Config, error)
 	// NewPhase constructs a new phase and registers it on the builders resulting pipeline.
-	NewPhase(meta glu.Metadata, source phases.Source[R], _ ...containers.Option[core.AddPhaseOptions[R]]) (*phases.Phase[R], error)
+	NewPhase(meta glu.Metadata, source phases.Source[R], _ ...containers.Option[phases.Options[R]]) (*phases.Phase[R], error)
 }
 
 // AddTrigger delegates to the underlying system but returns the system builder.
@@ -53,9 +52,9 @@ func (b *SystemBuilder[R]) BuildPipeline(meta glu.Metadata, newFunc func() R, bu
 		return b
 	}
 
-	pipeline := glu.NewPipeline(meta, newFunc)
+	pipeline := glu.NewPipeline[R](meta)
 
-	if err := build(pipelineBuilder[R]{b, pipeline}); err != nil {
+	if err := build(pipelineBuilder[R]{b, pipeline, newFunc}); err != nil {
 		b.err = err
 		return b
 	}
@@ -69,11 +68,12 @@ type pipelineBuilder[R glu.Resource] struct {
 	*SystemBuilder[R]
 
 	pipeline *glu.ResourcePipeline[R]
+	newFn    func() R
 }
 
 // NewPhase constructs a new phase and registers it on the builders resulting pipeline.
-func (p pipelineBuilder[R]) NewPhase(meta glu.Metadata, source phases.Source[R], opts ...containers.Option[core.AddPhaseOptions[R]]) (*phases.Phase[R], error) {
-	return phases.New(meta, p.pipeline, source, opts...)
+func (p pipelineBuilder[R]) NewPhase(meta glu.Metadata, source phases.Source[R], opts ...containers.Option[phases.Options[R]]) (*phases.Phase[R], error) {
+	return phases.New(meta, p.pipeline, source, p.newFn, opts...)
 }
 
 // GitSource is a convenience function for building a git.Source implementation using a pipeline builder implementation.

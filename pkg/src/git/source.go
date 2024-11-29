@@ -97,21 +97,75 @@ func NewSource[A Resource](repo *git.Repository, proposer Proposer, opts ...cont
 }
 
 type Branched interface {
-	Branch() string
+	Branch(pipeline, phase core.Metadata) string
 }
 
-func (g *Source[A]) View(ctx context.Context, _, phase core.Metadata, r A) error {
+func (g *Source[A]) View(ctx context.Context, pipeline, phase core.Metadata, r A) error {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
 	opts := []containers.Option[git.ViewUpdateOptions]{}
 	if branched, ok := core.Resource(r).(Branched); ok {
-		opts = append(opts, git.WithBranch(branched.Branch()))
+		opts = append(opts, git.WithBranch(branched.Branch(pipeline, phase)))
 	}
 
 	return g.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
 		return r.ReadFrom(ctx, phase, fs)
 	}, opts...)
+}
+
+func (g *Source[A]) Subscribe(pipeline, phase core.Metadata, newFn func() A, record func(A, map[string]string)) {
+	var (
+		a      = newFn()
+		branch = g.repo.DefaultBranch()
+	)
+
+	if branched, ok := core.Resource(a).(Branched); ok {
+		branch = branched.Branch(pipeline, phase)
+	}
+
+	g.repo.Subscribe(&subscriber[A]{
+		repo:   g.repo,
+		branch: branch,
+		phase:  phase,
+		newFn:  newFn,
+		record: record,
+	})
+}
+
+type subscriber[A Resource] struct {
+	repo   *git.Repository
+	branch string
+	phase  core.Metadata
+	newFn  func() A
+	record func(A, map[string]string)
+}
+
+func (s *subscriber[A]) Branches() []string {
+	return []string{s.branch}
+
+}
+
+func (s *subscriber[A]) Notify(ctx context.Context, refs map[string]string) error {
+	ref, ok := refs[s.branch]
+	if !ok {
+		slog.Debug("reference not found on notify", "branch", s.branch, "refs", refs)
+		return nil
+	}
+
+	a := s.newFn()
+	if err := s.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
+		return a.ReadFrom(ctx, s.phase, fs)
+	}, git.WithRevision(plumbing.NewHash(ref))); err != nil {
+		return err
+	}
+
+	// record latest
+	s.record(a, map[string]string{
+		AnnotationGitHeadSHAKey: ref,
+	})
+
+	return nil
 }
 
 type commitMessage[A Resource] interface {
@@ -146,7 +200,7 @@ func (g *Source[A]) Update(ctx context.Context, pipeline, phase core.Metadata, f
 	// use the target resources branch if it implementes an override
 	baseBranch := g.repo.DefaultBranch()
 	if branched, ok := core.Resource(to).(Branched); ok {
-		baseBranch = branched.Branch()
+		baseBranch = branched.Branch(pipeline, phase)
 	}
 
 	annotations := map[string]string{
