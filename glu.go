@@ -22,7 +22,6 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	metricsdk "go.opentelemetry.io/otel/sdk/metric"
@@ -369,16 +368,7 @@ func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Read
 				return nil, nil, fmt.Errorf("creating otlp metrics exporter: %w", err)
 			}
 		default:
-			// because of url parsing ambiguity, we'll assume that the endpoint is a host:port with no scheme
-			exporter, err = otlpmetricgrpc.New(ctx,
-				otlpmetricgrpc.WithEndpoint(cfg.OTLP.Endpoint),
-				otlpmetricgrpc.WithHeaders(cfg.OTLP.Headers),
-				// TODO: support TLS
-				otlpmetricgrpc.WithInsecure(),
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf("creating otlp metrics exporter: %w", err)
-			}
+			return nil, nil, fmt.Errorf("unsupported metrics exporter scheme: %s", u.Scheme)
 		}
 
 		metricExp = metricsdk.NewPeriodicReader(exporter)
