@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"maps"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -19,6 +20,14 @@ import (
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
+	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	metricsdk "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -60,6 +69,8 @@ func Annotation(k, v string) containers.Option[Metadata] {
 	}
 }
 
+type shutdownFunc func(context.Context) error
+
 // System is the primary entrypoint for build a set of Glu pipelines.
 // It supports functions for adding new pipelines, registering triggers
 // running the API server and handly command-line inputs.
@@ -71,8 +82,9 @@ type System struct {
 	triggers  []Trigger
 	err       error
 
-	ui     fs.FS
-	server *Server
+	ui            fs.FS
+	server        *Server
+	shutdownFuncs []shutdownFunc
 }
 
 // WithUI configures the provided fs.FS implementation to be served as the filesystem
@@ -176,6 +188,50 @@ func (s *System) Run() error {
 		}
 	)
 
+	s.shutdownFuncs = append(s.shutdownFuncs, srv.Shutdown)
+
+	if conf.Metrics.Enabled {
+		metricsExp, metricsShutdownFunc, err := getMetricsExporter(ctx, conf.Metrics)
+		if err != nil {
+			return err
+		}
+
+		s.shutdownFuncs = append(s.shutdownFuncs, metricsShutdownFunc)
+
+		metricsResource, err := resource.New(
+			ctx,
+			resource.WithSchemaURL(semconv.SchemaURL),
+			resource.WithAttributes(
+				semconv.ServiceName("glu"),
+			),
+			resource.WithFromEnv(),
+			resource.WithTelemetrySDK(),
+			resource.WithHost(),
+			resource.WithProcessRuntimeVersion(),
+			resource.WithProcessRuntimeName(),
+		)
+		if err != nil {
+			return fmt.Errorf("creating metrics resource: %w", err)
+		}
+
+		meterProvider := metricsdk.NewMeterProvider(
+			metricsdk.WithResource(metricsResource),
+			metricsdk.WithReader(metricsExp),
+		)
+
+		otel.SetMeterProvider(meterProvider)
+		s.shutdownFuncs = append(s.shutdownFuncs, meterProvider.Shutdown)
+
+		// We only want to start the runtime metrics by open telemetry if the user have chosen
+		// to use OTLP because the Prometheus endpoint already exposes those metrics.
+		if conf.Metrics.Exporter == config.MetricsExporterOTLP {
+			err = otlpruntime.Start(otlpruntime.WithMeterProvider(meterProvider))
+			if err != nil {
+				return fmt.Errorf("starting runtime metric exporter: %w", err)
+			}
+		}
+	}
+
 	group, ctx = errgroup.WithContext(ctx)
 
 	group.Go(func() error {
@@ -184,7 +240,16 @@ func (s *System) Run() error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		return srv.Shutdown(shutdownCtx)
+		// call in reverse order to emulate pop semantics of a stack
+		for i := len(s.shutdownFuncs) - 1; i >= 0; i-- {
+			if fn := s.shutdownFuncs[i]; fn != nil {
+				if err := fn(shutdownCtx); err != nil {
+					slog.Error("shutting down", "error", err)
+				}
+			}
+		}
+
+		return nil
 	})
 
 	var serveFunc = srv.ListenAndServe
@@ -260,4 +325,69 @@ func (s *System) runTriggers(ctx context.Context) (err error) {
 	case <-finished:
 		return ctx.Err()
 	}
+}
+
+func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Reader, shutdownFunc, error) {
+	var (
+		metricExp          metricsdk.Reader
+		metricShutdownFunc shutdownFunc = func(context.Context) error { return nil }
+		err                error
+	)
+
+	switch cfg.Exporter {
+	case config.MetricsExporterPrometheus:
+		// exporter registers itself on the prom client DefaultRegistrar
+		metricExp, err = prometheus.New()
+		if err != nil {
+			return nil, nil, err
+		}
+
+	case config.MetricsExporterOTLP:
+		u, err := url.Parse(cfg.OTLP.Endpoint)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing otlp endpoint: %w", err)
+		}
+
+		var exporter metricsdk.Exporter
+
+		switch u.Scheme {
+		case "https":
+			exporter, err = otlpmetrichttp.New(ctx,
+				otlpmetrichttp.WithEndpoint(u.Host+u.Path),
+				otlpmetrichttp.WithHeaders(cfg.OTLP.Headers),
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("creating otlp metrics exporter: %w", err)
+			}
+		case "http":
+			exporter, err = otlpmetrichttp.New(ctx,
+				otlpmetrichttp.WithEndpoint(u.Host+u.Path),
+				otlpmetrichttp.WithHeaders(cfg.OTLP.Headers),
+				otlpmetrichttp.WithInsecure(),
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("creating otlp metrics exporter: %w", err)
+			}
+		default:
+			// because of url parsing ambiguity, we'll assume that the endpoint is a host:port with no scheme
+			exporter, err = otlpmetricgrpc.New(ctx,
+				otlpmetricgrpc.WithEndpoint(cfg.OTLP.Endpoint),
+				otlpmetricgrpc.WithHeaders(cfg.OTLP.Headers),
+				// TODO: support TLS
+				otlpmetricgrpc.WithInsecure(),
+			)
+			if err != nil {
+				return nil, nil, fmt.Errorf("creating otlp metrics exporter: %w", err)
+			}
+		}
+
+		metricExp = metricsdk.NewPeriodicReader(exporter)
+		metricShutdownFunc = func(ctx context.Context) error {
+			return exporter.Shutdown(ctx)
+		}
+	default:
+		return nil, nil, fmt.Errorf("unsupported metrics exporter: %s", cfg.Exporter)
+	}
+
+	return metricExp, metricShutdownFunc, err
 }
