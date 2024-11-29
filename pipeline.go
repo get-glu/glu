@@ -6,6 +6,7 @@ import (
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/phases"
 )
 
 // Pipeline is an alias for the core Pipeline interface (see core.Pipeline)
@@ -16,7 +17,7 @@ type Phase = core.Phase
 
 type entry[R Resource] struct {
 	core.ResourcePhase[R]
-	opts core.AddPhaseOptions[R]
+	opts phases.Options[R]
 }
 
 // ResourcePipeline is a collection of phases for a given resource type R.
@@ -28,18 +29,11 @@ type ResourcePipeline[R Resource] struct {
 }
 
 // NewPipeline constructs and configures a new instance of *ResourcePipeline[R]
-func NewPipeline[R Resource](meta Metadata, newFn func() R) *ResourcePipeline[R] {
+func NewPipeline[R Resource](meta Metadata) *ResourcePipeline[R] {
 	return &ResourcePipeline[R]{
 		meta:  meta,
-		newFn: newFn,
 		nodes: map[string]entry[R]{},
 	}
-}
-
-// New calls the functions underlying resource constructor function to get a
-// new default instance of the resource.
-func (p *ResourcePipeline[R]) New() R {
-	return p.newFn()
 }
 
 // Metadata returns the metadata assocated with the Pipelines (name and labels).
@@ -49,8 +43,8 @@ func (p *ResourcePipeline[R]) Metadata() Metadata {
 
 // Add will add the provided resource phase to the pipeline along with configuring
 // any dependent promotion source phases if configured to do so.
-func (p *ResourcePipeline[R]) Add(r core.ResourcePhase[R], opts ...containers.Option[core.AddPhaseOptions[R]]) error {
-	add := core.AddPhaseOptions[R]{}
+func (p *ResourcePipeline[R]) Add(r core.ResourcePhase[R], opts ...containers.Option[phases.Options[R]]) error {
+	add := phases.Options[R]{}
 	containers.ApplyAll(&add, opts...)
 
 	if _, existing := p.nodes[r.Metadata().Name]; existing {

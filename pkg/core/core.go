@@ -6,6 +6,7 @@ import (
 	"iter"
 
 	"github.com/get-glu/glu/pkg/containers"
+	"github.com/google/uuid"
 )
 
 var (
@@ -55,22 +56,17 @@ type Phase interface {
 	Get(context.Context) (Resource, error)
 	Promote(context.Context) (PromotionResult, error)
 	Synced(context.Context) (bool, error)
+	History(context.Context) ([]State, error)
 }
 
 type PromotionResult struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-// AddPhaseOptions are used to configure the addition of a ResourcePhase to a Pipeline
-type AddPhaseOptions[R Resource] struct {
-	PromotedFrom ResourcePhase[R]
-}
-
-// PromotesFrom configures a dependent Phase to promote from for the Phase being added.
-func PromotesFrom[R Resource](c ResourcePhase[R]) containers.Option[AddPhaseOptions[R]] {
-	return func(o *AddPhaseOptions[R]) {
-		o.PromotedFrom = c
-	}
+type State struct {
+	Version     uuid.UUID
+	Resource    Resource
+	Annotations map[string]string
 }
 
 // ResourcePhase is a Phase bound to a particular resource type R.

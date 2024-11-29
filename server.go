@@ -67,6 +67,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/pipelines", s.listPipelines)
 			r.Get("/pipelines/{pipeline}", s.getPipeline)
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
+			r.Get("/pipelines/{pipeline}/phases/{phase}/history", s.phaseHistory)
 			r.Post("/pipelines/{pipeline}/phases/{phase}/promote", s.promotePhase)
 		})
 	})
@@ -285,6 +286,41 @@ func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(&result); err != nil {
+		slog.Error("encoding response", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	phaseName := chi.URLParam(r, "phase")
+	phase, err := pipeline.PhaseByName(phaseName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, core.ErrNotFound) {
+			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+			status = http.StatusNotFound
+		}
+
+		http.Error(w, err.Error(), status)
+		return
+	}
+
+	history, err := phase.History(r.Context())
+	if err != nil {
+		slog.Error("performing promotion", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(history); err != nil {
 		slog.Error("encoding response", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

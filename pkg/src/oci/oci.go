@@ -3,6 +3,7 @@ package oci
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 
 	"github.com/get-glu/glu/pkg/core"
@@ -51,6 +52,10 @@ func (s *Source[R]) Metadata() core.Metadata {
 		Name:        "oci",
 		Annotations: map[string]string{ANNOTATION_OCI_IMAGE_URL: s.resolver.Reference()},
 	}
+}
+
+func (g *Source[R]) Subscribe(pipeline, phase core.Metadata, newFn func() R, record func(R, map[string]string)) {
+	panic("not implemented")
 }
 
 func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
@@ -103,6 +108,10 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 	}
 
 	return r.ReadFromOCIDescriptor(desc)
+}
+
+func (s *Source[A]) History(ctx context.Context, pipeline, phase core.Metadata) ([]core.State, error) {
+	return nil, errors.New("not implemented")
 }
 
 var (
