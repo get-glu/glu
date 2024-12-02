@@ -6,104 +6,63 @@ import (
 	"os"
 
 	"github.com/get-glu/glu"
-	"github.com/get-glu/glu/pkg/builder"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/phases"
+	"github.com/get-glu/glu/pkg/edges"
+	"github.com/get-glu/glu/pkg/pipelines"
 )
 
 func run(ctx context.Context) error {
-	return builder.New[*MockResource](
-		glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce"))),
-	).BuildPipeline(glu.Name("checkout"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
-		_, err := b.Configuration()
-		if err != nil {
-			return err
-		}
-		// OCI phase
-		ociSource := NewMockSource("oci")
-		ociPhase, err := b.NewPhase(
-			glu.Name("oci"),
-			ociSource,
-		)
-		if err != nil {
-			return err
-		}
+	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")))
+	config, err := system.Configuration()
+	if err != nil {
+		return err
+	}
 
-		// Staging phase
-		stagingSource := NewMockSource("git")
-		stagingPhase, err := b.NewPhase(
-			glu.Name("staging",
-				glu.Label("environment", "staging"),
-				glu.Label("region", "us-east-1"),
-			),
-			stagingSource,
-			phases.PromotesFrom(ociPhase),
-		)
-		if err != nil {
-			return err
-		}
+	checkout := pipelines.NewBuilder(config, glu.Name("checkout"), NewMockResource)
+	// oci promotes to staging
+	stagingPhase := checkout.
+		// oci phase
+		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
+			return NewMockPhase("checkout", "oci", "oci"), nil
+		}).
+		// staging phase
+		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+			return NewMockPhase("checkout", "git", "staging"), nil
+		})
 
-		// Production phases
-		prodEastSource := NewMockSource("git")
-		b.NewPhase(
-			glu.Name("production-east-1",
-				glu.Label("environment", "production"),
-				glu.Label("region", "us-east-1"),
-			),
-			prodEastSource,
-			phases.PromotesFrom(stagingPhase),
-		)
+	// staging promotes to prod-east-1
+	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+		return NewMockPhase("checkout", "git", "production-east-1"), nil
+	})
 
-		prodWestSource := NewMockSource("git")
-		b.NewPhase(
-			glu.Name("production-west-1",
-				glu.Label("environment", "production"),
-				glu.Label("region", "us-west-1"),
-			),
-			prodWestSource,
-			phases.PromotesFrom(stagingPhase),
-		)
+	// staging promotes to prod-west-1
+	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+		return NewMockPhase("checkout", "git", "production-east-2"), nil
+	})
 
-		return nil
-	}).BuildPipeline(glu.Name("billing"), NewMockResource, func(b builder.PipelineBuilder[*MockResource]) error {
-		// OCI phase
-		fdOciSource := NewMockSource("oci")
-		fdOciPhase, err := b.NewPhase(
-			glu.Name("oci"),
-			fdOciSource,
-		)
-		if err != nil {
-			return err
-		}
+	if err := checkout.Build(system); err != nil {
+		return err
+	}
 
-		// Staging phase
-		fdStagingSource := NewMockSource("git")
-		fdStagingPhase, err := b.NewPhase(
-			glu.Name("staging",
-				glu.Label("environment", "staging"),
-				glu.Label("domain", "http://stage.billing.mycorp.com"),
-			),
-			fdStagingSource,
-			phases.PromotesFrom(fdOciPhase),
-		)
-		if err != nil {
-			return err
-		}
+	billing := pipelines.NewBuilder(config, glu.Name("billing"), NewMockResource).
+		// oci phase
+		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
+			return NewMockPhase("billing", "oci", "oci"), nil
+		}).
+		// staging phase
+		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+			return NewMockPhase("billing", "git", "staging"), nil
+		}).
+		// production phase
+		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+			return NewMockPhase("billing", "git", "production"), nil
+		})
 
-		// Production phase
-		fdProdSource := NewMockSource("git")
-		b.NewPhase(
-			glu.Name("production",
-				glu.Label("environment", "production"),
-				glu.Label("domain", "https://prod.billing.mycorp.com"),
-				glu.Label("ssl", "enabled"),
-			),
-			fdProdSource,
-			phases.PromotesFrom(fdStagingPhase),
-		)
+	if err := billing.Build(system); err != nil {
+		return err
+	}
 
-		return nil
-	}).Run()
+	return system.Run()
 }
 
 func main() {
@@ -124,25 +83,37 @@ func NewMockResource() *MockResource {
 	return &MockResource{}
 }
 
-// MockSource implements a simple source for our mock resources
-type MockSource struct {
-	typ string
+// MockPhase implements a simple phase for our mock resources
+type MockPhase struct {
+	pipeline, kind, name string
 }
 
-func NewMockSource(typ string) *MockSource {
-	return &MockSource{typ: typ}
+func NewMockPhase(pipeline, kind, name string) *MockPhase {
+	return &MockPhase{pipeline: pipeline, kind: kind, name: name}
 }
 
-func (m *MockSource) Metadata() core.Metadata {
-	return core.Metadata{
-		Name: m.typ,
+func (m *MockPhase) Descriptor() glu.Descriptor {
+	return glu.Descriptor{
+		Kind:     m.kind,
+		Pipeline: m.pipeline,
+		Metadata: core.Metadata{
+			Name: m.name,
+		},
 	}
 }
 
-func (m *MockSource) Subscribe(pipeline, phase core.Metadata, newFn func() *MockResource, record func(*MockResource, map[string]string)) {
-	return
+func (m *MockPhase) Get(ctx context.Context) (core.Resource, error) {
+	return m.GetResource(ctx)
 }
 
-func (m *MockSource) View(_ context.Context, _, _ core.Metadata, r *MockResource) error {
-	return nil
+func (m *MockPhase) GetResource(context.Context) (*MockResource, error) {
+	return &MockResource{}, nil
+}
+
+func (m *MockPhase) History(_ context.Context) ([]core.State, error) {
+	return nil, nil
+}
+
+func (m *MockPhase) Update(_ context.Context, from, to *MockResource) (map[string]string, error) {
+	return map[string]string{}, nil
 }

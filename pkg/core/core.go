@@ -1,12 +1,8 @@
 package core
 
 import (
-	"context"
 	"errors"
-	"iter"
-
-	"github.com/get-glu/glu/pkg/containers"
-	"github.com/google/uuid"
+	"fmt"
 )
 
 var (
@@ -27,15 +23,6 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// Pipeline is a collection of phases with potential promotion dependencies
-// relationships between one another.
-type Pipeline interface {
-	Metadata() Metadata
-	PhaseByName(string) (Phase, error)
-	Phases(...containers.Option[PhaseOptions]) iter.Seq[Phase]
-	Dependencies() map[Phase]Phase
-}
-
 // Resource is an instance of a resource in a phase.
 // Primarilly, it exposes a Digest method used to produce
 // a hash digest of the resource instances current state.
@@ -43,100 +30,19 @@ type Resource interface {
 	Digest() (string, error)
 }
 
+// ResourceWithAnnotations is a resource with additional annotations
 type ResourceWithAnnotations interface {
 	Resource
 	Annotations() map[string]string
 }
 
-// Phase is the core interface for resource sourcing and management.
-// These types can be registered on pipelines and can depend upon on another for promotion.
-type Phase interface {
-	Metadata() Metadata
-	Source() Metadata
-	Get(context.Context) (Resource, error)
-	Promote(context.Context) (PromotionResult, error)
-	Synced(context.Context) (bool, error)
-	History(context.Context) ([]State, error)
+// Descriptor is a type which describes a Phase
+type Descriptor struct {
+	Kind     string   `json:"kind"`
+	Pipeline string   `json:"pipeline"`
+	Metadata Metadata `json:"metadata"`
 }
 
-type PromotionResult struct {
-	Annotations map[string]string `json:"annotations"`
-}
-
-type State struct {
-	Version     uuid.UUID
-	Resource    Resource
-	Annotations map[string]string
-}
-
-// ResourcePhase is a Phase bound to a particular resource type R.
-type ResourcePhase[R Resource] interface {
-	Phase
-	GetResource(context.Context) (R, error)
-}
-
-// PhaseOptions scopes a call to get phases from a pipeline.
-type PhaseOptions struct {
-	phase  Phase
-	name   string
-	labels map[string]string
-}
-
-func (p *PhaseOptions) Matches(phase Phase) bool {
-	if p.phase != nil && phase != p.phase {
-		return false
-	}
-
-	if !hasAllLabels(phase, p.labels) {
-		return false
-	}
-
-	if p.name != "" && p.name != phase.Metadata().Name {
-		return false
-	}
-
-	return true
-}
-
-// IsPhase causes a call to Phases to list specifically the provided phase p.
-func IsPhase(p Phase) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		co.phase = p
-	}
-}
-
-// HasLabel causes a call to Phases to list any phase with the matching name.
-func HasName(name string) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		co.name = name
-	}
-}
-
-// HasLabel causes a call to Phases to list any phase with the matching label paid k and v.
-func HasLabel(k, v string) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		if co.labels == nil {
-			co.labels = map[string]string{}
-		}
-
-		co.labels[k] = v
-	}
-}
-
-// HasAllLabels causes a call to Phases to list any phase which mataches all the provided labels.
-func HasAllLabels(labels map[string]string) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		co.labels = labels
-	}
-}
-
-// hasAllLabels returns true if the provided phase has all the supplied labels
-func hasAllLabels(c Phase, toFind map[string]string) (found bool) {
-	labels := c.Metadata().Labels
-	for k, v := range toFind {
-		if found, ok := labels[k]; !ok || v != found {
-			return false
-		}
-	}
-	return true
+func (d Descriptor) String() string {
+	return fmt.Sprintf("%s/%s", d.Pipeline, d.Metadata.Name)
 }

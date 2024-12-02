@@ -73,7 +73,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/pipelines/{pipeline}", s.getPipeline)
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 			r.Get("/pipelines/{pipeline}/phases/{phase}/history", s.phaseHistory)
-			r.Post("/pipelines/{pipeline}/phases/{phase}/promote", s.promotePhase)
+			r.Post("/pipelines/{pipeline}/from/{from}/to/{to}/perform", s.edgePerform)
 		})
 	})
 }
@@ -95,30 +95,27 @@ type pipelineResponse struct {
 	Name   string            `json:"name"`
 	Labels map[string]string `json:"labels,omitempty"`
 	Phases []phaseResponse   `json:"phases,omitempty"`
+	Edges  []edgeResponse    `json:"edges,omitempty"`
 }
 
 type phaseResponse struct {
-	Metadata  core.Metadata    `json:"metadata,omitempty"`
-	DependsOn string           `json:"depends_on,omitempty"`
-	Source    core.Metadata    `json:"source,omitempty"`
-	Resource  resourceResponse `json:"resource,omitempty"`
+	Descriptor core.Descriptor  `json:"descriptor,omitempty"`
+	Resource   resourceResponse `json:"resource,omitempty"`
+}
+
+type edgeResponse struct {
+	Kind       string          `json:"kind,omitempty"`
+	From       core.Descriptor `json:"from,omitempty"`
+	To         core.Descriptor `json:"to,omitempty"`
+	CanPerform bool            `json:"can_perform,omitempty"`
 }
 
 type resourceResponse struct {
-	Synced      bool              `json:"synced,omitempty"`
 	Digest      string            `json:"digest,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, dependencies map[core.Phase]core.Phase) (phaseResponse, error) {
-	var dependsOn string
-
-	if dependencies != nil {
-		if d, ok := dependencies[phase]; ok && d != nil {
-			dependsOn = d.Metadata().Name
-		}
-	}
-
+func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase) (phaseResponse, error) {
 	v, err := phase.Get(ctx)
 	if err != nil {
 		return phaseResponse{}, err
@@ -134,29 +131,24 @@ func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase, depe
 		return phaseResponse{}, err
 	}
 
-	synced, err := phase.Synced(ctx)
-	if err != nil {
-		return phaseResponse{}, err
-	}
-
 	return phaseResponse{
-		Metadata:  phase.Metadata(),
-		DependsOn: dependsOn,
-		Source:    phase.Source(),
+		Descriptor: phase.Descriptor(),
 		Resource: resourceResponse{
 			Digest:      digest,
 			Annotations: annotations,
-			Synced:      synced,
 		},
 	}, nil
 }
 
-func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipeline) (pipelineResponse, error) {
-	dependencies := pipeline.Dependencies()
-	phases := make([]phaseResponse, 0)
+func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipeline) (pipelineResponse, error) {
+	var labels map[string]string
+	if pipeline.Metadata().Labels != nil {
+		labels = pipeline.Metadata().Labels
+	}
 
+	phases := make([]phaseResponse, 0)
 	for phase := range pipeline.Phases() {
-		response, err := s.createPhaseResponse(ctx, phase, dependencies)
+		response, err := s.createPhaseResponse(ctx, phase)
 		if err != nil {
 			return pipelineResponse{}, err
 		}
@@ -164,15 +156,28 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline core.Pipel
 		phases = append(phases, response)
 	}
 
-	var labels map[string]string
-	if pipeline.Metadata().Labels != nil {
-		labels = pipeline.Metadata().Labels
+	edges := make([]edgeResponse, 0)
+	for _, outgoing := range pipeline.Edges() {
+		for _, edge := range outgoing {
+			canPerform, err := edge.CanPerform(ctx)
+			if err != nil {
+				return pipelineResponse{}, err
+			}
+
+			edges = append(edges, edgeResponse{
+				Kind:       edge.Kind(),
+				From:       edge.From(),
+				To:         edge.To(),
+				CanPerform: canPerform,
+			})
+		}
 	}
 
 	return pipelineResponse{
 		Name:   pipeline.Metadata().Name,
 		Labels: labels,
 		Phases: phases,
+		Edges:  edges,
 	}, nil
 }
 
@@ -243,7 +248,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := s.createPhaseResponse(r.Context(), phase, pipeline.Dependencies())
+	response, err := s.createPhaseResponse(r.Context(), phase)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -256,7 +261,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
+func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
@@ -264,20 +269,26 @@ func (s *Server) promotePhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	phaseName := chi.URLParam(r, "phase")
-	phase, err := pipeline.PhaseByName(phaseName)
-	if err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, core.ErrNotFound) {
-			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
-			status = http.StatusNotFound
-		}
+	var (
+		from = chi.URLParam(r, "from")
+		to   = chi.URLParam(r, "to")
+	)
 
-		http.Error(w, err.Error(), status)
+	outgoing, ok := pipeline.Edges()[from]
+	if !ok {
+		slog.Debug("edge not found", "path", r.URL.Path, "error", err, "from", from)
+		http.Error(w, "edge not found", http.StatusNotFound)
 		return
 	}
 
-	result, err := phase.Promote(r.Context())
+	edge, ok := outgoing[to]
+	if !ok {
+		slog.Debug("edge not found", "path", r.URL.Path, "error", err, "from", from, "to", to)
+		http.Error(w, "edge not found", http.StatusNotFound)
+		return
+	}
+
+	result, err := edge.Perform(r.Context())
 	if err != nil {
 		if errors.Is(err, core.ErrNoChange) {
 			slog.Debug("promotion produced no change")

@@ -4,69 +4,47 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/get-glu/glu"
-	"github.com/get-glu/glu/pkg/builder"
-	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/edges"
 	"github.com/get-glu/glu/pkg/fs"
-	"github.com/get-glu/glu/pkg/phases"
-	"github.com/get-glu/glu/pkg/src/git"
-	"github.com/get-glu/glu/pkg/src/oci"
-	"github.com/get-glu/glu/pkg/triggers/schedule"
+	"github.com/get-glu/glu/pkg/pipelines"
+	"github.com/get-glu/glu/pkg/phases/git"
+	"github.com/get-glu/glu/pkg/phases/oci"
 	"github.com/opencontainers/go-digest"
 	"gopkg.in/yaml.v3"
 )
 
 func run(ctx context.Context) error {
-	return builder.New[*CheckoutResource](glu.NewSystem(ctx, glu.Name("mypipelines"))).
-		BuildPipeline(glu.Name("checkout"), NewCheckoutResource, func(b builder.PipelineBuilder[*CheckoutResource]) error {
+	system := glu.NewSystem(ctx, glu.Name("mypipelines"))
+	config, err := system.Configuration()
+	if err != nil {
+		return err
+	}
+
+	if err := pipelines.NewBuilder(config, glu.Name("checkout"), NewCheckoutResource).
+		NewPhase(func(b pipelines.Builder[*CheckoutResource]) (edges.Phase[*CheckoutResource], error) {
 			// fetch the configured OCI repositority source named "checkout"
-			ociSource, err := builder.OCISource(b, "checkout")
-			if err != nil {
-				return err
-			}
-
-			// fetch the configured Git repository source named "checkout"
-			gitSource, err := builder.GitSource(b, "checkout", git.ProposeChanges[*CheckoutResource](git.ProposalOption{
-				Labels: []string{"automerge"},
-			}))
-			if err != nil {
-				return err
-			}
-
-			// build a phase which sources from the OCI repository
-			ociPhase, err := b.NewPhase(glu.Name("oci"), ociSource)
-			if err != nil {
-				return err
-			}
-
+			return pipelines.OCIPhase(b, glu.Name("oci"), "checkout")
+		}).
+		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
 			// build a phase for the staging environment which source from the git repository
 			// configure it to promote from the OCI phase
-			staging, err := b.NewPhase(glu.Name("staging", glu.Label("env", "staging")),
-				gitSource, phases.PromotesFrom(ociPhase))
-			if err != nil {
-				return err
-			}
-
+			return pipelines.GitPhase(b, glu.Name("staging", glu.Label("env", "staging")), "checkout",
+				git.ProposeChanges[*CheckoutResource](git.ProposalOption{
+					Labels: []string{"automerge"},
+				}))
+		}).
+		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
 			// build a phase for the production environment which source from the git repository
 			// configure it to promote from the staging git phase
-			_, err = b.NewPhase(glu.Name("production", glu.Label("env", "production")),
-				gitSource, phases.PromotesFrom(staging))
-			if err != nil {
-				return err
-			}
+			return pipelines.GitPhase(b, glu.Name("production", glu.Label("env", "production")), "checkout")
+		}).
+		Build(system); err != nil {
+		return err
+	}
 
-			// return configured pipeline to the system
-			return nil
-		}).AddTrigger(
-		schedule.New(
-			schedule.WithInterval(10*time.Second),
-			schedule.MatchesLabel("env", "staging"),
-			// alternatively, the phase instance can be target directly with:
-			// glu.ScheduleMatchesPhase(gitStaging),
-		),
-	).Run()
+	return system.Run()
 }
 
 // CheckoutResource is a custom envelope for carrying our specific repository configuration
@@ -108,9 +86,9 @@ func (c *CheckoutResource) ProposalBody(meta glu.Metadata, r *CheckoutResource) 
 // The function is also provided with metadata for the calling phase.
 // This allows the defining type to adjust behaviour based on the context of the phase.
 // Here we are reading a yaml file from a directory signified by a label ("env") on the phase metadata.
-func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs.Filesystem) error {
+func (c *CheckoutResource) ReadFrom(_ context.Context, phase glu.Descriptor, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
 		os.O_RDONLY,
 		0644,
 	)
@@ -138,9 +116,9 @@ func (c *CheckoutResource) ReadFrom(_ context.Context, meta core.Metadata, fs fs
 // The function is also provided with metadata for the calling phase.
 // This allows the defining type to adjust behaviour based on the context of the phase.
 // Here we are writing a yaml file to a directory signified by a label ("env") on the phase metadata.
-func (c *CheckoutResource) WriteTo(ctx context.Context, meta glu.Metadata, fs fs.Filesystem) error {
+func (c *CheckoutResource) WriteTo(ctx context.Context, phase glu.Descriptor, fs fs.Filesystem) error {
 	fi, err := fs.OpenFile(
-		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", meta.Labels["env"]),
+		fmt.Sprintf("/env/%s/apps/checkout/deployment.yaml", phase.Metadata.Name),
 		os.O_RDONLY,
 		0644,
 	)

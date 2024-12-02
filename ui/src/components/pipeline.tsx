@@ -17,9 +17,14 @@ import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
 import { NodePanel } from '@/components/node-panel';
+import { ButtonEdge } from './ButtonEdge';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
+};
+
+const edgeTypes = {
+  button: ButtonEdge
 };
 
 export function Pipeline(props: { pipeline: PipelineType }) {
@@ -51,7 +56,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [nodes, edges, fitView]);
 
-  const onNodeClick = (event: React.MouseEvent, node: Node) => {
+  const onNodeClick = (_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node as PhaseNode);
   };
 
@@ -62,6 +67,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
@@ -142,27 +148,31 @@ function getElements(pipeline: PipelineType): FlowPipeline {
 
   pipeline.phases.forEach((phase) => {
     const node: PhaseNode = {
-      id: phase.metadata.name,
+      id: phase.descriptor.metadata.name,
       type: 'phase',
       position: { x: 0, y: 0 },
       data: {
-        pipeline: pipeline.name,
-        metadata: phase.metadata,
-        source: phase.source,
-        resource: phase.resource,
-        depends_on: phase.depends_on
+        descriptor: phase.descriptor,
+        resource: phase.resource
       },
       extent: 'parent'
     };
     nodes.push(node);
+  });
 
-    if (phase.depends_on) {
-      edges.push({
-        id: `edge-${phase.depends_on}-${phase.metadata.name}`,
-        source: phase.depends_on,
-        target: phase.metadata.name
-      });
-    }
+  pipeline.edges.forEach((e) => {
+    const edge: PipelineEdge = {
+      id: `edge-${e.from.metadata.name}-${e.to.metadata.name}`,
+      type: 'button',
+      source: e.from.metadata.name,
+      target: e.to.metadata.name,
+      data: {
+        from: e.from,
+        to: e.to
+      }
+    };
+
+    edges.push(edge);
   });
 
   return { nodes, edges };

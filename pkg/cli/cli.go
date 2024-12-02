@@ -2,11 +2,8 @@ package cli
 
 import (
 	"context"
-	"errors"
-	"flag"
 	"fmt"
 	"iter"
-	"log/slog"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -15,8 +12,8 @@ import (
 )
 
 type System interface {
-	GetPipeline(name string) (core.Pipeline, error)
-	Pipelines() iter.Seq2[string, core.Pipeline]
+	GetPipeline(name string) (*core.Pipeline, error)
+	Pipelines() iter.Seq2[string, *core.Pipeline]
 }
 
 func Run(ctx context.Context, s System, args ...string) error {
@@ -24,10 +21,11 @@ func Run(ctx context.Context, s System, args ...string) error {
 	case "inspect":
 		return inspect(ctx, s, args[2:]...)
 	case "promote":
-		return promote(ctx, s, args[2:]...)
+		// return promote(ctx, s, args[2:]...)
 	default:
 		return fmt.Errorf("unexpected command %q (expected one of [inspect promote])", args[1])
 	}
+	return nil
 }
 
 func inspect(ctx context.Context, s System, args ...string) (err error) {
@@ -52,15 +50,16 @@ func inspect(ctx context.Context, s System, args ...string) (err error) {
 	}
 
 	if len(args) == 1 {
-		fmt.Fprintln(wr, "NAME\tDEPENDS_ON")
-		deps := pipeline.Dependencies()
+		fmt.Fprintln(wr, "NAME\tPROMOTES_TO")
+		edges := pipeline.Edges()
 		for phase := range pipeline.Phases() {
-			dependsName := ""
-			if depends, ok := deps[phase]; ok && depends != nil {
-				dependsName = depends.Metadata().Name
+			name := phase.Descriptor().Metadata.Name
+			outgoing := []string{}
+			for to := range edges[name] {
+				outgoing = append(outgoing, to)
 			}
 
-			fmt.Fprintf(wr, "%s\t%s\n", phase.Metadata().Name, dependsName)
+			fmt.Fprintf(wr, "%s\t%s\n", name, strings.Join(outgoing, ","))
 		}
 		return nil
 	}
@@ -87,7 +86,7 @@ func inspect(ctx context.Context, s System, args ...string) (err error) {
 	}
 	fmt.Fprintln(wr)
 
-	meta := phase.Metadata()
+	meta := phase.Descriptor().Metadata
 	digest, err := inst.Digest()
 	if err != nil {
 		return err
@@ -123,72 +122,72 @@ func (l labels) Set(v string) error {
 	return nil
 }
 
-func promote(ctx context.Context, s System, args ...string) error {
-	var (
-		labels = labels{}
-		all    bool
-		apply  bool
-	)
-
-	set := flag.NewFlagSet("promote", flag.ExitOnError)
-	set.Var(&labels, "label", "selector for filtering phases (format key=value)")
-	set.BoolVar(&apply, "apply", false, "actually run promotions (default dry-run)")
-	set.BoolVar(&all, "all", false, "promote all phases (ignores label filters)")
-	if err := set.Parse(args); err != nil {
-		return err
-	}
-
-	var logArgs []any
-	if !apply {
-		logArgs = append(logArgs, "note", "use --apply for promotion to take effect (dry run)")
-	}
-
-	if all {
-		// ignore labels if the all flag is passed
-		labels = nil
-	}
-
-	for k, v := range labels {
-		logArgs = append(logArgs, k, v)
-	}
-
-	slog.Info("starting promotion", logArgs...)
-
-	if set.NArg() == 0 {
-		if len(labels) == 0 && !all {
-			return errors.New("please pass --all if you want to promote all phases")
-		}
-
-		for _, pipeline := range s.Pipelines() {
-			if err := promoteAllPhases(ctx, pipeline.Phases(core.HasAllLabels(labels)), apply); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	pipeline, err := s.GetPipeline(set.Arg(0))
-	if err != nil {
-		return err
-	}
-
-	phases := pipeline.Phases(core.HasAllLabels(labels))
-	if set.NArg() < 2 {
-		return promoteAllPhases(ctx, phases, apply)
-	}
-
-	phase, err := pipeline.PhaseByName(set.Arg(1))
-	if err != nil {
-		return err
-	}
-
-	if err := promoteAllPhases(ctx, toIter(phase), apply); err != nil {
-		return err
-	}
-
-	return nil
-}
+//func promote(ctx context.Context, s System, args ...string) error {
+//	var (
+//		labels = labels{}
+//		all    bool
+//		apply  bool
+//	)
+//
+//	set := flag.NewFlagSet("promote", flag.ExitOnError)
+//	set.Var(&labels, "label", "selector for filtering phases (format key=value)")
+//	set.BoolVar(&apply, "apply", false, "actually run promotions (default dry-run)")
+//	set.BoolVar(&all, "all", false, "promote all phases (ignores label filters)")
+//	if err := set.Parse(args); err != nil {
+//		return err
+//	}
+//
+//	var logArgs []any
+//	if !apply {
+//		logArgs = append(logArgs, "note", "use --apply for promotion to take effect (dry run)")
+//	}
+//
+//	if all {
+//		// ignore labels if the all flag is passed
+//		labels = nil
+//	}
+//
+//	for k, v := range labels {
+//		logArgs = append(logArgs, k, v)
+//	}
+//
+//	slog.Info("starting promotion", logArgs...)
+//
+//	if set.NArg() == 0 {
+//		if len(labels) == 0 && !all {
+//			return errors.New("please pass --all if you want to promote all phases")
+//		}
+//
+//		for _, pipeline := range s.Pipelines() {
+//			if err := promoteAllPhases(ctx, pipeline.Phases(core.HasAllLabels(labels)), apply); err != nil {
+//				return err
+//			}
+//		}
+//
+//		return nil
+//	}
+//
+//	pipeline, err := s.GetPipeline(set.Arg(0))
+//	if err != nil {
+//		return err
+//	}
+//
+//	phases := pipeline.Phases(core.HasAllLabels(labels))
+//	if set.NArg() < 2 {
+//		return promoteAllPhases(ctx, phases, apply)
+//	}
+//
+//	phase, err := pipeline.PhaseByName(set.Arg(1))
+//	if err != nil {
+//		return err
+//	}
+//
+//	if err := promoteAllPhases(ctx, toIter(phase), apply); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
 
 func toIter[V any](v ...V) iter.Seq[V] {
 	return func(yield func(V) bool) {
@@ -200,16 +199,16 @@ func toIter[V any](v ...V) iter.Seq[V] {
 	}
 }
 
-func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase], apply bool) error {
-	for phase := range phases {
-		slog.Info("promoting phase", "phase", phase.Metadata().Name, "dry-run", !apply)
-
-		if apply {
-			if _, err := phase.Promote(ctx); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
+//func promoteAllPhases(ctx context.Context, phases iter.Seq[core.Phase], apply bool) error {
+//	for phase := range phases {
+//		slog.Info("promoting phase", "phase", phase.Metadata().Name, "dry-run", !apply)
+//
+//		if apply {
+//			if _, err := phase.Promote(ctx); err != nil {
+//				return err
+//			}
+//		}
+//	}
+//
+//	return nil
+//}

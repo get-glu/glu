@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/get-glu/glu/pkg/src/git"
+	"github.com/get-glu/glu/pkg/phases/git"
 	"github.com/google/go-github/v64/github"
 )
 

@@ -13,7 +13,7 @@ import (
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/credentials"
 	"github.com/get-glu/glu/pkg/scm/github"
-	srcgit "github.com/get-glu/glu/pkg/src/git"
+	srcgit "github.com/get-glu/glu/pkg/phases/git"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	giturls "github.com/whilp/git-urls"
