@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
@@ -240,11 +241,9 @@ func (s *System) Run() error {
 		defer cancel()
 
 		// call in reverse order to emulate pop semantics of a stack
-		for i := len(s.shutdownFuncs) - 1; i >= 0; i-- {
-			if fn := s.shutdownFuncs[i]; fn != nil {
-				if err := fn(shutdownCtx); err != nil {
-					slog.Error("shutting down", "error", err)
-				}
+		for _, fn := range slices.Backward(s.shutdownFuncs) {
+			if err := fn(shutdownCtx); err != nil {
+				slog.Error("shutting down", "error", err)
 			}
 		}
 
