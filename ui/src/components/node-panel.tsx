@@ -39,7 +39,7 @@ export function NodePanel({ node, isExpanded, onToggle }: NodePanelProps) {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <History className="h-4 w-4 transition-transform hover:scale-110" />
+                    <History className="h-4 w-4 transition-transform hover:-rotate-45 hover:scale-125" />
                   </TooltipTrigger>
                   <TooltipContent sideOffset={5} className="text-sm">
                     Show History
