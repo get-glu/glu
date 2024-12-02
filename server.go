@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Server struct {
@@ -36,9 +37,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupRoutes() {
+	s.router.Use(middleware.RequestID)
+	s.router.Use(middleware.RealIP)
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+
 	s.router.Mount("/debug", middleware.Profiler())
+	s.router.Mount("/metrics", promhttp.Handler())
 
 	if s.ui != nil {
 		s.router.Mount("/", http.FileServer(http.FS(s.ui)))

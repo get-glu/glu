@@ -18,6 +18,7 @@ type Config struct {
 	Credentials Credentials `glu:"credentials"`
 	Sources     Sources     `glu:"sources"`
 	Server      Server      `glu:"server"`
+	Metrics     Metrics     `glu:"metrics"`
 }
 
 type Sources struct {

@@ -196,6 +196,10 @@ func TestConfig(t *testing.T) {
 					Host:     "0.0.0.0",
 					Protocol: "http",
 				},
+				Metrics: Metrics{
+					Enabled:  true,
+					Exporter: MetricsExporterPrometheus,
+				},
 			},
 		},
 		{
@@ -221,6 +225,10 @@ func TestConfig(t *testing.T) {
 					Host:     "0.0.0.0",
 					Protocol: "http",
 				},
+				Metrics: Metrics{
+					Enabled:  true,
+					Exporter: MetricsExporterPrometheus,
+				},
 			},
 		},
 		{
@@ -245,6 +253,10 @@ func TestConfig(t *testing.T) {
 					Port:     8080,
 					Host:     "0.0.0.0",
 					Protocol: "http",
+				},
+				Metrics: Metrics{
+					Enabled:  true,
+					Exporter: MetricsExporterPrometheus,
 				},
 			},
 		},
