@@ -24,3 +24,9 @@ export interface Edge {
 export interface Result {
   annotations: Record<string, string>;
 }
+
+export interface State {
+  version: string;
+  resource: Resource;
+  annotations: Record<string, string>;
+}

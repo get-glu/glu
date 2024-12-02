@@ -7,11 +7,9 @@ export interface FlowPipeline {
   edges: PipelineEdge[];
 }
 
-export type PipelineNode = PhaseNode;
+type PipelineNodeData = Phase & Record<string, unknown>;
 
-type PhaseNodeData = Phase & Record<string, unknown>;
-
-export type PhaseNode = Node<PhaseNodeData, 'phase'>;
+export type PipelineNode = Node<PipelineNodeData, 'phase'>;
 
 export type PipelineEdge = Edge<{
   kind: string;

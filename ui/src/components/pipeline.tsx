@@ -14,7 +14,7 @@ import '@xyflow/react/dist/style.css';
 import { useTheme } from '@/components/theme-provider';
 import { PhaseNode as PhaseNodeComponent } from '@/components/node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
-import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
+import { FlowPipeline, PipelineEdge, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
 import { NodePanel } from '@/components/node-panel';
 import { ButtonEdge } from './button-edge';
@@ -30,7 +30,7 @@ const edgeTypes = {
 export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
   const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
-  const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<PipelineNode | null>(null);
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
   const { pipeline } = props;
@@ -57,7 +57,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   }, [nodes, edges, fitView]);
 
   const onNodeClick = (_event: React.MouseEvent, node: Node) => {
-    setSelectedNode(node as PhaseNode);
+    setSelectedNode(node as PipelineNode);
   };
 
   return (
@@ -92,11 +92,13 @@ export function Pipeline(props: { pipeline: PipelineType }) {
           <Controls />
         </ReactFlow>
       </div>
-      <NodePanel
-        node={selectedNode}
-        isExpanded={isPanelExpanded}
-        onToggle={() => setIsPanelExpanded(!isPanelExpanded)}
-      />
+      {selectedNode && (
+        <NodePanel
+          node={selectedNode}
+          isExpanded={isPanelExpanded}
+          onToggle={() => setIsPanelExpanded(!isPanelExpanded)}
+        />
+      )}
     </div>
   );
 }
@@ -147,7 +149,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
   const edges: PipelineEdge[] = [];
 
   pipeline.phases.forEach((phase) => {
-    const node: PhaseNode = {
+    const node: PipelineNode = {
       id: phase.descriptor.metadata.name,
       type: 'phase',
       position: { x: 0, y: 0 },
