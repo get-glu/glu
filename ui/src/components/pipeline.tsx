@@ -17,7 +17,7 @@ import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode, PipelineNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
 import { NodePanel } from '@/components/node-panel';
-import { ButtonEdge } from './ButtonEdge';
+import { ButtonEdge } from './button-edge';
 
 const nodeTypes = {
   phase: PhaseNodeComponent

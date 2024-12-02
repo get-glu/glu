@@ -9,10 +9,11 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/edges"
 	"github.com/get-glu/glu/pkg/pipelines"
+	"github.com/get-glu/glu/ui"
 )
 
 func run(ctx context.Context) error {
-	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")))
+	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")), glu.WithUI(ui.FS()))
 	config, err := system.Configuration()
 	if err != nil {
 		return err

@@ -14,7 +14,7 @@ type PhaseNodeData = Phase & Record<string, unknown>;
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
 
 export type PipelineEdge = Edge<{
-  king: string;
+  kind: string;
   from: Descriptor;
   to: Descriptor;
   can_perform: boolean;
