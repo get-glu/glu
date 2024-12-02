@@ -157,7 +157,7 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 	}
 
 	edges := make([]edgeResponse, 0)
-	for _, outgoing := range pipeline.Edges() {
+	for _, outgoing := range pipeline.EdgesFrom() {
 		for _, edge := range outgoing {
 			canPerform, err := edge.CanPerform(ctx)
 			if err != nil {
@@ -274,7 +274,7 @@ func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
 		to   = chi.URLParam(r, "to")
 	)
 
-	outgoing, ok := pipeline.Edges()[from]
+	outgoing, ok := pipeline.EdgesFrom()[from]
 	if !ok {
 		slog.Debug("edge not found", "path", r.URL.Path, "error", err, "from", from)
 		http.Error(w, "edge not found", http.StatusNotFound)

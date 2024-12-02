@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"strings"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/google/uuid"
@@ -103,20 +104,58 @@ type Result struct {
 }
 
 // AddEdge adds an edge to a Pipeline.
-func (p *Pipeline) AddEdge(e Edge) {
+func (p *Pipeline) AddEdge(e Edge) error {
 	outgoing, ok := p.edges[e.From().Metadata.Name]
 	if !ok {
 		outgoing = map[string]Edge{}
 		p.edges[e.From().Metadata.Name] = outgoing
 	}
 
+	if edge, ok := outgoing[e.To().Metadata.Name]; ok && e.Kind() == edge.Kind() {
+		return fmt.Errorf("edge already exists with the same kind: from %q to %q", edge.From().Metadata.Name, edge.To().Metadata.Name)
+	}
+
 	outgoing[e.To().Metadata.Name] = e
+
+	return nil
 }
 
-// Edges returns the set of edges as a map of "from" phase names to
+// EdgesFrom returns the set of edges as a map of "from" phase names to
 // map of "to" phase names to the edge instance itself
-func (p *Pipeline) Edges() map[string]map[string]Edge {
+func (p *Pipeline) EdgesFrom() map[string]map[string]Edge {
 	return p.edges
+}
+
+type EdgeOptions struct {
+	kind string
+}
+
+func WithKind(kind string) containers.Option[EdgeOptions] {
+	return func(eo *EdgeOptions) {
+		eo.kind = kind
+	}
+}
+
+// Edges returns all edges as a sequence
+func (p *Pipeline) Edges(o ...containers.Option[EdgeOptions]) iter.Seq[Edge] {
+	var opts EdgeOptions
+	containers.ApplyAll(&opts, o...)
+
+	return iter.Seq[Edge](func(yield func(Edge) bool) {
+		for _, out := range p.edges {
+			for _, edge := range out {
+				if opts.kind != "" {
+					if !strings.EqualFold(edge.Kind(), opts.kind) {
+						continue
+					}
+				}
+
+				if !yield(edge) {
+					return
+				}
+			}
+		}
+	})
 }
 
 // PhaseOptions scopes a call to get phases from a pipeline.

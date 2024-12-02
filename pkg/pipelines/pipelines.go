@@ -49,20 +49,26 @@ func (b *PipelineBuilder[R]) Build(system *glu.System) error {
 	return nil
 }
 
-func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], error)) *PhaseBuilder[R] {
+func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], error)) (next *PhaseBuilder[R]) {
+	next = &PhaseBuilder[R]{PipelineBuilder: b}
 	if b.err != nil {
-		return &PhaseBuilder[R]{PipelineBuilder: b}
+		return
 	}
 
 	phase, err := fn(b)
 	if err != nil {
 		b.err = err
-		return &PhaseBuilder[R]{PipelineBuilder: b}
+		return
 	}
 
-	b.pipeline.AddPhase(phase)
+	if err := b.pipeline.AddPhase(phase); err != nil {
+		b.err = err
+		return
+	}
 
-	return &PhaseBuilder[R]{PipelineBuilder: b, phase: phase}
+	next.phase = phase
+
+	return
 }
 
 type PhaseBuilder[R glu.Resource] struct {
@@ -70,22 +76,31 @@ type PhaseBuilder[R glu.Resource] struct {
 	phase edges.Phase[R]
 }
 
-func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error)) *PhaseBuilder[R] {
+func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error)) (next *PhaseBuilder[R]) {
+	next = &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
 	if b.err != nil {
-		return &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
+		return
 	}
 
 	to, err := fn(b)
 	if err != nil {
 		b.err = err
-
-		return &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
+		return
 	}
 
-	b.pipeline.AddPhase(to)
-	b.pipeline.AddEdge(edges.Promotes(b.phase, to))
+	if err := b.pipeline.AddPhase(to); err != nil {
+		b.err = err
+		return
+	}
 
-	return &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder, phase: to}
+	if err := b.pipeline.AddEdge(edges.Promotes(b.phase, to)); err != nil {
+		b.err = err
+		return
+	}
+
+	next.phase = to
+
+	return
 }
 
 type Builder[R glu.Resource] interface {
