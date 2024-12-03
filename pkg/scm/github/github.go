@@ -60,6 +60,13 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix s
 }
 
 func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts git.ProposalOption) error {
+	slog.Debug("creating proposal",
+		"branch", proposal.Branch,
+		"base", proposal.BaseBranch,
+		"title", proposal.Title,
+		"body", proposal.Body,
+	)
+
 	pr, _, err := s.client.PullRequests.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
 		Base:  github.String(proposal.BaseBranch),
 		Head:  github.String(proposal.Branch),

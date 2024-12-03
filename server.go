@@ -291,7 +291,7 @@ func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
 	result, err := edge.Perform(r.Context())
 	if err != nil {
 		if errors.Is(err, core.ErrNoChange) {
-			slog.Debug("promotion produced no change")
+			slog.Debug("no change occurred")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}

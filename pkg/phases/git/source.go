@@ -123,23 +123,29 @@ type Branched interface {
 	Branch(phase core.Descriptor) string
 }
 
-func (g *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
-	return g.GetResource(ctx)
+func (p *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
+	return p.GetResource(ctx)
 }
 
-func (g *Phase[R]) GetResource(ctx context.Context) (R, error) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+func (p *Phase[R]) GetResource(ctx context.Context) (R, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-	r := g.newFn()
-	desc := g.Descriptor()
+	return p.getResource(ctx)
+}
+
+func (p *Phase[R]) getResource(ctx context.Context) (R, error) {
+	var (
+		r    = p.newFn()
+		desc = p.Descriptor()
+	)
 
 	opts := []containers.Option[git.ViewUpdateOptions]{}
 	if branched, ok := core.Resource(r).(Branched); ok {
 		opts = append(opts, git.WithBranch(branched.Branch(desc)))
 	}
 
-	if err := g.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
+	if err := p.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
 		return r.ReadFrom(ctx, desc, fs)
 	}, opts...); err != nil {
 		return r, err
@@ -148,12 +154,12 @@ func (g *Phase[R]) GetResource(ctx context.Context) (R, error) {
 	return r, nil
 }
 
-func (g *Phase[R]) History(ctx context.Context) ([]core.State, error) {
-	if g.log == nil {
+func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
+	if p.log == nil {
 		return nil, nil
 	}
 
-	return g.log.History(ctx, g.Descriptor())
+	return p.log.History(ctx, p.Descriptor())
 }
 
 func (p *Phase[R]) branch() string {
@@ -207,7 +213,7 @@ type proposalBody[R Resource] interface {
 	ProposalBody(phase core.Descriptor, from R) (string, error)
 }
 
-func (p *Phase[R]) Update(ctx context.Context, from, to R) (map[string]string, error) {
+func (p *Phase[R]) Update(ctx context.Context, to R) (map[string]string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -216,6 +222,11 @@ func (p *Phase[R]) Update(ctx context.Context, from, to R) (map[string]string, e
 	err := p.repo.Fetch(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching upstream during update: %w", err)
+	}
+
+	from, err := p.getResource(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	// use the target resources branch if it implementes an override
@@ -254,10 +265,17 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 		return nil, fmt.Errorf("resolving base branch %q: %w", baseBranch, err)
 	}
 
+	fromDigest, err := from.Digest()
+	if err != nil {
+		return nil, err
+	}
+
 	digest, err := to.Digest()
 	if err != nil {
 		return nil, err
 	}
+
+	slog.Debug("proposing update", "from", fromDigest, "to", digest)
 
 	// create branch name and check if this phase, resource and state has previously been observed
 	var (
@@ -307,22 +325,7 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 	}
 
 	if head, err := p.updateAndPush(ctx, from, to, options...); err != nil {
-		if !errors.Is(err, core.ErrNoChange) {
-			return nil, err
-		}
-
-		// we check here to see if the update produced no changes due to either
-		// the branch previously existing and had been advanced already or
-		// the branch was just created and matches the base after update
-		// if it is the latter then our update produces no change
-		// otherwise, we just need to open the pull request again and continue
-		if baseRev.String() == head {
-			return nil, core.ErrNoChange
-		}
-	}
-
-	fromDigest, err := from.Digest()
-	if err != nil {
+		slog.Error("while attempting update", "head", head, "error", err)
 		return nil, err
 	}
 
@@ -361,10 +364,12 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 }
 
 func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, opts ...containers.Option[git.ViewUpdateOptions]) (string, error) {
-	slog := slog.With("name", p.meta.Name)
-
 	desc := p.Descriptor()
 	update := func(fs fs.Filesystem) (message string, err error) {
+		if err := to.WriteTo(ctx, desc, fs); err != nil {
+			return "", err
+		}
+
 		message = fmt.Sprintf("Update %s", p.meta.Name)
 		if m, ok := core.Resource(to).(commitMessage[R]); ok {
 			message, err = m.CommitMessage(desc, from)
@@ -373,18 +378,12 @@ func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, opts ...contai
 			}
 		}
 
-		if err := to.WriteTo(ctx, desc, fs); err != nil {
-			return "", err
-		}
-
 		return message, nil
 	}
 
 	head, err := p.repo.UpdateAndPush(ctx, update, opts...)
 	if err != nil {
 		if errors.Is(err, git.ErrEmptyCommit) {
-			slog.Debug("promotion produced no changes")
-
 			return "", core.ErrNoChange
 		}
 

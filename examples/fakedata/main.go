@@ -115,6 +115,6 @@ func (m *MockPhase) History(_ context.Context) ([]core.State, error) {
 	return nil, nil
 }
 
-func (m *MockPhase) Update(_ context.Context, from, to *MockResource) (map[string]string, error) {
+func (m *MockPhase) Update(_ context.Context, to *MockResource) (map[string]string, error) {
 	return map[string]string{}, nil
 }

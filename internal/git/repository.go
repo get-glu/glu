@@ -452,7 +452,8 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 
 	if r.remote != nil {
 		local := plumbing.NewBranchReferenceName(branch)
-		if err := r.repo.Storer.SetReference(plumbing.NewHashReference(local, commit.Hash)); err != nil {
+		if err := r.repo.Storer.SetReference(
+			plumbing.NewHashReference(local, commit.Hash)); err != nil {
 			return hash, err
 		}
 
@@ -550,7 +551,7 @@ func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.O
 
 	remoteRef := plumbing.NewRemoteReferenceName(remoteName, branch)
 	if _, err := r.repo.Reference(remoteRef, true); err == nil {
-		// reference already exists
+		slog.Debug("branch already exists")
 		return nil
 	}
 

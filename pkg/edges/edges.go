@@ -17,7 +17,7 @@ type Phase[R core.Resource] interface {
 // UpdatableSource is a source through which the phase can promote resources to new versions
 type UpdatablePhase[R core.Resource] interface {
 	Phase[R]
-	Update(_ context.Context, from, to R) (map[string]string, error)
+	Update(_ context.Context, to R) (map[string]string, error)
 }
 
 var _ core.Edge = (*PromotionEdge[core.Resource])(nil)
@@ -56,11 +56,11 @@ func (s *PromotionEdge[R]) Perform(ctx context.Context) (r core.Result, err erro
 	defer func() {
 		s.logger.Debug("Promotion finished")
 		if err != nil {
-			err = fmt.Errorf("promoting from %s to %s: %w", s.from, s.to, err)
+			err = fmt.Errorf("promoting from %s to %s: %w", s.from.Descriptor().Metadata.Name, s.to.Descriptor().Metadata.Name, err)
 		}
 	}()
 
-	from, to, synced, err := s.synced(ctx)
+	from, synced, err := s.synced(ctx)
 	if err != nil {
 		return r, err
 	}
@@ -70,7 +70,7 @@ func (s *PromotionEdge[R]) Perform(ctx context.Context) (r core.Result, err erro
 		return r, nil
 	}
 
-	if r.Annotations, err = s.to.Update(ctx, from, to); err != nil {
+	if r.Annotations, err = s.to.Update(ctx, from); err != nil {
 		return r, err
 	}
 
@@ -78,34 +78,34 @@ func (s *PromotionEdge[R]) Perform(ctx context.Context) (r core.Result, err erro
 }
 
 func (s *PromotionEdge[R]) CanPerform(ctx context.Context) (bool, error) {
-	_, _, synced, err := s.synced(ctx)
+	_, synced, err := s.synced(ctx)
 	return synced, err
 }
 
-func (s *PromotionEdge[R]) synced(ctx context.Context) (from, to R, synced bool, err error) {
+func (s *PromotionEdge[R]) synced(ctx context.Context) (from R, synced bool, err error) {
 	from, err = s.from.GetResource(ctx)
 	if err != nil {
-		return from, to, false, err
-	}
-
-	to, err = s.to.GetResource(ctx)
-	if err != nil {
-		return from, to, false, err
+		return from, false, err
 	}
 
 	fromDigest, err := from.Digest()
 	if err != nil {
-		return from, to, false, err
+		return from, false, err
+	}
+
+	to, err := s.to.GetResource(ctx)
+	if err != nil {
+		return from, false, err
 	}
 
 	toDigest, err := to.Digest()
 	if err != nil {
-		return from, to, false, err
+		return from, false, err
 	}
 
 	if fromDigest == toDigest {
-		return from, to, true, nil
+		return from, true, nil
 	}
 
-	return from, to, false, nil
+	return from, false, nil
 }
