@@ -61,4 +61,4 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   );
 };
 
-export { PhaseNode as PhaseNode };
+export { PhaseNode };

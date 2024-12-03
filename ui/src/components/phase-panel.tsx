@@ -20,7 +20,7 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
 
   return (
     <div className="flex flex-col border-t bg-background">
-      <div className="flex items-center justify-between px-4 pt-2">
+      <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-2">
           {node.data.kind === 'oci' ? (
             <Package className="h-4 w-4" />
