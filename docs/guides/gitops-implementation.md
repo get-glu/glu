@@ -437,24 +437,41 @@ When it comes to writing, again we look to the file in the path dictated by meta
 Here, we're taking the image digest from our receiving `r *AppResource` and setting it on the target container in our deployment pod spec.
 Finally, we're rewriting our target file with the newly updated contents of our deployment.
 
-## The Triggers
+## Edges
 
-Triggers are used to automate promotions based on some event or schedule.
-Currently, scheduled triggers are the only prebuilt triggers available (we intend to add more, e.g. on oci or git push).
+> A note on edges
 
-```go
-system.AddTrigger(
-	schedule.New(
-		schedule.WithInterval(10*time.Second),
-		schedule.MatchesLabel("env", "staging"),
-		// alternatively, the phase instance can be target directly with:
-		// glu.ScheduleMatchesPhase(stagingPhase),
-	),
-)
+The pipeline builder we have used in this guide has implicitly created edges between phases on calls to `PromotesTo`.
+Edges expressed the dependencies and operations that can occur between connected phases.
+Edges have a from source and to destination, as well as a kind and a `Perform()` method.
+
+Here we have created `promotion` kind edges (currently the only out-of-the-box edge kind available in Glu).
+The edge kind will update the `to` phase, with the version of the resource found in the `from` phase.
+It only does this given that the two edges digests differ (are not equal).
+
+## Triggers
+
+Triggers are used to automate performing the actions associated with edges.
+When creating an edge, it can be decorated with a trigger (an triggerable edge is an edge that exposes a `RunTriggers` method).
+
+The `triggers` package provides a utility for decorating edges with triggers.
+These will only get scheduled when Glu is run in serving mode (not as a CLI).
+
+The `pipelines.PhaseBuilder[R]` has a simplified method for registering triggers on promotion kind edges when calling `PromotesTo()`:
+
+```diff
+PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
+   return pipelines.GitPhase(b, glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")), "gitopsexample")
+-}).
++}, schedule.New(
++    schedule.WithInterval(10*time.Second),
++)).
 ```
 
-Here, we configure the system to attempt a promotion on any phase with a particular label pair (`"env" == "staging"`) every `10s`.
-Remember, a phase will only perform a real promotion if the resource derived from the two sources differs (based on comparing the result of `Digest()`).
+The diff above demonstrates adding a scheduled trigger (calls perform every 10 seconds) to the resulting promotion edge.
+
+Currently, scheduled triggers are the only prebuilt triggers available (we intend to add more, e.g. on oci or git push).
+Note, Glu will only perform a real promotion if the resources derived from the two phases differs (based on comparing the result of `Digest()`).
 
 ## Now Run
 
