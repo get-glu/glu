@@ -8,15 +8,16 @@ import (
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/edges"
 	"github.com/get-glu/glu/pkg/fs"
-	"github.com/get-glu/glu/pkg/pipelines"
 	"github.com/get-glu/glu/pkg/phases/git"
 	"github.com/get-glu/glu/pkg/phases/oci"
+	"github.com/get-glu/glu/pkg/pipelines"
+	"github.com/get-glu/glu/ui"
 	"github.com/opencontainers/go-digest"
 	"gopkg.in/yaml.v3"
 )
 
 func run(ctx context.Context) error {
-	system := glu.NewSystem(ctx, glu.Name("mypipelines"))
+	system := glu.NewSystem(ctx, glu.Name("mypipelines"), glu.WithUI(ui.FS()))
 	config, err := system.Configuration()
 	if err != nil {
 		return err

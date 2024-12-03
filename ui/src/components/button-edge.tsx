@@ -80,7 +80,7 @@ export function ButtonEdge({
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
       <EdgeLabelRenderer>
         <div
-          className="nodrag nopan pointer-events-auto absolute"
+          className="nodrag nopan pointer-events-auto absolute mt-4"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
           }}
