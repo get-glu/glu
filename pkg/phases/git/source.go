@@ -87,10 +87,17 @@ type ProposalOption struct {
 
 // ProposeChanges configures the phase to propose the change (via PR or MR)
 // as opposed to directly integrating it into the target trunk branch.
-func ProposeChanges[A Resource](opts ProposalOption) containers.Option[Phase[A]] {
-	return func(i *Phase[A]) {
+func ProposeChanges[R Resource](opts ProposalOption) containers.Option[Phase[R]] {
+	return func(i *Phase[R]) {
 		i.proposeChange = true
 		i.proposalOptions = opts
+	}
+}
+
+// WithLog sets of the reflog on the phase for tracking history
+func WithLog[R Resource](log RefLog[R]) containers.Option[Phase[R]] {
+	return func(p *Phase[R]) {
+		p.log = log
 	}
 }
 
