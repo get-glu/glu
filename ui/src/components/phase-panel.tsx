@@ -25,7 +25,6 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
             <GitBranch className="h-4 w-4" />
           )}
           <h2 className="text-lg font-semibold">{descriptor.metadata.name}</h2>
-          <PhaseHistory pipeline={descriptor.pipeline} phase={descriptor.metadata.name} />
         </div>
         <Button variant="ghost" size="sm" onClick={onToggle}>
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}

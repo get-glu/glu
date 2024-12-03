@@ -3,7 +3,6 @@ package oci
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 
 	"github.com/get-glu/glu/pkg/containers"
@@ -131,7 +130,8 @@ func (s *Phase[R]) GetResource(ctx context.Context) (R, error) {
 }
 
 func (s *Phase[A]) History(ctx context.Context) ([]core.State, error) {
-	return nil, errors.New("not implemented")
+	// TODO: implement
+	return []core.State{}, nil
 }
 
 var (
