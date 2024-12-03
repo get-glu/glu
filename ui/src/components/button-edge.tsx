@@ -80,7 +80,7 @@ export function ButtonEdge({
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
       <EdgeLabelRenderer>
         <div
-          className="nodrag nopan pointer-events-auto absolute mt-4"
+          className="nodrag nopan pointer-events-auto absolute"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`
           }}
@@ -101,7 +101,7 @@ export function ButtonEdge({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <CircleArrowUp
-                    className="h-4 w-4 flex-shrink-0 cursor-pointer transition-transform hover:rotate-90 hover:text-green-400"
+                    className="h-4 w-4 flex-shrink-0 cursor-pointer fill-background transition-transform hover:rotate-90 hover:text-green-400"
                     onClick={() => setDialogOpen(true)}
                   />
                 </TooltipTrigger>
