@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/edges"
@@ -11,6 +12,7 @@ import (
 	"github.com/get-glu/glu/pkg/phases/git"
 	"github.com/get-glu/glu/pkg/phases/oci"
 	"github.com/get-glu/glu/pkg/pipelines"
+	"github.com/get-glu/glu/pkg/triggers/schedule"
 	"github.com/get-glu/glu/ui"
 	"github.com/opencontainers/go-digest"
 	"gopkg.in/yaml.v3"
@@ -35,7 +37,9 @@ func run(ctx context.Context) error {
 				git.ProposeChanges[*CheckoutResource](git.ProposalOption{
 					Labels: []string{"automerge"},
 				}))
-		}).
+		}, schedule.New(
+			schedule.WithInterval(30*time.Second),
+		)).
 		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
 			// build a phase for the production environment which source from the git repository
 			// configure it to promote from the staging git phase

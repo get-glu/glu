@@ -98,6 +98,14 @@ type Edge interface {
 	CanPerform(context.Context) (bool, error)
 }
 
+// TriggerableEdge is an edge that has an additional method RunTriggers.
+// This method should schedule any necessary dependencies needed to automate
+// calling perform on the respectibe edge (e.g. start background schedules).
+type TriggerableEdge interface {
+	Edge
+	RunTriggers(context.Context) error
+}
+
 // Result is a type that carries annotations relating to the result of calling Perform on an edge.
 type Result struct {
 	Annotations map[string]string `json:"annotations"`
@@ -121,7 +129,7 @@ func (p *Pipeline) AddEdge(e Edge) error {
 }
 
 // EdgesFrom returns the set of edges as a map of "from" phase names to
-// map of "to" phase names to the edge instance itself
+// map of "to" phase names to the edge instance itself.
 func (p *Pipeline) EdgesFrom() map[string]map[string]Edge {
 	return p.edges
 }

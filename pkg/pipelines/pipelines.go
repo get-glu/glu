@@ -6,6 +6,7 @@ import (
 	"github.com/get-glu/glu/pkg/edges"
 	srcgit "github.com/get-glu/glu/pkg/phases/git"
 	srcoci "github.com/get-glu/glu/pkg/phases/oci"
+	"github.com/get-glu/glu/pkg/triggers"
 )
 
 var _ Builder[glu.Resource] = (*PipelineBuilder[glu.Resource])(nil)
@@ -76,7 +77,7 @@ type PhaseBuilder[R glu.Resource] struct {
 	phase edges.Phase[R]
 }
 
-func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error)) (next *PhaseBuilder[R]) {
+func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error), ts ...triggers.Trigger) (next *PhaseBuilder[R]) {
 	next = &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
 	if b.err != nil {
 		return
@@ -93,7 +94,7 @@ func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase
 		return
 	}
 
-	if err := b.pipeline.AddEdge(edges.Promotes(b.phase, to)); err != nil {
+	if err := b.pipeline.AddEdge(triggers.Edge(edges.Promotes(b.phase, to), ts...)); err != nil {
 		b.err = err
 		return
 	}

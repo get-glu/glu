@@ -27,6 +27,18 @@ env
     └── service.yaml
 ```
 
+Our goal is to automate updating those `deployment.yaml` files in each environment specific directory.
+In particular, we're going to update the pod spec's container image version:
+
+```yaml
+# ...
+spec:
+  containers:
+    # ...
+    image: ghcr.io/get-glu/gitops-example/app@sha256:d0ae5e10d27115a8bd245f989377c5eca2f74878b8a65bc4db21fd096551f802
+# ...
+```
+
 Glu doesn't perform deployments directly (we're using FluxCD for that in this situation).
 However, it instead keeps changes flowing in an orderly fashion from OCI through Git.
 
@@ -34,17 +46,16 @@ In Glu, we will:
 
 1. Implement a _system_
 2. Add a single release _pipeline_
-3. Define three phases _oci_ (to mode the source of new versions), _staging_ and _production_
+3. Define three phases _oci_ (to track the source of new versions), _staging_ and _production_
 
 At the end, we will add a trigger for the staging phase to attempt promotions based on a schedule.
 
-## The System
+## System
 
-Every Glu codebase starts with a `glu.System`. A system is a container for your pipelines, and entrypoint for command line interactions and starting the built-in server, as well as a scheduler for running promotions based on triggers.
+Every Glu codebase starts with a `glu.System`. A system is a container for your pipelines, an entrypoint for command line interactions, a server for running promotions, as well as a scheduler for triggering promotions based on conditions.
 
 In the GitOps example, you will find a `main.go`. In this, you will find `main()` function, which calls a function `run(ctx) error`.
-
-This `run()` function is where we first get introduced to our new glu system instance.
+This function is where we first get introduced to our new glu system instance.
 
 We start by creating a system and getting our pre-built configuration (this comes in handy configuring our phases later).
 
@@ -104,15 +115,26 @@ In this example, we have a single pipeline we have chosen to call `gitops-exampl
 
 > We tend to model our pipelines around the particular applications they deliver.
 
-To add a new pipeline, we normally call `AddPipeline()`, which takes an instance of the `glu.Pipeline` interface.
+To add a new pipeline, we normally call `system.AddPipeline()`, which takes an instance of the `glu.Pipeline` interface:
 
 ```go
 system.AddPipeline(glu.Pipeline)
 ```
 
-However, our handy `pipelines.PipelineBuilder` has a final method `build.Build(system)` for registering the built pipeline at the end of the building phase.
+However, our handy `pipelines.PipelineBuilder` has a final method `build.Build(system)` for registering the built pipeline at the end of the creating and adding all our phases:
 
-## The Phases
+```go
+if err := pipelines.NewBuilder(config, glu.Name("gitops-example-app"), func() *AppResource {
+    return &AppResource{
+        Image: "ghcr.io/get-glu/gitops-example/app",
+    }
+// ...
+}).Build(system); err != nil {
+    return err
+}
+```
+
+## Phases
 
 Now that we have our pipeline named and our sources configured, we can begin defining our phases and their promotion dependencies.
 
@@ -125,13 +147,16 @@ Remember, we said that we plan to define three phases:
 ### OCI
 
 ```go
-builder.NewPhase(func(b pipelines.Builder[*AppResource]) (edges.Phase[*AppResource], error) {
+}).NewPhase(func(b pipelines.Builder[*AppResource]) (edges.Phase[*AppResource], error) {
     // build a phase which sources from the OCI repository
     return pipelines.OCIPhase(b, glu.Name("oci"), "app")
 })
 ```
 
-The initial phase is nice and simple. We're going to use the `NewPhase` method on the builder to make a new phase using our builder, some metadata to identify it and a source name `"app"`.
+The initial phase is nice and simple. We're going to use the `NewPhase` method on the builder to make a new phase using our builder.
+This method takes a function, which is provided with a builder type and expects you to return a typed phase.
+Here we are using another utility function `pipelines.OCIPhase`.
+This takes the builder we're provider, along with some metadata to identify it and a source name `"app"`.
 
 #### Configuration
 
@@ -157,26 +182,39 @@ credentials:
 
 ### Git
 
+The next two phases we're going to build will be backed by Git.
+This is where we will configure access to configuration stored in respective paths in our repository.
+
 #### Staging
 
 ```go
-oci.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
+//...
+.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
     return pipelines.GitPhase(b, glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")), "gitopsexample")
 })
 ```
 
-Again, here we give the phase the builder, some phase metadata (this time with a helpful label) and pass additional dependencies (pipeline and git source).
+Again, here we are building a new phase, passing it a function which takes a builder.
 However, this time we did not use `NewPhase`, but instead used the handy `PromotesTo` method.
-This is a similar signature and it we chain it directly after building the OCI phase.
-This particular function creates a _promotion_ edge **to** the _staging_ phase **from** the OCI _phase_.
-In other words, we make it so that you can promote from _oci_ to _staging_.
+This has a similar signature to `NewPhase`, except instead we're chaining it directly after building the OCI phase.
 
+This particular function both creates a phase and it creates a _promotion_ edge **to** the _staging_ phase **from** the OCI _phase_.
+In other words, we make it so that you can promote from _oci_ to _staging_.
 This is how we create the promotion paths from one phase to the next in Glu.
+
+Here we're returning an `edges.UpdatePhase[*AppResource]` instead of just an `edges.Phase[*AppResource]`.
+This interface includes an additional method to the phase abstraction, which means the phase is writable.
+In order to support promoting to a phase, it needs to be writable so that we can update it.
+
+Also, this time we use `pipelines.GitPhase` instead of `pipelines.OCIPhase`.
+This gives us a phase which is backed by configuration in a Git Repository.
+This function, similarly to OCI, takes a builder, some identifying metadata and a source name.
 
 #### Production
 
 ```go
-staging.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
+//...
+.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
     return pipelines.GitPhase(b, glu.Name("production", glu.Label("url", "http://0.0.0.0:30082")), "gitopsexample")
 })
 ```
@@ -267,7 +305,7 @@ In our example, we return the actual image digest field, as this is the unique d
 This part is important, and the functions you need to implement depend on the sources you're using.
 Whenever you attempt to integrate a source into a phase for a given resource type, the source will add further compile constraints.
 
-#### oci.Source[Resource]
+#### oci.Phase[Resource]
 
 ```go
 type Resource interface {
@@ -276,7 +314,7 @@ type Resource interface {
 }
 ```
 
-The OCI source (currently a read-only phase source) requires a single method `ReadFromOCIDescriptor(...)`.
+The OCI phase (currently a read-only phase) requires a method `ReadFromOCIDescriptor(...)`.
 By implementing this method, you can combine your resource type and this source type into a phase for your pipeline.
 The method should extract any necessary details onto your type structure.
 These details should be the ones that change and are copied between phases.
@@ -294,7 +332,7 @@ func (c *AppResource) ReadFromOCIDescriptor(d v1.Descriptor) error {
 In our example, we're interested in moving the OCI image digest from one phase to the next.
 So, we extract that from the image descriptor provided to this function and set it on the field we defined on our type.
 
-#### git.Source[Resource]
+#### git.Phase[Resource]
 
 ```go
 type Resource interface {
@@ -309,7 +347,7 @@ This source is particularly special, as it takes care of details such as checkin
 Instead, all it requires the implementer to do is explain how to read and write the definition to a target repository root tree.
 The source then takes care of the rest of the contribution lifecycle.
 
-> There are further ways to configure the resulting commit message, PR title, and body via other methods on your type.
+> There are also further ways to configure the resulting commit message, PR title, and body via other methods on your type.
 
 **GitOps Example: Reading from filesystem**
 
@@ -340,7 +378,7 @@ func (r *AppResource) ReadFrom(_ context.Context, phase core.Descriptor, fs fs.F
 
 Here we see that we read a file at a particular path: `fmt.Sprintf("env/%s/deployment.yaml", phase.Descriptor.Name)`
 
-The metadata supplied by Glu here happens to be the phases metadata.
+The descriptor supplied by Glu here happens to be the phases identifiers and metadata.
 This is how we can read different paths, dependent on the phase being read or written to.
 
 This particular implementation reads the file as a Kubernetes deployment encoded as YAML.
@@ -433,15 +471,15 @@ Additionally, if you have configured any triggers and are invoking your glu pipe
 
 ## Recap
 
-OK, that was a lot. I appreciate you taking the time to walk through this journey!
+OK, that was a lot of concepts to learn (hopefully, not too much code to write (~<200 LOC)).
+I appreciate you taking the time to walk through this journey!
 
 We have:
 
 - Created a glu system to orchestrate our promotion pipelines with
-- Configured two sources (OCI and Git) for reading and writing to
-- Declared three phases to promote change between
+- Declared three phases (based over OCI and Git repositories) to promote change between
 - Defined a resource type for carrying our promotion material through the pipeline
 
-The byproduct of doing all this is that we get an instant API for introspecting and manually promoting changes through pipelines.
+The byproduct of doing all this is that we get an instant API for introspecting and promoting changes through pipelines.
+Promotions can be triggered manually through the UI and API, or configured to run on a schedule.
 All changes flow in and out of our disparate sources, via whichever encoding formats/configuration languages and filesystem layouts we choose.
-Additionally, we can add a dashboard interface for humans to read and interact with, in order to trigger manual promotions.
