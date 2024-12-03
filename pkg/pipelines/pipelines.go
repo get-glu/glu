@@ -127,7 +127,7 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 
 	ctx := builder.Context()
 
-	phase, err := srcgit.NewPhase(
+	phase, err := srcgit.New(
 		ctx,
 		builder.PipelineName(),
 		meta,
@@ -155,6 +155,7 @@ func OCIPhase[R srcoci.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		meta,
 		builder.New,
 		repo,
+		opts...,
 	)
 
 	return phase, nil

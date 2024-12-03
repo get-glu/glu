@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/edges"
 	"github.com/opencontainers/go-digest"
@@ -44,7 +45,7 @@ type Phase[R Resource] struct {
 	resolver Resolver
 }
 
-func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolver Resolver) *Phase[R] {
+func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolver Resolver, opts ...containers.Option[Phase[R]]) *Phase[R] {
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
@@ -55,6 +56,8 @@ func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolv
 		newFn:    newFn,
 		resolver: resolver,
 	}
+
+	containers.ApplyAll(phase, opts...)
 
 	meta.Annotations[ANNOTATION_OCI_IMAGE_URL] = phase.resolver.Reference()
 

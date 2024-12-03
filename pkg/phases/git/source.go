@@ -101,7 +101,7 @@ func WithLog[R Resource](log RefLog[R]) containers.Option[Phase[R]] {
 	}
 }
 
-func NewPhase[R Resource](
+func New[R Resource](
 	ctx context.Context,
 	pipeline string,
 	meta core.Metadata,

@@ -46,14 +46,16 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
         </div>
       )}
 
-      <div className="mt-2 flex w-full flex-col">
+      <div className="mt-4 flex w-full flex-wrap gap-2">
         {phase.descriptor.metadata.labels &&
-          Object.entries(phase.descriptor.metadata.labels).length > 0 &&
-          Object.entries(phase.descriptor.metadata.labels).map(([key, value]) => (
-            <div key={`${key}-${value}`} className="mb-2 flex">
-              <Label labelKey={key} value={value} />
-            </div>
-          ))}
+          Object.keys(phase.descriptor.metadata.labels).length > 0 &&
+          Object.entries(phase.descriptor.metadata.labels)
+            .slice(0, 3)
+            .map(([key, value]) => (
+              <div key={`${key}-${value}`} className="mb-2 flex">
+                <Label labelKey={key} value={value} />
+              </div>
+            ))}
       </div>
 
       <Handle type="target" position={Position.Left} style={{ left: -8 }} />

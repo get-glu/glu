@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Label } from './label';
 import { useGetPhaseHistoryQuery } from '@/services/api';
 import { PhaseHistory } from './phase-history';
+import { ScrollArea } from './ui/scroll-area';
 
 interface PhasePanelProps {
   node: PhaseNode;
@@ -13,9 +14,12 @@ interface PhasePanelProps {
 }
 
 export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
+  const descriptor = node.data.descriptor;
+  const resource = node.data.resource;
+
   const { data: history } = useGetPhaseHistoryQuery({
-    pipeline: node.data.descriptor.pipeline,
-    phase: node.data.descriptor.metadata.name
+    pipeline: descriptor.pipeline,
+    phase: descriptor.metadata.name
   });
 
   return (
@@ -27,8 +31,8 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
           ) : (
             <GitBranch className="h-4 w-4" />
           )}
-          <h2 className="text-lg font-semibold">{node.data.descriptor.metadata.name}</h2>
-          {history && <PhaseHistory phase={node.data.descriptor.metadata.name} history={history} />}
+          <h2 className="text-lg font-semibold">{descriptor.metadata.name}</h2>
+          {history && <PhaseHistory phase={descriptor.metadata.name} history={history} />}
         </div>
         <Button variant="ghost" size="sm" onClick={onToggle}>
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -42,33 +46,32 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
         )}
       >
         <div className="overflow-hidden p-4">
-          <div>
-            <h3 className="text-sm font-medium">Details</h3>
-            <div className="mt-2 space-y-2">
-              <div className="text-sm">
-                <span className="text-muted-foreground">Pipeline: </span>
-                {node.data.descriptor.pipeline}
-              </div>
-              <div className="text-sm">
-                <span className="text-muted-foreground">Digest: </span>
-                <span className="truncate font-mono text-xs">{node.data.resource.digest}</span>
-              </div>
+          <h3 className="text-sm font-medium">Details</h3>
+          <div className="mt-2 space-y-2">
+            <div className="text-sm">
+              <span className="text-muted-foreground">Pipeline: </span>
+              {descriptor.pipeline}
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Digest: </span>
+              <span className="truncate font-mono text-xs">{resource.digest}</span>
             </div>
           </div>
         </div>
 
-        <div className="overflow-hidden p-4">
-          {node.data.descriptor.metadata.labels &&
-            Object.keys(node.data.descriptor.metadata.labels).length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium">Labels</h3>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {Object.entries(node.data.descriptor.metadata.labels).map(([key, value]) => (
-                    <Label key={key} labelKey={key} value={value} />
+        <div className="h-[200px] p-4">
+          {descriptor.metadata.labels && Object.keys(descriptor.metadata.labels).length > 0 && (
+            <>
+              <h3 className="text-sm font-medium">Labels</h3>
+              <ScrollArea className="mt-2 h-[150px]">
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(descriptor.metadata.labels).map(([key, value]) => (
+                    <Label key={key} labelKey={key} value={value} className="cursor-default" />
                   ))}
                 </div>
-              </div>
-            )}
+              </ScrollArea>
+            </>
+          )}
         </div>
       </div>
     </div>
