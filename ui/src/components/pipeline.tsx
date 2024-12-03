@@ -12,11 +12,11 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useTheme } from '@/components/theme-provider';
-import { PhaseNode as PhaseNodeComponent } from '@/components/node';
+import { PhasePanel } from '@/components/phase-panel';
+import { PhaseNode as PhaseNodeComponent } from '@/components/phase-node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
-import { FlowPipeline, PipelineEdge, PipelineNode } from '@/types/flow';
+import { FlowPipeline, PipelineEdge, PhaseNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
-import { NodePanel } from '@/components/node-panel';
 import { ButtonEdge } from './button-edge';
 
 const nodeTypes = {
@@ -29,8 +29,8 @@ const edgeTypes = {
 
 export function Pipeline(props: { pipeline: PipelineType }) {
   const { theme } = useTheme();
-  const { fitView, getNodes, getEdges } = useReactFlow<PipelineNode, PipelineEdge>();
-  const [selectedNode, setSelectedNode] = useState<PipelineNode | null>(null);
+  const { fitView, getNodes, getEdges } = useReactFlow<PhaseNode, PipelineEdge>();
+  const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
   const { pipeline } = props;
@@ -57,7 +57,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
   }, [nodes, edges, fitView]);
 
   const onNodeClick = (_event: React.MouseEvent, node: Node) => {
-    setSelectedNode(node as PipelineNode);
+    setSelectedNode(node as PhaseNode);
   };
 
   return (
@@ -93,7 +93,7 @@ export function Pipeline(props: { pipeline: PipelineType }) {
         </ReactFlow>
       </div>
       {selectedNode && (
-        <NodePanel
+        <PhasePanel
           node={selectedNode}
           isExpanded={isPanelExpanded}
           onToggle={() => setIsPanelExpanded(!isPanelExpanded)}
@@ -145,11 +145,11 @@ function getLayoutedElements(pipeline: FlowPipeline) {
 }
 
 function getElements(pipeline: PipelineType): FlowPipeline {
-  const nodes: PipelineNode[] = [];
+  const nodes: PhaseNode[] = [];
   const edges: PipelineEdge[] = [];
 
   pipeline.phases.forEach((phase) => {
-    const node: PipelineNode = {
+    const node: PhaseNode = {
       id: phase.descriptor.metadata.name,
       type: 'phase',
       position: { x: 0, y: 0 },

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"strings"
+	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ type State struct {
 	Resource    Resource          `json:"resource,omitempty"`
 	Digest      string            `json:"digest,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+	RecordedAt  time.Time         `json:"recorded_at,omitempty"`
 }
 
 // Pipeline is a collection of phases for a given resource type R.

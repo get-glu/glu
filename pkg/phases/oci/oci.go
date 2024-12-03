@@ -138,7 +138,7 @@ var (
 
 type BaseResource struct {
 	// ImageName   string // TODO: add this when we have a use case for it
-	ImageDigest digest.Digest
+	ImageDigest digest.Digest `json:"image_digest,omitempty"`
 	annotations map[string]string
 }
 

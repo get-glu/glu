@@ -1,10 +1,10 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
 import { Package, GitBranch } from 'lucide-react';
-import { PipelineNode as PipelineNodeType } from '@/types/flow';
+import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 
-const PipelineNode = ({ data: phase }: NodeProps<PipelineNodeType>) => {
+const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
     switch (phase.descriptor.kind ?? '') {
       case 'oci':
@@ -61,4 +61,4 @@ const PipelineNode = ({ data: phase }: NodeProps<PipelineNodeType>) => {
   );
 };
 
-export { PipelineNode as PhaseNode };
+export { PhaseNode as PhaseNode };

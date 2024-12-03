@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/google/uuid"
@@ -176,11 +177,14 @@ func (l *Log[R]) History(ctx context.Context, phase core.Descriptor) (states []c
 				}
 			}
 
+			timestamp := time.Unix(id.Time().UnixTime())
+
 			states = append(states, core.State{
 				Version:     id,
 				Digest:      string(version.Digest),
 				Resource:    r,
 				Annotations: version.Annotations,
+				RecordedAt:  timestamp.UTC(),
 			})
 		}
 

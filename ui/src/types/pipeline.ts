@@ -27,6 +27,8 @@ export interface Result {
 
 export interface State {
   version: string;
+  digest: string;
+  recorded_at: string;
   resource: Resource;
   annotations: Record<string, string>;
 }
