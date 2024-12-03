@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useState } from 'react';
 import { History } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -97,9 +98,23 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
                 </div>
 
                 <div className="ml-6 mt-2">
-                  <span className="inline-flex items-center rounded-md bg-muted px-2 py-1">
-                    <span className="font-mono text-xs">{state.digest?.slice(0, 12)}</span>
-                  </span>
+                  <HoverCard>
+                    <HoverCardTrigger asChild className="cursor-default">
+                      <span className="inline-flex items-center rounded-md bg-muted px-2 py-1">
+                        <span className="font-mono text-xs">{state.digest?.slice(0, 12)}</span>
+                      </span>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="flex w-full flex-col gap-1">
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Digest: </span>
+                        {state.digest}
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Recorded At: </span>
+                        {state.recorded_at}
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
                 </div>
               </div>
             ))

@@ -25,7 +25,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	if err := pipelines.NewBuilder(config, glu.Name("checkout"), NewCheckoutResource).
+	if err := pipelines.NewBuilder(ctx, config, glu.Name("checkout"), NewCheckoutResource).
 		NewPhase(func(b pipelines.Builder[*CheckoutResource]) (edges.Phase[*CheckoutResource], error) {
 			// fetch the configured OCI repositority source named "checkout"
 			return pipelines.OCIPhase(b, glu.Name("oci"), "checkout")

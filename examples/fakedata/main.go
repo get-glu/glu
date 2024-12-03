@@ -19,7 +19,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	checkout := pipelines.NewBuilder(config, glu.Name("checkout"), NewMockResource)
+	checkout := pipelines.NewBuilder(ctx, config, glu.Name("checkout"), NewMockResource)
 	// oci promotes to staging
 	stagingPhase := checkout.
 		// oci phase
@@ -45,7 +45,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	billing := pipelines.NewBuilder(config, glu.Name("billing"), NewMockResource).
+	billing := pipelines.NewBuilder(ctx, config, glu.Name("billing"), NewMockResource).
 		// oci phase
 		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
 			return NewMockPhase("billing", "oci", "oci"), nil
