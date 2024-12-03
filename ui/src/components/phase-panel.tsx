@@ -3,7 +3,6 @@ import { Package, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Label } from './label';
-import { PhaseHistory } from './phase-history';
 import { ScrollArea } from './ui/scroll-area';
 
 interface PhasePanelProps {

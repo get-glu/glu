@@ -1,6 +1,6 @@
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath } from '@xyflow/react';
 import { TooltipProvider, TooltipTrigger, TooltipContent, Tooltip } from '@/components/ui/tooltip';
-import { CircleArrowUp, CheckCircle, Loader2, Check, CircleCheck } from 'lucide-react';
+import { CircleArrowUp, CheckCircle, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useEdgePerformMutation } from '@/services/api';
 import { ANNOTATION_GIT_PROPOSAL_URL } from '@/types/metadata';
