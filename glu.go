@@ -2,7 +2,6 @@ package glu
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"iter"
@@ -13,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"slices"
-	"sync"
 	"syscall"
 	"time"
 
@@ -36,6 +34,23 @@ type Metadata = core.Metadata
 
 // Resource is an alias for the core Resource interface (see core.Resource)
 type Resource = core.Resource
+
+// Pipeline is an alias for the core Pipeline interface (see core.Pipeline)
+type Pipeline = core.Pipeline
+
+// NewPipeline delegates to core.NewPipeline
+func NewPipeline(meta Metadata) *Pipeline {
+	return core.NewPipeline(meta)
+}
+
+// Phase is an alias for the core Phase interface (see core.Phase)
+type Phase = core.Phase
+
+// Descriptor is an alias for the core Descriptor interface (see core.Descriptor)
+type Descriptor = core.Descriptor
+
+// Edge is an alias for the core Edge interface (see core.Edge)
+type Edge = core.Edge
 
 // Name is a utility for quickly creating an instance of Metadata
 // with a name (required) and optional labels / annotations
@@ -78,8 +93,7 @@ type System struct {
 	ctx       context.Context
 	meta      Metadata
 	conf      *Config
-	pipelines map[string]core.Pipeline
-	triggers  []Trigger
+	pipelines map[string]*core.Pipeline
 	err       error
 
 	ui            fs.FS
@@ -103,7 +117,7 @@ func NewSystem(ctx context.Context, meta Metadata, opts ...containers.Option[Sys
 	r := &System{
 		ctx:       ctx,
 		meta:      meta,
-		pipelines: map[string]core.Pipeline{},
+		pipelines: map[string]*core.Pipeline{},
 	}
 
 	containers.ApplyAll(r, opts...)
@@ -114,7 +128,7 @@ func NewSystem(ctx context.Context, meta Metadata, opts ...containers.Option[Sys
 }
 
 // GetPipeline returns a pipeline by name.
-func (s *System) GetPipeline(name string) (core.Pipeline, error) {
+func (s *System) GetPipeline(name string) (*core.Pipeline, error) {
 	pipeline, ok := s.pipelines[name]
 	if !ok {
 		return nil, fmt.Errorf("pipeline %q: %w", name, core.ErrNotFound)
@@ -125,14 +139,14 @@ func (s *System) GetPipeline(name string) (core.Pipeline, error) {
 
 // Pipelines returns an iterator across all name and pipeline pairs
 // previously registered on the system.
-func (s *System) Pipelines() iter.Seq2[string, core.Pipeline] {
+func (s *System) Pipelines() iter.Seq2[string, *core.Pipeline] {
 	return maps.All(s.pipelines)
 }
 
 // AddPipeline invokes a pipeline builder function provided by the caller.
 // The function is provided with the systems configuration and (if successful)
 // the system registers the resulting pipeline.
-func (s *System) AddPipeline(pipeline core.Pipeline) *System {
+func (s *System) AddPipeline(pipeline *core.Pipeline) *System {
 	s.pipelines[pipeline.Metadata().Name] = pipeline
 
 	return s
@@ -179,8 +193,13 @@ func (s *System) Run() error {
 		return cli.Run(ctx, s, os.Args...)
 	}
 
+	sConf, err := s.Configuration()
+	if err != nil {
+		return err
+	}
+
 	var (
-		conf  = s.conf.conf
+		conf  = sConf.conf
 		group *errgroup.Group
 		srv   = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
@@ -276,53 +295,25 @@ func (s *System) Run() error {
 
 // Pipelines is a type which can list a set of configured name/Pipeline pairs.
 type Pipelines interface {
-	Pipelines() iter.Seq2[string, core.Pipeline]
+	Pipelines() iter.Seq2[string, *core.Pipeline]
 }
 
-// Trigger is a type with a blocking function run which can trigger
-// calls to promote phases in a set of pipelines.
-type Trigger interface {
-	Run(context.Context, Pipelines)
-}
+func (s *System) runTriggers(ctx context.Context) error {
+	group, ctx := errgroup.WithContext(ctx)
+	for _, pipeline := range s.pipelines {
+		for edge := range pipeline.Edges() {
+			tedge, ok := edge.(core.TriggerableEdge)
+			if !ok {
+				continue
+			}
 
-// AddTrigger registers a Trigger to run when the system is invoked in server mode.
-func (s *System) AddTrigger(trigger Trigger) *System {
-	s.triggers = append(s.triggers, trigger)
-
-	return s
-}
-
-func (s *System) runTriggers(ctx context.Context) (err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("running triggers: %w", err)
+			group.Go(func() error {
+				return tedge.RunTriggers(ctx)
+			})
 		}
-	}()
-
-	var wg sync.WaitGroup
-	for _, trigger := range s.triggers {
-		wg.Add(1)
-		go func(trigger Trigger) {
-			defer wg.Done()
-
-			trigger.Run(ctx, s)
-		}(trigger)
 	}
 
-	finished := make(chan struct{})
-	go func() {
-		defer close(finished)
-		wg.Wait()
-	}()
-
-	<-ctx.Done()
-
-	select {
-	case <-time.After(15 * time.Second):
-		return errors.New("timedout waiting on shutdown of schedules")
-	case <-finished:
-		return ctx.Err()
-	}
+	return group.Wait()
 }
 
 func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Reader, shutdownFunc, error) {

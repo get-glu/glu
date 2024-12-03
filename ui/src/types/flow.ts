@@ -1,5 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 import { Phase } from './pipeline';
+import { Descriptor } from './descriptor';
 
 export interface FlowPipeline {
   nodes: PipelineNode[];
@@ -8,15 +9,13 @@ export interface FlowPipeline {
 
 export type PipelineNode = PhaseNode;
 
-type PhaseNodeData = Phase &
-  Record<string, unknown> & {
-    pipeline: string;
-  };
+type PhaseNodeData = Phase & Record<string, unknown>;
 
 export type PhaseNode = Node<PhaseNodeData, 'phase'>;
 
 export type PipelineEdge = Edge<{
-  id: string;
-  source: string;
-  target: string;
+  kind: string;
+  from: Descriptor;
+  to: Descriptor;
+  can_perform: boolean;
 }>;

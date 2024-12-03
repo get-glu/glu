@@ -3,10 +3,11 @@ package oci
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/phases"
+	"github.com/get-glu/glu/pkg/edges"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
@@ -14,7 +15,7 @@ import (
 
 const ANNOTATION_OCI_IMAGE_URL = "dev.getglu.oci.image.url"
 
-var _ phases.Source[Resource] = (*Source[Resource])(nil)
+var _ edges.Phase[Resource] = (*Phase[Resource])(nil)
 
 type Resource interface {
 	core.Resource
@@ -36,27 +37,48 @@ type Resolver interface {
 	Reference() string
 }
 
-type Source[R Resource] struct {
+type Phase[R Resource] struct {
+	pipeline string
+	meta     core.Metadata
+	newFn    func() R
 	resolver Resolver
 }
 
-func New[R Resource](resolver Resolver) *Source[R] {
-	return &Source[R]{
+func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolver Resolver) *Phase[R] {
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+
+	phase := &Phase[R]{
+		pipeline: pipeline,
+		meta:     meta,
+		newFn:    newFn,
 		resolver: resolver,
 	}
+
+	meta.Annotations[ANNOTATION_OCI_IMAGE_URL] = phase.resolver.Reference()
+
+	return phase
 }
 
-func (s *Source[R]) Metadata() core.Metadata {
-	return core.Metadata{
-		Name:        "oci",
-		Annotations: map[string]string{ANNOTATION_OCI_IMAGE_URL: s.resolver.Reference()},
+func (s *Phase[R]) Descriptor() core.Descriptor {
+	return core.Descriptor{
+		Kind:     "oci",
+		Pipeline: s.pipeline,
+		Metadata: s.meta,
 	}
 }
 
-func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
+func (s *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
+	return s.GetResource(ctx)
+}
+
+func (s *Phase[R]) GetResource(ctx context.Context) (R, error) {
+	r := s.newFn()
+
 	desc, reader, err := s.resolver.Resolve(ctx)
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	defer func() {
@@ -74,10 +96,10 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 
 		var index v1.Index
 		if err := json.NewDecoder(reader).Decode(&index); err != nil {
-			return err
+			return r, err
 		}
 
-		return ri.ReadFromOCIIndex(desc, index)
+		return r, ri.ReadFromOCIIndex(desc, index)
 	case v1.MediaTypeImageManifest:
 		rm, ok := Resource(r).(ResourceFromManifest)
 		if !ok {
@@ -86,23 +108,27 @@ func (s *Source[R]) View(ctx context.Context, _, _ core.Metadata, r R) error {
 
 		var manifest v1.Manifest
 		if err := json.NewDecoder(reader).Decode(&manifest); err != nil {
-			return err
+			return r, err
 		}
 
-		return rm.ReadFromOCIManifest(desc, manifest)
+		return r, rm.ReadFromOCIManifest(desc, manifest)
 	default:
 	}
 
 	rest, err := content.ReadAll(reader, desc)
 	if err != nil {
-		return err
+		return r, err
 	}
 
 	if err := json.Unmarshal(rest, &desc); err != nil {
-		return err
+		return r, err
 	}
 
-	return r.ReadFromOCIDescriptor(desc)
+	return r, r.ReadFromOCIDescriptor(desc)
+}
+
+func (s *Phase[A]) History(ctx context.Context) ([]core.State, error) {
+	return nil, errors.New("not implemented")
 }
 
 var (

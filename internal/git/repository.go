@@ -256,8 +256,17 @@ func (r *Repository) Fetch(ctx context.Context, specific ...string) (err error) 
 		return nil
 	}
 
+	updatedRefs := map[string]plumbing.Hash{}
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	defer func() {
+		r.mu.Unlock()
+
+		// update subscribers if any matching and requested references
+		// are updated while processing this fetch
+		if len(updatedRefs) > 0 {
+			r.updateSubs(ctx, updatedRefs)
+		}
+	}()
 
 	heads := specific
 	if len(heads) == 0 {
@@ -294,7 +303,6 @@ func (r *Repository) Fetch(ctx context.Context, specific ...string) (err error) 
 		return err
 	}
 
-	updatedRefs := map[string]plumbing.Hash{}
 	if err := allRefs.ForEach(func(ref *plumbing.Reference) error {
 		// we're only interested in updates to remotes
 		if !ref.Name().IsRemote() {
@@ -312,8 +320,6 @@ func (r *Repository) Fetch(ctx context.Context, specific ...string) (err error) 
 	}); err != nil {
 		return err
 	}
-
-	r.updateSubs(ctx, updatedRefs)
 
 	return nil
 }
@@ -355,9 +361,12 @@ func (r *Repository) ListCommits(ctx context.Context, branch, from string, filte
 }
 
 type ViewUpdateOptions struct {
-	branch   string
-	revision *plumbing.Hash
-	force    bool
+	branch string
+	// revision on View predicates it to the specific hash
+	// revision on Update returns a conflict error if the branch head does not match
+	revision plumbing.Hash
+	// force configures an update to ignore any conflicts when attempting to push
+	force bool
 }
 
 func (r *Repository) getOptions(opts ...containers.Option[ViewUpdateOptions]) *ViewUpdateOptions {
@@ -372,7 +381,7 @@ func WithBranch(branch string) containers.Option[ViewUpdateOptions] {
 	}
 }
 
-func WithRevision(rev *plumbing.Hash) containers.Option[ViewUpdateOptions] {
+func WithRevision(rev plumbing.Hash) containers.Option[ViewUpdateOptions] {
 	return func(vuo *ViewUpdateOptions) {
 		vuo.revision = rev
 	}
@@ -388,12 +397,15 @@ func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs
 
 	options := r.getOptions(opts...)
 
-	r.logger.Debug("View", slog.String("branch", options.branch))
-
-	hash, err := r.Resolve(options.branch)
-	if err != nil {
-		return err
+	hash := options.revision
+	if hash == plumbing.ZeroHash {
+		hash, err = r.Resolve(options.branch)
+		if err != nil {
+			return err
+		}
 	}
+
+	r.logger.Debug("View", slog.String("branch", options.branch), slog.String("revision", hash.String()))
 
 	fs, err := r.newFilesystem(hash)
 	if err != nil {
@@ -418,10 +430,8 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 		return plumbing.ZeroHash, err
 	}
 
-	if rev != nil {
-		if *rev != hash {
-			return hash, fmt.Errorf("base revision %q has changed (now %q): %w", rev, hash, errors.New("conflict"))
-		}
+	if rev != plumbing.ZeroHash && rev != hash {
+		return hash, fmt.Errorf("base revision %q has changed (now %q): %w", rev, hash, errors.New("conflict"))
 	}
 
 	// if rev == nil then hash will be the zero hash
@@ -442,7 +452,8 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 
 	if r.remote != nil {
 		local := plumbing.NewBranchReferenceName(branch)
-		if err := r.repo.Storer.SetReference(plumbing.NewHashReference(local, commit.Hash)); err != nil {
+		if err := r.repo.Storer.SetReference(
+			plumbing.NewHashReference(local, commit.Hash)); err != nil {
 			return hash, err
 		}
 
@@ -503,7 +514,7 @@ func (r *Repository) updateSubs(ctx context.Context, refs map[string]plumbing.Ha
 }
 
 func refMatch(ref, pattern string) bool {
-	if !strings.Contains(ref, "*") {
+	if !strings.Contains(pattern, "*") {
 		return ref == pattern
 	}
 
@@ -540,7 +551,7 @@ func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.O
 
 	remoteRef := plumbing.NewRemoteReferenceName(remoteName, branch)
 	if _, err := r.repo.Reference(remoteRef, true); err == nil {
-		// reference already exists
+		slog.Debug("branch already exists")
 		return nil
 	}
 

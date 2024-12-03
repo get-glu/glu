@@ -6,7 +6,7 @@ import (
 
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/credentials"
-	"github.com/get-glu/glu/pkg/src/oci"
+	"github.com/get-glu/glu/pkg/phases/oci"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/registry/remote"
 )
