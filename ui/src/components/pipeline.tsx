@@ -167,8 +167,10 @@ function getElements(pipeline: PipelineType): FlowPipeline {
       source: e.from.metadata.name,
       target: e.to.metadata.name,
       data: {
+        kind: e.kind,
         from: e.from,
-        to: e.to
+        to: e.to,
+        can_perform: e.can_perform ?? false
       }
     };
 
