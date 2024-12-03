@@ -3,7 +3,6 @@ import { Package, GitBranch, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Label } from './label';
-import { useGetPhaseHistoryQuery } from '@/services/api';
 import { PhaseHistory } from './phase-history';
 import { ScrollArea } from './ui/scroll-area';
 
@@ -15,12 +14,6 @@ interface PhasePanelProps {
 
 export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
   const descriptor = node.data.descriptor;
-  const resource = node.data.resource;
-
-  const { data: history } = useGetPhaseHistoryQuery({
-    pipeline: descriptor.pipeline,
-    phase: descriptor.metadata.name
-  });
 
   return (
     <div className="flex flex-col border-t bg-background">
@@ -32,7 +25,7 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
             <GitBranch className="h-4 w-4" />
           )}
           <h2 className="text-lg font-semibold">{descriptor.metadata.name}</h2>
-          {history && <PhaseHistory phase={descriptor.metadata.name} history={history} />}
+          <PhaseHistory pipeline={descriptor.pipeline} phase={descriptor.metadata.name} />
         </div>
         <Button variant="ghost" size="sm" onClick={onToggle}>
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -54,7 +47,7 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
             </div>
             <div className="text-sm">
               <span className="text-muted-foreground">Digest: </span>
-              <span className="truncate font-mono text-xs">{resource.digest}</span>
+              <span className="truncate font-mono text-xs">{node.data.resource.digest}</span>
             </div>
           </div>
         </div>
