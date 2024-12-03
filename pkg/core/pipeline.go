@@ -20,9 +20,10 @@ type Phase interface {
 
 // State contains a snapshot of a resource version at a point in history
 type State struct {
-	Version     uuid.UUID
-	Resource    Resource
-	Annotations map[string]string
+	Version     uuid.UUID         `json:"version,omitempty"`
+	Resource    Resource          `json:"resource,omitempty"`
+	Digest      string            `json:"digest,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // Pipeline is a collection of phases for a given resource type R.

@@ -1,6 +1,8 @@
 package pipelines
 
 import (
+	"context"
+
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/edges"
@@ -15,6 +17,7 @@ var _ Builder[glu.Resource] = (*PipelineBuilder[glu.Resource])(nil)
 // It has a number of utilities for simplifying common configuration options used
 // to create types sources and phases within a typed pipeline.
 type PipelineBuilder[R glu.Resource] struct {
+	ctx      context.Context
 	pipeline *glu.Pipeline
 	config   *glu.Config
 	newFn    func() R
@@ -34,10 +37,14 @@ func (p *PipelineBuilder[R]) Configuration() *glu.Config {
 	return p.config
 }
 
+func (p *PipelineBuilder[R]) Context() context.Context {
+	return p.ctx
+}
+
 // NewBuilder constructs and configures a new pipeline builder.
-func NewBuilder[R glu.Resource](config *glu.Config, meta glu.Metadata, newFn func() R) *PipelineBuilder[R] {
+func NewBuilder[R glu.Resource](ctx context.Context, config *glu.Config, meta glu.Metadata, newFn func() R) *PipelineBuilder[R] {
 	pipeline := glu.NewPipeline(meta)
-	return &PipelineBuilder[R]{config: config, pipeline: pipeline, newFn: newFn}
+	return &PipelineBuilder[R]{ctx: ctx, config: config, pipeline: pipeline, newFn: newFn}
 }
 
 func (b *PipelineBuilder[R]) Build(system *glu.System) error {
@@ -105,6 +112,7 @@ func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase
 }
 
 type Builder[R glu.Resource] interface {
+	Context() context.Context
 	Configuration() *glu.Config
 	PipelineName() string
 	New() R
@@ -117,7 +125,10 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		return nil, err
 	}
 
-	phase := srcgit.NewPhase(
+	ctx := builder.Context()
+
+	phase, err := srcgit.NewPhase(
+		ctx,
 		builder.PipelineName(),
 		meta,
 		builder.New,
@@ -125,6 +136,9 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		proposer,
 		opts...,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return phase, nil
 }
