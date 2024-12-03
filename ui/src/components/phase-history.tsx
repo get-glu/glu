@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 import { History } from 'lucide-react';
 import { State } from '@/types/pipeline';
+import { cn } from '@/lib/utils';
 
 export function PhaseHistory({ phase, history }: { phase: string; history: State[] }) {
   const [isHistorySheetOpen, setIsHistorySheetOpen] = useState(false);
@@ -43,7 +44,12 @@ export function PhaseHistory({ phase, history }: { phase: string; history: State
 
               <div className="flex items-center gap-3">
                 <div className="relative z-10">
-                  <div className="h-3 w-3 translate-x-[-0.375rem] rounded-full border-2 border-primary bg-background" />
+                  <div
+                    className={cn(
+                      'h-3 w-3 translate-x-[-0.375rem] rounded-full border-2 bg-background',
+                      index === 0 ? 'border-primary' : 'border-gray-400'
+                    )}
+                  />
                 </div>
                 <TooltipProvider>
                   <Tooltip>
