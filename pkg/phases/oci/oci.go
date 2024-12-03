@@ -45,15 +45,15 @@ type Phase[R Resource] struct {
 }
 
 func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolver Resolver) *Phase[R] {
+	if meta.Annotations == nil {
+		meta.Annotations = map[string]string{}
+	}
+
 	phase := &Phase[R]{
 		pipeline: pipeline,
 		meta:     meta,
 		newFn:    newFn,
 		resolver: resolver,
-	}
-
-	if meta.Annotations == nil {
-		meta.Annotations = map[string]string{}
 	}
 
 	meta.Annotations[ANNOTATION_OCI_IMAGE_URL] = phase.resolver.Reference()
