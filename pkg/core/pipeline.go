@@ -47,7 +47,7 @@ func (p *Pipeline) Metadata() Metadata {
 	return p.meta
 }
 
-// Add will add the provided resource phase to the pipeline along with configuring
+// AddPhase will add the provided resource phase to the pipeline along with configuring
 // any dependent promotion source phases if configured to do so.
 func (p *Pipeline) AddPhase(phase Phase) error {
 	name := phase.Descriptor().Metadata.Name
@@ -199,7 +199,7 @@ func IsPhase(p Phase) containers.Option[PhaseOptions] {
 	}
 }
 
-// HasLabel causes a call to Phases to list any phase with the matching name.
+// HasName causes a call to Phases to list any phase with the matching name.
 func HasName(name string) containers.Option[PhaseOptions] {
 	return func(co *PhaseOptions) {
 		co.name = name

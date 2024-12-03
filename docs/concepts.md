@@ -145,12 +145,12 @@ type Edge interface {
 
 #### Promotion
 
-The core `promotion` kind edge take care of promotion one phase to the next on a call to `Perform(ctx)`.
+The core `promotion` kind edge promotes one phase to the next on a call to `Perform(ctx)`.
 The process is as follows:
 
 1. Get the current resource state from the source phase based on phase metadata.
 2. Get the current resource state from the destination promotion target phase.
-3. If the resource from (2) is equal to that of (3) (based on comparing their digest), the return (no op).
+3. If the resource from (2) is equal to that of (3) (based on comparing their digest), then return (no-op).
 4. Update the state of the phase destination with the state of the upstream resource (3) (this is a promotion).
 
 ### Triggers

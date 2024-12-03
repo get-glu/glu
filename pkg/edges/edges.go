@@ -8,13 +8,13 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 )
 
-// Source is an interface around storage for resources.
+// Phase is an interface around storage for resources.
 type Phase[R core.Resource] interface {
 	core.Phase
 	GetResource(_ context.Context) (R, error)
 }
 
-// UpdatableSource is a source through which the phase can promote resources to new versions
+// UpdatablePhase is a source through which the phase can promote resources to new versions
 type UpdatablePhase[R core.Resource] interface {
 	Phase[R]
 	Update(_ context.Context, to R) (map[string]string, error)
