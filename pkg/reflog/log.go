@@ -174,7 +174,7 @@ func (l *Log[R]) GetResourceAtVersion(ctx context.Context, phase core.Descriptor
 		}
 
 		blob := blobs.Get(version.Digest)
-		if blob != nil {
+		if blob == nil {
 			return fmt.Errorf("version data for %q: %w", v, ErrNotFound)
 		}
 
