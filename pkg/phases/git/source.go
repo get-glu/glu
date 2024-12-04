@@ -14,6 +14,7 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/google/uuid"
 )
 
 const (
@@ -55,12 +56,16 @@ type Proposal struct {
 	Annotations map[string]string
 }
 
+// RefLog is a logging abstraction used to store the history of resource versions over time per phase.
 type RefLog[R core.Resource] interface {
-	CreateReference(ctx context.Context, phase core.Descriptor) error
-	RecordLatest(ctx context.Context, phase core.Descriptor, resource R, annotations map[string]string) error
-	History(ctx context.Context, phase core.Descriptor) ([]core.State, error)
+	CreateReference(context.Context, core.Descriptor) error
+	RecordLatest(context.Context, core.Descriptor, R, map[string]string) error
+	GetResourceAtVersion(context.Context, core.Descriptor, uuid.UUID) (R, error)
+	History(context.Context, core.Descriptor) ([]core.State, error)
 }
 
+// Phase is a Git storage backed phase implementation.
+// It is used to manage the state of a resource as represented in a target Git repository.
 type Phase[R Resource] struct {
 	mu              sync.RWMutex
 	pipeline        string
@@ -73,6 +78,7 @@ type Phase[R Resource] struct {
 	log             RefLog[R]
 }
 
+// Descriptor returns the phases descriptor.
 func (p *Phase[A]) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		Kind:     "git",
@@ -81,6 +87,7 @@ func (p *Phase[A]) Descriptor() core.Descriptor {
 	}
 }
 
+// ProposalOption configures calls to create proposals
 type ProposalOption struct {
 	Labels []string
 }
@@ -101,6 +108,7 @@ func WithLog[R Resource](log RefLog[R]) containers.Option[Phase[R]] {
 	}
 }
 
+// New constructs and configures a new phase.
 func New[R Resource](
 	ctx context.Context,
 	pipeline string,
@@ -131,6 +139,8 @@ func New[R Resource](
 	return phase, nil
 }
 
+// Branched is a resource which exposes an alternative base branch
+// on which the resource should be based.
 type Branched interface {
 	Branch(phase core.Descriptor) string
 }
@@ -166,12 +176,27 @@ func (p *Phase[R]) getResource(ctx context.Context) (R, error) {
 	return r, nil
 }
 
+// History returns the history of the phase (given a log has been configured).
 func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
 	if p.log == nil {
 		return nil, nil
 	}
 
 	return p.log.History(ctx, p.Descriptor())
+}
+
+// Rollback updates the state of the phase to a previous known version in history.
+func (p *Phase[R]) Rollback(ctx context.Context, version uuid.UUID) error {
+	resource, err := p.log.GetResourceAtVersion(ctx, p.Descriptor(), version)
+	if err != nil {
+		return err
+	}
+
+	if _, err := p.Update(ctx, resource); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *Phase[R]) branch() string {
