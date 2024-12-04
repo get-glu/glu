@@ -68,7 +68,7 @@ export function ButtonEdge({
     } catch (e) {
       console.error(e);
 
-      toast.error('something went wrong');
+      toast.error('Something went wrong');
     } finally {
       setIsPerforming(false);
       setDialogOpen(false);
