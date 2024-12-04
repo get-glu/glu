@@ -16,34 +16,27 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useState } from 'react';
-import { History, Loader2, MoreVertical } from 'lucide-react';
+import { History, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useGetPhaseHistoryQuery, useRollbackPhaseMutation } from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from './ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from './ui/dialog';
 import { State } from '@/types/pipeline';
-import { toast } from 'sonner';
+import { PhaseStateDetails } from './phase-state-details';
+import { PhaseRollbackDialog } from './phase-rollback-dialog';
 
 interface PhaseHistoryProps {
-  pipeline: string;
-  phase: string;
+  pipelineId: string;
+  phaseId: string;
 }
 
-export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
+export function PhaseHistory({ pipelineId, phaseId }: PhaseHistoryProps) {
   const [isHistorySheetOpen, setIsHistorySheetOpen] = useState(false);
 
   const { data: history, isLoading } = useGetPhaseHistoryQuery(
     {
-      pipeline,
-      phase
+      pipeline: pipelineId,
+      phase: phaseId
     },
     {
       skip: !isHistorySheetOpen,
@@ -67,8 +60,10 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
           </TooltipProvider>
         </SheetTrigger>
         <SheetContent>
-          <SheetHeader>
-            <SheetTitle>{phase}</SheetTitle>
+          <SheetHeader className="flex flex-col gap-1">
+            <SheetTitle className="underline decoration-primary decoration-1 underline-offset-8">
+              {phaseId}
+            </SheetTitle>
             <SheetDescription>Phase History</SheetDescription>
           </SheetHeader>
           <div className="mt-6 max-h-[calc(100vh-8rem)] space-y-6">
@@ -82,8 +77,8 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
               history?.map((state, index) => (
                 <PhaseHistoryItem
                   key={index}
-                  pipeline={pipeline}
-                  phase={phase}
+                  pipelineId={pipelineId}
+                  phaseId={phaseId}
                   state={state}
                   index={index}
                 />
@@ -111,32 +106,15 @@ function LoadingHistoryItem() {
 }
 
 interface PhaseHistoryItemProps {
-  pipeline: string;
-  phase: string;
+  pipelineId: string;
+  phaseId: string;
   state: State;
   index: number;
 }
 
-function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemProps) {
+function PhaseHistoryItem({ pipelineId, phaseId, state, index }: PhaseHistoryItemProps) {
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
-  const [isPerformingRollback, setIsPerformingRollback] = useState(false);
-  const [rollbackPhase] = useRollbackPhaseMutation();
-
-  const performRollback = async () => {
-    try {
-      setIsPerformingRollback(true);
-      await rollbackPhase({ pipeline, phase, version: state.version }).unwrap();
-
-      toast.success('Phase version updated');
-    } catch (e) {
-      console.error(e);
-
-      toast.error('Something went wrong');
-    } finally {
-      setIsPerformingRollback(false);
-      setRollbackDialogOpen(false);
-    }
-  };
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   return (
     <>
@@ -165,7 +143,9 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
                   {formatDistanceToNow(new Date(state.recorded_at), { addSuffix: true })}
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="right">{state.recorded_at}</TooltipContent>
+              <TooltipContent side="right">
+                {new Date(state.recorded_at).toUTCString()}
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
@@ -181,12 +161,22 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
             </HoverCardTrigger>
             <HoverCardContent className="flex w-full flex-col gap-1">
               <div className="text-sm">
-                <span className="text-muted-foreground">Digest: </span>
-                {state.digest}
+                <span className="text-foreground">Recorded At: </span>
+                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 text-xs">
+                  {new Date(state.recorded_at).toUTCString()}
+                </span>
               </div>
               <div className="text-sm">
-                <span className="text-muted-foreground">Recorded At: </span>
-                {state.recorded_at}
+                <span className="text-foreground">Digest: </span>
+                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
+                  {state.digest}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="text-foreground">Version: </span>
+                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
+                  {state.version}
+                </span>
               </div>
             </HoverCardContent>
           </HoverCard>
@@ -199,7 +189,7 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => console.log('Details action')}>
+              <DropdownMenuItem onSelect={() => setDetailsDialogOpen(true)}>
                 Details
               </DropdownMenuItem>
               {index !== 0 && (
@@ -212,33 +202,22 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
         </div>
       </div>
 
-      <Dialog open={rollbackDialogOpen} onOpenChange={setRollbackDialogOpen}>
-        <DialogContent className="px-4">
-          <DialogHeader>
-            <DialogTitle>Rollback Phase</DialogTitle>
-            <DialogDescription className="flex flex-col gap-4">
-              Are you sure you want to rollback this phase to this digest?
-              <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1">
-                <span className="font-mono text-xs">{state.digest}</span>
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRollbackDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={performRollback}>
-              {isPerformingRollback ? (
-                <>
-                  <Loader2 className="animate-spin" /> Please Wait{' '}
-                </>
-              ) : (
-                'Rollback'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PhaseRollbackDialog
+        isOpen={rollbackDialogOpen}
+        onClose={() => setRollbackDialogOpen(false)}
+        pipelineId={pipelineId}
+        phaseId={phaseId}
+        state={state}
+      />
+
+      <PhaseStateDetails
+        isOpen={detailsDialogOpen}
+        onClose={() => setDetailsDialogOpen(false)}
+        pipelineId={pipelineId}
+        phaseId={phaseId}
+        state={state}
+        latest={index === 0}
+      />
     </>
   );
 }
