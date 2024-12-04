@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	ErrBucketNotFound = errors.New("bucket not found")
+	ErrNotFound = errors.New("not found")
 )
 
 type Log[R core.Resource] struct {
@@ -145,6 +145,44 @@ func (l *Log[R]) fetchLatestVersion(refs *bbolt.Bucket) (v version, _ bool) {
 	return v, true
 }
 
+// GetResourceAtVersion returns the state of the resource at a given point in history identified by the provided version
+func (l *Log[R]) GetResourceAtVersion(ctx context.Context, phase core.Descriptor, v uuid.UUID) (r R, _ error) {
+	return r, l.db.View(func(tx *bbolt.Tx) error {
+		refs, err := getRefsBucket(phase, tx)
+		if err != nil {
+			return err
+		}
+
+		versionBytes, err := v.MarshalText()
+		if err != nil {
+			return err
+		}
+
+		versionData := refs.Get(versionBytes)
+		if versionData == nil {
+			return fmt.Errorf("version %q: %w", v, ErrNotFound)
+		}
+
+		blobs, err := getBlobBucket(phase, tx)
+		if err != nil {
+			return err
+		}
+
+		var version version
+		if err := l.decoder(versionData, &version); err != nil {
+			return err
+		}
+
+		blob := blobs.Get(version.Digest)
+		if blob == nil {
+			return fmt.Errorf("version data for %q: %w", v, ErrNotFound)
+		}
+
+		return l.decoder(blob, &r)
+	})
+}
+
+// Histort returns a slice of states for a provided phase descriptor.
 func (l *Log[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
 	return states, l.db.View(func(tx *bbolt.Tx) error {
 		refs, err := getRefsBucket(phase, tx)
@@ -178,7 +216,6 @@ func (l *Log[R]) History(ctx context.Context, phase core.Descriptor) (states []c
 			}
 
 			timestamp := time.Unix(id.Time().UnixTime())
-
 			states = append(states, core.State{
 				Version:     id,
 				Digest:      string(version.Digest),
@@ -202,7 +239,7 @@ func getRefsBucket(phase core.Descriptor, tx *bbolt.Tx) (*bbolt.Bucket, error) {
 
 func getBucket(tx *bbolt.Tx, path ...string) (bkt *bbolt.Bucket, err error) {
 	if len(path) == 0 {
-		return nil, fmt.Errorf("empty path: %w", ErrBucketNotFound)
+		return nil, fmt.Errorf("empty path: %w", ErrNotFound)
 	}
 
 	var b interface {
@@ -211,7 +248,7 @@ func getBucket(tx *bbolt.Tx, path ...string) (bkt *bbolt.Bucket, err error) {
 
 	for i, p := range path {
 		if bkt = b.Bucket([]byte(p)); bkt == nil {
-			return nil, fmt.Errorf("bucket %q: %w", strings.Join(path[:i+1], "/"), ErrBucketNotFound)
+			return nil, fmt.Errorf("bucket %q: %w", strings.Join(path[:i+1], "/"), ErrNotFound)
 		}
 		b = bkt
 	}
@@ -220,7 +257,7 @@ func getBucket(tx *bbolt.Tx, path ...string) (bkt *bbolt.Bucket, err error) {
 
 func createBucketPath(tx *bbolt.Tx, path ...string) (bkt *bbolt.Bucket, err error) {
 	if len(path) == 0 {
-		return nil, fmt.Errorf("empty path: %w", ErrBucketNotFound)
+		return nil, fmt.Errorf("empty path: %w", ErrNotFound)
 	}
 
 	var b interface {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/containers"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/edges"
 	srcgit "github.com/get-glu/glu/pkg/phases/git"
 	srcoci "github.com/get-glu/glu/pkg/phases/oci"
@@ -68,7 +69,7 @@ func (b *PipelineBuilder[R]) Build() error {
 }
 
 // NewPhase constructs a new phase and registers it on the resulting pipeline produced by the builder.
-func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], error)) (next *PhaseBuilder[R]) {
+func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (typed.Phase[R], error)) (next *PhaseBuilder[R]) {
 	next = &PhaseBuilder[R]{PipelineBuilder: b}
 	if b.err != nil {
 		return
@@ -93,11 +94,11 @@ func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], err
 // PhaseBuilder is used to chain building new phases with edges leading to the same phase.
 type PhaseBuilder[R glu.Resource] struct {
 	*PipelineBuilder[R]
-	phase edges.Phase[R]
+	phase typed.Phase[R]
 }
 
 // PromotesTo creates a new phase and an edge to this new phase from the phase built in the receiver.
-func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error), ts ...triggers.Trigger) (next *PhaseBuilder[R]) {
+func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (typed.UpdatablePhase[R], error), ts ...triggers.Trigger) (next *PhaseBuilder[R]) {
 	next = &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
 	if b.err != nil {
 		return

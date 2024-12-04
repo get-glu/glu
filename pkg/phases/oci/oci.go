@@ -7,7 +7,7 @@ import (
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/edges"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
@@ -15,7 +15,7 @@ import (
 
 const ANNOTATION_OCI_IMAGE_URL = "dev.getglu.oci.image.url"
 
-var _ edges.Phase[Resource] = (*Phase[Resource])(nil)
+var _ typed.Phase[Resource] = (*Phase[Resource])(nil)
 
 type Resource interface {
 	core.Resource
