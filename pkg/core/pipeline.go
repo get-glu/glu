@@ -19,6 +19,14 @@ type Phase interface {
 	History(context.Context) ([]State, error)
 }
 
+// RollbackPhase is a phase which can be rolled back to a previous version.
+type RollbackPhase interface {
+	Phase
+	// Rollback performs a rollback operation to a previous state identified
+	// by a version uuid.
+	Rollback(context.Context, uuid.UUID) error
+}
+
 // State contains a snapshot of a resource version at a point in history
 type State struct {
 	Version     uuid.UUID         `json:"version,omitempty"`

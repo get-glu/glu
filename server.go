@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -74,6 +75,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 			r.Get("/pipelines/{pipeline}/phases/{phase}/history", s.phaseHistory)
 			r.Post("/pipelines/{pipeline}/from/{from}/to/{to}/perform", s.edgePerform)
+			r.Post("/pipelines/{pipeline}/phases/{phase}/rollback/{version}", s.phaseRollback)
 		})
 	})
 }
@@ -338,6 +340,47 @@ func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(history); err != nil {
 		slog.Error("encoding response", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) phaseRollback(w http.ResponseWriter, r *http.Request) {
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	phaseName := chi.URLParam(r, "phase")
+	phase, err := pipeline.PhaseByName(phaseName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, core.ErrNotFound) {
+			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+			status = http.StatusNotFound
+		}
+
+		http.Error(w, err.Error(), status)
+		return
+	}
+
+	rollback, ok := phase.(core.RollbackPhase)
+	if !ok {
+		http.Error(w, "operation not permitted on phase kind", http.StatusBadRequest)
+		return
+	}
+
+	version, err := uuid.Parse(chi.URLParam(r, "version"))
+	if err != nil {
+		slog.Error("parsing version", "path", r.URL.Path, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := rollback.Rollback(r.Context(), version); err != nil {
+		slog.Error("rolling back phase", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
