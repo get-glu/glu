@@ -20,6 +20,12 @@ export const api = createApi({
     getPhaseHistory: builder.query<State[], { pipeline: string; phase: string }>({
       query: ({ pipeline, phase }) => `/pipelines/${pipeline}/phases/${phase}/history`
     }),
+    rollbackPhase: builder.mutation<Result, { pipeline: string; phase: string; version: string }>({
+      query: ({ pipeline, phase, version }) => ({
+        url: `/pipelines/${pipeline}/phases/${phase}/rollback/${version}`,
+        method: 'POST'
+      })
+    }),
     edgePerform: builder.mutation<Result, { pipeline: string; from: string; to: string }>({
       query: ({ pipeline, from, to }) => ({
         url: `/pipelines/${pipeline}/from/${from}/to/${to}/perform`,
@@ -35,5 +41,6 @@ export const {
   useGetPipelineQuery,
   useGetPhaseQuery,
   useGetPhaseHistoryQuery,
+  useRollbackPhaseMutation,
   useEdgePerformMutation
 } = api;
