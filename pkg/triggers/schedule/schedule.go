@@ -2,11 +2,13 @@ package schedule
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/edges"
 )
 
 const defaultScheduleInternal = time.Minute
@@ -41,12 +43,14 @@ func (t *Trigger) Run(ctx context.Context, edge core.Edge) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			result, err := edge.Perform(ctx)
-			if err != nil {
-				slog.Error("edge perform", "error", err)
-			}
+			if _, err := edge.Perform(ctx); err != nil {
+				if !errors.Is(err, edges.ErrSkipped) {
+					return
+				}
 
-			slog.Info("edge perform succeeded", "annotations", result.Annotations)
+				slog.Error("triggered edge", "error", err)
+				return
+			}
 		}
 	}
 }
