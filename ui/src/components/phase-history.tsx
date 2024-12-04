@@ -75,15 +75,7 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
             {isLoading ? (
               <>
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="relative pl-4">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-3 w-3 rounded-full" />
-                      <Skeleton className="h-4 w-full" />
-                    </div>
-                    <div className="ml-6 mt-2">
-                      <Skeleton className="h-6 w-48" />
-                    </div>
-                  </div>
+                  <LoadingHistoryItem key={i} />
                 ))}
               </>
             ) : (
@@ -101,6 +93,20 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+function LoadingHistoryItem() {
+  return (
+    <div className="relative pl-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-3 w-3 rounded-full" />
+        <Skeleton className="h-4 w-full" />
+      </div>
+      <div className="ml-6 mt-2">
+        <Skeleton className="h-6 w-48" />
+      </div>
+    </div>
   );
 }
 
