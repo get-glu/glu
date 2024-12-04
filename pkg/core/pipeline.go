@@ -24,7 +24,7 @@ type RollbackPhase interface {
 	Phase
 	// Rollback performs a rollback operation to a previous state identified
 	// by a version uuid.
-	Rollback(context.Context, uuid.UUID) error
+	Rollback(context.Context, uuid.UUID) (*Result, error)
 }
 
 // State contains a snapshot of a resource version at a point in history
@@ -105,7 +105,7 @@ type Edge interface {
 	Kind() string
 	From() Descriptor
 	To() Descriptor
-	Perform(context.Context) (Result, error)
+	Perform(context.Context) (*Result, error)
 	CanPerform(context.Context) (bool, error)
 }
 

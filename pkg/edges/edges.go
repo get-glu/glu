@@ -2,33 +2,29 @@ package edges
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/core/typed"
 )
-
-// Phase is an interface around storage for resources.
-type Phase[R core.Resource] interface {
-	core.Phase
-	GetResource(_ context.Context) (R, error)
-}
-
-// UpdatablePhase is a source through which the phase can promote resources to new versions
-type UpdatablePhase[R core.Resource] interface {
-	Phase[R]
-	Update(_ context.Context, to R) (map[string]string, error)
-}
 
 var _ core.Edge = (*PromotionEdge[core.Resource])(nil)
 
+// ErrSkipped is returned when an edge skips performing because the operation
+// would be a no-op.
+var ErrSkipped = errors.New("skipped performing")
+
+// PromotionEdge is a type edge implementation which supports promoting
+// from a source phase to a destination phase.
 type PromotionEdge[R core.Resource] struct {
 	logger *slog.Logger
-	from   Phase[R]
-	to     UpdatablePhase[R]
+	from   typed.Phase[R]
+	to     typed.UpdatablePhase[R]
 }
 
-func Promotes[R core.Resource](from Phase[R], to UpdatablePhase[R]) *PromotionEdge[R] {
+func Promotes[R core.Resource](from typed.Phase[R], to typed.UpdatablePhase[R]) *PromotionEdge[R] {
 	return &PromotionEdge[R]{
 		logger: slog.With("from", from.Descriptor().String(), "to", to.Descriptor().String()),
 		from:   from,
@@ -37,7 +33,7 @@ func Promotes[R core.Resource](from Phase[R], to UpdatablePhase[R]) *PromotionEd
 }
 
 func (s *PromotionEdge[R]) Kind() string {
-	return "promotion"
+	return typed.KindPromotion
 }
 
 func (s *PromotionEdge[R]) From() core.Descriptor {
@@ -51,13 +47,16 @@ func (s *PromotionEdge[R]) To() core.Descriptor {
 // Perform causes a promotion from a dependent to a target phase.
 // The phase fetches both its current resource state, and that of the promotion source phase.
 // If the resources differ, then the phase updates its source to match the promoted version.
-func (s *PromotionEdge[R]) Perform(ctx context.Context) (r core.Result, err error) {
-	s.logger.Debug("Promotion started")
+func (s *PromotionEdge[R]) Perform(ctx context.Context) (r *core.Result, err error) {
+	s.logger.Debug("edge perform started")
 	defer func() {
-		s.logger.Debug("Promotion finished")
+		var args []any
 		if err != nil {
 			err = fmt.Errorf("promoting from %s to %s: %w", s.from.Descriptor().Metadata.Name, s.to.Descriptor().Metadata.Name, err)
+			args = append(args, "error", err)
 		}
+
+		s.logger.Debug("edge perform finished", args...)
 	}()
 
 	from, synced, err := s.synced(ctx)
@@ -67,14 +66,10 @@ func (s *PromotionEdge[R]) Perform(ctx context.Context) (r core.Result, err erro
 
 	if synced {
 		s.logger.Debug("skipping promotion", "reason", "UpToDate")
-		return r, nil
+		return nil, ErrSkipped
 	}
 
-	if r.Annotations, err = s.to.Update(ctx, from); err != nil {
-		return r, err
-	}
-
-	return r, nil
+	return s.to.Update(ctx, from, typed.UpdateWithKind(typed.KindPromotion))
 }
 
 func (s *PromotionEdge[R]) CanPerform(ctx context.Context) (bool, error) {

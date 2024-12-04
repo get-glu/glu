@@ -12,6 +12,7 @@ import (
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/uuid"
@@ -27,14 +28,19 @@ const (
 var (
 	// ErrProposalNotFound is returned when a proposal cannot be located
 	ErrProposalNotFound = errors.New("proposal not found")
+
+	_ typed.UpdatablePhase[Resource] = (*Phase[Resource])(nil)
 )
 
+// Resource is a core.Resource with additional constraints which are
+// required for reading from and writing to a filesystem.
 type Resource interface {
 	core.Resource
 	ReadFrom(context.Context, core.Descriptor, fs.Filesystem) error
 	WriteTo(context.Context, core.Descriptor, fs.Filesystem) error
 }
 
+// Proposer is a type which can be used to create and manage proposals.
 type Proposer interface {
 	GetCurrentProposal(_ context.Context, baseBranch, branchPrefix string) (*Proposal, error)
 	CreateProposal(context.Context, *Proposal, ProposalOption) error
@@ -186,17 +192,13 @@ func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
 }
 
 // Rollback updates the state of the phase to a previous known version in history.
-func (p *Phase[R]) Rollback(ctx context.Context, version uuid.UUID) error {
+func (p *Phase[R]) Rollback(ctx context.Context, version uuid.UUID) (*core.Result, error) {
 	resource, err := p.log.GetResourceAtVersion(ctx, p.Descriptor(), version)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if _, err := p.Update(ctx, resource); err != nil {
-		return err
-	}
-
-	return nil
+	return p.Update(ctx, resource, typed.UpdateWithKind(typed.KindRollback))
 }
 
 func (p *Phase[R]) branch() string {
@@ -232,25 +234,7 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 	return nil
 }
 
-type commitMessage[R Resource] interface {
-	// CommitMessage is an optional git specific method for overriding generated commit messages.
-	// The function is provided with the source phases metadata and the previous value of resource.
-	CommitMessage(phase core.Descriptor, from R) (string, error)
-}
-
-type proposalTitle[R Resource] interface {
-	// ProposalTitle is an optional git specific method for overriding generated proposal message (PR/MR) title message.
-	// The function is provided with the source phases metadata and the previous value of resource.
-	ProposalTitle(phase core.Descriptor, from R) (string, error)
-}
-
-type proposalBody[R Resource] interface {
-	// ProposalBody is an optional git specific method for overriding generated proposal body (PR/MR) body message.
-	// The function is provided with the source phases metadata and the previous value of resource.
-	ProposalBody(phase core.Descriptor, from R) (string, error)
-}
-
-func (p *Phase[R]) Update(ctx context.Context, to R) (map[string]string, error) {
+func (p *Phase[R]) Update(ctx context.Context, to R, opts ...containers.Option[typed.UpdateOptions]) (*core.Result, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -277,23 +261,29 @@ func (p *Phase[R]) Update(ctx context.Context, to R) (map[string]string, error) 
 		AnnotationGitBaseRefKey: baseBranch,
 	}
 
+	updateOpts := typed.NewUpdateOptions(opts...)
 	if !p.proposeChange {
-		annotations[AnnotationGitHeadSHAKey], err = p.updateAndPush(ctx, from, to, git.WithBranch(baseBranch))
+		annotations[AnnotationGitHeadSHAKey], err = p.updateAndPush(ctx, from, to, updateOpts, git.WithBranch(baseBranch))
 		if err != nil {
 			return nil, err
 		}
 
-		return annotations, nil
+		return &core.Result{Annotations: annotations}, nil
 	}
 
 	if p.proposer == nil {
 		return nil, errors.New("proposal requested but not configured")
 	}
 
-	return p.propose(ctx, from, to, baseBranch)
+	annotations, err = p.propose(ctx, from, to, baseBranch, updateOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.Result{Annotations: annotations}, nil
 }
 
-func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (map[string]string, error) {
+func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string, updateOpts *typed.UpdateOptions) (map[string]string, error) {
 	slog := slog.With("name", p.meta.Name)
 	desc := p.Descriptor()
 
@@ -348,7 +338,7 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 			return annotations(proposal), nil
 		}
 
-		head, err := p.updateAndPush(ctx, from, to, options...)
+		head, err := p.updateAndPush(ctx, from, to, updateOpts, options...)
 		if err != nil {
 			return nil, fmt.Errorf("updating existing proposal: %w", err)
 		}
@@ -361,28 +351,19 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 		return annotations, nil
 	}
 
-	if head, err := p.updateAndPush(ctx, from, to, options...); err != nil {
+	if head, err := p.updateAndPush(ctx, from, to, updateOpts, options...); err != nil {
 		slog.Error("while attempting update", "head", head, "error", err)
 		return nil, err
 	}
 
-	title := fmt.Sprintf("Update %s", p.meta.Name)
-	if p, ok := core.Resource(to).(proposalTitle[R]); ok {
-		title, err = p.ProposalTitle(desc, from)
-		if err != nil {
-			return nil, err
-		}
+	title, err := p.proposalTitle(to, desc, from, updateOpts)
+	if err != nil {
+		return nil, err
 	}
 
-	body := fmt.Sprintf(`| from | to |
-| -- | -- |
-| %s | %s |
-`, fromDigest, digest)
-	if b, ok := core.Resource(to).(proposalBody[R]); ok {
-		body, err = b.ProposalBody(desc, from)
-		if err != nil {
-			return nil, err
-		}
+	body, err := p.proposalBody(to, desc, from, updateOpts)
+	if err != nil {
+		return nil, err
 	}
 
 	proposal = &Proposal{
@@ -400,22 +381,14 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string) (
 	return annotations(proposal), nil
 }
 
-func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, opts ...containers.Option[git.ViewUpdateOptions]) (string, error) {
+func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, updateOpts *typed.UpdateOptions, opts ...containers.Option[git.ViewUpdateOptions]) (string, error) {
 	desc := p.Descriptor()
 	update := func(fs fs.Filesystem) (message string, err error) {
 		if err := to.WriteTo(ctx, desc, fs); err != nil {
 			return "", err
 		}
 
-		message = fmt.Sprintf("Update %s", p.meta.Name)
-		if m, ok := core.Resource(to).(commitMessage[R]); ok {
-			message, err = m.CommitMessage(desc, from)
-			if err != nil {
-				return "", fmt.Errorf("overriding commit message during update: %w", err)
-			}
-		}
-
-		return message, nil
+		return p.commitMessage(to, desc, from, updateOpts)
 	}
 
 	head, err := p.repo.UpdateAndPush(ctx, update, opts...)
@@ -438,4 +411,59 @@ func annotations(proposal *Proposal) map[string]string {
 
 	maps.Insert(a, maps.All(proposal.Annotations))
 	return a
+}
+
+type commitMessageBuilder[R Resource] interface {
+	// CommitMessage is an optional git specific method for overriding generated commit messages.
+	// The function is provided with the source phases metadata and the previous value of resource.
+	CommitMessage(phase core.Descriptor, from R, opts *typed.UpdateOptions) (string, error)
+}
+
+func (p *Phase[R]) commitMessage(to core.Resource, phase core.Descriptor, from R, updateOpts *typed.UpdateOptions) (string, error) {
+	if m, ok := to.(commitMessageBuilder[R]); ok {
+		return m.CommitMessage(phase, from, updateOpts)
+	}
+
+	return updateOpts.DefaultMessage(p.Descriptor()), nil
+}
+
+type proposalTitleBuilder[R Resource] interface {
+	// ProposalTitle is an optional git specific method for overriding generated proposal message (PR/MR) title message.
+	// The function is provided with the source phases metadata and the previous value of resource.
+	ProposalTitle(phase core.Descriptor, from R, opts *typed.UpdateOptions) (string, error)
+}
+
+func (p *Phase[R]) proposalTitle(to core.Resource, phase core.Descriptor, from R, updateOpts *typed.UpdateOptions) (string, error) {
+	if p, ok := to.(proposalTitleBuilder[R]); ok {
+		return p.ProposalTitle(phase, from, updateOpts)
+	}
+
+	return updateOpts.DefaultMessage(p.Descriptor()), nil
+}
+
+type proposalBodyBuilder[R Resource] interface {
+	// ProposalBody is an optional git specific method for overriding generated proposal body (PR/MR) body message.
+	// The function is provided with the source phases metadata and the previous value of resource.
+	ProposalBody(phase core.Descriptor, from R, opts *typed.UpdateOptions) (string, error)
+}
+
+func (p *Phase[R]) proposalBody(to core.Resource, phase core.Descriptor, from R, updateOpts *typed.UpdateOptions) (string, error) {
+	if b, ok := to.(proposalBodyBuilder[R]); ok {
+		return b.ProposalBody(phase, from, updateOpts)
+	}
+
+	fromDigest, err := from.Digest()
+	if err != nil {
+		return "", err
+	}
+
+	toDigest, err := to.Digest()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf(`| from | to |
+| -- | -- |
+| %s | %s |
+`, fromDigest, toDigest), nil
 }
