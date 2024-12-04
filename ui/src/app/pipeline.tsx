@@ -2,23 +2,22 @@ import '@xyflow/react/dist/style.css';
 import { Pipeline as PipelineComponent } from '@/components/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useParams } from 'react-router-dom';
-import { Header } from '@/components/header';
+import { setSelectedPipeline } from '@/store/pipelinesSlice';
+import { useAppDispatch } from '@/store/hooks';
 
 export default function Pipeline() {
   const { pipelineId } = useParams();
+  const dispatch = useAppDispatch();
 
   if (!pipelineId) {
     return <div>Pipeline not found: {pipelineId}</div>;
   }
 
+  dispatch(setSelectedPipeline(pipelineId));
+
   return (
-    <>
-      <Header className="absolute left-0 right-0 top-0 z-10" pipelineId={pipelineId} />
-      <div className="flex h-screen w-full">
-        <ReactFlowProvider key={`provider-${pipelineId}`}>
-          <PipelineComponent pipelineId={pipelineId} />
-        </ReactFlowProvider>
-      </div>
-    </>
+    <ReactFlowProvider key={`provider-${pipelineId}`}>
+      <PipelineComponent pipelineId={pipelineId} />
+    </ReactFlowProvider>
   );
 }

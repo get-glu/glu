@@ -24,15 +24,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Pipeline } from '@/types/pipeline';
 import { useListPipelinesQuery } from '@/services/api';
 import { useParams } from 'react-router-dom';
+import { setSelectedPipeline } from '@/store/pipelinesSlice';
+import { useAppDispatch } from '@/store/hooks';
 
 export function Sidebar() {
   const navigate = useNavigate();
   const { pipelineId } = useParams();
   const [open, setOpen] = useState(false);
   const { data: pipelinesData, isLoading } = useListPipelinesQuery();
+  const dispatch = useAppDispatch();
 
   const onPipelineSelect = (pipelineName: string) => {
     setOpen(false);
+    dispatch(setSelectedPipeline(pipelineName));
     navigate(`/pipelines/${pipelineName}`);
   };
 

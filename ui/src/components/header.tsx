@@ -3,8 +3,11 @@ import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarTrigger } from './ui/sidebar';
 import { useGetSystemQuery } from '@/services/api';
+import { useAppSelector } from '@/store/hooks';
+import { getSelectedPipeline } from '@/store/pipelinesSlice';
 
-export function Header({ className, pipelineId }: { className?: string; pipelineId: string }) {
+export function Header({ className }: { className?: string }) {
+  const pipelineId = useAppSelector(getSelectedPipeline);
   const { data: system, isLoading } = useGetSystemQuery();
 
   return (
