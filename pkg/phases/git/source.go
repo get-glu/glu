@@ -101,14 +101,15 @@ func WithLog[R Resource](log RefLog[R]) containers.Option[Phase[R]] {
 	}
 }
 
-func NewPhase[R Resource](
+func New[R Resource](
+	ctx context.Context,
 	pipeline string,
 	meta core.Metadata,
 	newFn func() R,
 	repo *git.Repository,
 	proposer Proposer,
 	opts ...containers.Option[Phase[R]],
-) (_ *Phase[R]) {
+) (*Phase[R], error) {
 	phase := &Phase[R]{
 		pipeline: pipeline,
 		meta:     meta,
@@ -120,10 +121,14 @@ func NewPhase[R Resource](
 	containers.ApplyAll(phase, opts...)
 
 	if phase.log != nil {
+		if err := phase.log.CreateReference(ctx, phase.Descriptor()); err != nil {
+			return nil, err
+		}
+
 		phase.repo.Subscribe(phase)
 	}
 
-	return phase
+	return phase, nil
 }
 
 type Branched interface {

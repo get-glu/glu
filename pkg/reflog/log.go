@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/google/uuid"
@@ -45,37 +46,37 @@ type version struct {
 	Annotations map[string]string
 }
 
-func (l *Log[R]) CreateReference(ctx context.Context, pipeline, phase core.Metadata) error {
+func (l *Log[R]) CreateReference(ctx context.Context, phase core.Descriptor) error {
 	return l.db.Update(func(tx *bbolt.Tx) error {
-		if _, err := createBucketPath(tx, versionBucket, refBucket, pipeline.Name, phase.Name); err != nil {
+		if _, err := createBucketPath(tx, versionBucket, refBucket, phase.Pipeline, phase.Metadata.Name); err != nil {
 			return err
 		}
 
-		_, err := createBucketPath(tx, versionBucket, blobsBucket, pipeline.Name, phase.Name)
+		_, err := createBucketPath(tx, versionBucket, blobsBucket, phase.Pipeline, phase.Metadata.Name)
 		return err
 	})
 }
 
-func (l *Log[R]) RecordLatest(ctx context.Context, pipeline, phase core.Metadata, resource R, annotations map[string]string) error {
-	slog := slog.With("pipeline", pipeline.Name, "phase", phase.Name)
+func (l *Log[R]) RecordLatest(ctx context.Context, phase core.Descriptor, resource R, annotations map[string]string) error {
+	slog := slog.With("pipeline", phase.Pipeline, "phase", phase.Metadata.Name)
 	return l.db.Update(func(tx *bbolt.Tx) error {
 		digest, err := resource.Digest()
 		if err != nil {
 			return err
 		}
 
-		refs, err := getRefsBucket(pipeline, phase, tx)
+		refs, err := getRefsBucket(phase, tx)
 		if err != nil {
 			return err
 		}
 
-		curLatest, ok := l.getLatestVersion(refs, pipeline, phase)
+		curLatest, ok := l.getLatestVersion(refs, phase)
 		if ok && bytes.Equal(curLatest.Digest, []byte(digest)) {
 			slog.Debug("skipped recording latest", "reason", "NoChange")
 			return nil
 		}
 
-		blobs, err := getBlobBucket(pipeline, phase, tx)
+		blobs, err := getBlobBucket(phase, tx)
 		if err != nil {
 			return err
 		}
@@ -111,21 +112,21 @@ func (l *Log[R]) RecordLatest(ctx context.Context, pipeline, phase core.Metadata
 	})
 }
 
-func (l *Log[R]) getLatestVersion(refs *bbolt.Bucket, pipeline, phase core.Metadata) (version, bool) {
-	phases, ok := l.last[pipeline.Name]
+func (l *Log[R]) getLatestVersion(refs *bbolt.Bucket, phase core.Descriptor) (version, bool) {
+	phases, ok := l.last[phase.Pipeline]
 	if !ok {
 		phases = map[string]version{}
-		l.last[phase.Name] = phases
+		l.last[phase.Metadata.Name] = phases
 	}
 
-	version, ok := phases[phase.Name]
+	version, ok := phases[phase.Metadata.Name]
 	if !ok {
 		version, ok = l.fetchLatestVersion(refs)
 		if !ok {
 			return version, false
 		}
 
-		phases[phase.Name] = version
+		phases[phase.Metadata.Name] = version
 	}
 
 	return version, true
@@ -144,14 +145,14 @@ func (l *Log[R]) fetchLatestVersion(refs *bbolt.Bucket) (v version, _ bool) {
 	return v, true
 }
 
-func (l *Log[R]) History(ctx context.Context, pipeline, phase core.Metadata) (states []core.State, _ error) {
+func (l *Log[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
 	return states, l.db.View(func(tx *bbolt.Tx) error {
-		refs, err := getRefsBucket(pipeline, phase, tx)
+		refs, err := getRefsBucket(phase, tx)
 		if err != nil {
 			return err
 		}
 
-		blobs, err := getBlobBucket(pipeline, phase, tx)
+		blobs, err := getBlobBucket(phase, tx)
 		if err != nil {
 			return err
 		}
@@ -176,10 +177,14 @@ func (l *Log[R]) History(ctx context.Context, pipeline, phase core.Metadata) (st
 				}
 			}
 
+			timestamp := time.Unix(id.Time().UnixTime())
+
 			states = append(states, core.State{
 				Version:     id,
+				Digest:      string(version.Digest),
 				Resource:    r,
 				Annotations: version.Annotations,
+				RecordedAt:  timestamp.UTC(),
 			})
 		}
 
@@ -187,12 +192,12 @@ func (l *Log[R]) History(ctx context.Context, pipeline, phase core.Metadata) (st
 	})
 }
 
-func getBlobBucket(pipeline, phase core.Metadata, tx *bbolt.Tx) (*bbolt.Bucket, error) {
-	return getBucket(tx, versionBucket, blobsBucket, pipeline.Name, phase.Name)
+func getBlobBucket(phase core.Descriptor, tx *bbolt.Tx) (*bbolt.Bucket, error) {
+	return getBucket(tx, versionBucket, blobsBucket, phase.Pipeline, phase.Metadata.Name)
 }
 
-func getRefsBucket(pipeline, phase core.Metadata, tx *bbolt.Tx) (*bbolt.Bucket, error) {
-	return getBucket(tx, versionBucket, refBucket, pipeline.Name, phase.Name)
+func getRefsBucket(phase core.Descriptor, tx *bbolt.Tx) (*bbolt.Bucket, error) {
+	return getBucket(tx, versionBucket, refBucket, phase.Pipeline, phase.Metadata.Name)
 }
 
 func getBucket(tx *bbolt.Tx, path ...string) (bkt *bbolt.Bucket, err error) {

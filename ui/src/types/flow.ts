@@ -3,11 +3,9 @@ import { Phase } from './pipeline';
 import { Descriptor } from './descriptor';
 
 export interface FlowPipeline {
-  nodes: PipelineNode[];
+  nodes: Node[];
   edges: PipelineEdge[];
 }
-
-export type PipelineNode = PhaseNode;
 
 type PhaseNodeData = Phase & Record<string, unknown>;
 

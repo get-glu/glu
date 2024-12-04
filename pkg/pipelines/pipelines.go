@@ -1,6 +1,8 @@
 package pipelines
 
 import (
+	"context"
+
 	"github.com/get-glu/glu"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/edges"
@@ -16,8 +18,10 @@ var _ Builder[glu.Resource] = (*PipelineBuilder[glu.Resource])(nil)
 // to create types sources and phases within a typed pipeline.
 type PipelineBuilder[R glu.Resource] struct {
 	pipeline *glu.Pipeline
-	config   *glu.Config
-	newFn    func() R
+
+	system *glu.System
+	config *glu.Config
+	newFn  func() R
 
 	err error
 }
@@ -34,22 +38,36 @@ func (p *PipelineBuilder[R]) Configuration() *glu.Config {
 	return p.config
 }
 
-// NewBuilder constructs and configures a new pipeline builder.
-func NewBuilder[R glu.Resource](config *glu.Config, meta glu.Metadata, newFn func() R) *PipelineBuilder[R] {
-	pipeline := glu.NewPipeline(meta)
-	return &PipelineBuilder[R]{config: config, pipeline: pipeline, newFn: newFn}
+func (p *PipelineBuilder[R]) Context() context.Context {
+	return p.system.Context()
 }
 
-func (b *PipelineBuilder[R]) Build(system *glu.System) error {
+// NewBuilder constructs and configures a new pipeline builder.
+func NewBuilder[R glu.Resource](system *glu.System, meta glu.Metadata, newFn func() R) *PipelineBuilder[R] {
+	config, err := system.Configuration()
+	if err != nil {
+		return &PipelineBuilder[R]{err: err}
+	}
+
+	return &PipelineBuilder[R]{
+		system:   system,
+		config:   config,
+		pipeline: glu.NewPipeline(meta),
+		newFn:    newFn,
+	}
+}
+
+func (b *PipelineBuilder[R]) Build() error {
 	if b.err != nil {
 		return b.err
 	}
 
-	system.AddPipeline(b.pipeline)
+	b.system.AddPipeline(b.pipeline)
 
 	return nil
 }
 
+// NewPhase constructs a new phase and registers it on the resulting pipeline produced by the builder.
 func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], error)) (next *PhaseBuilder[R]) {
 	next = &PhaseBuilder[R]{PipelineBuilder: b}
 	if b.err != nil {
@@ -72,11 +90,13 @@ func (b *PipelineBuilder[R]) NewPhase(fn func(b Builder[R]) (edges.Phase[R], err
 	return
 }
 
+// PhaseBuilder is used to chain building new phases with edges leading to the same phase.
 type PhaseBuilder[R glu.Resource] struct {
 	*PipelineBuilder[R]
 	phase edges.Phase[R]
 }
 
+// PromotesTo creates a new phase and an edge to this new phase from the phase built in the receiver.
 func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase[R], error), ts ...triggers.Trigger) (next *PhaseBuilder[R]) {
 	next = &PhaseBuilder[R]{PipelineBuilder: b.PipelineBuilder}
 	if b.err != nil {
@@ -104,7 +124,9 @@ func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (edges.UpdatablePhase
 	return
 }
 
+// Builder is used carry dependencies for building new phases
 type Builder[R glu.Resource] interface {
+	Context() context.Context
 	Configuration() *glu.Config
 	PipelineName() string
 	New() R
@@ -117,7 +139,10 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		return nil, err
 	}
 
-	phase := srcgit.NewPhase(
+	ctx := builder.Context()
+
+	phase, err := srcgit.New(
+		ctx,
 		builder.PipelineName(),
 		meta,
 		builder.New,
@@ -125,6 +150,9 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		proposer,
 		opts...,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	return phase, nil
 }
@@ -141,6 +169,7 @@ func OCIPhase[R srcoci.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		meta,
 		builder.New,
 		repo,
+		opts...,
 	)
 
 	return phase, nil

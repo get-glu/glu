@@ -20,12 +20,7 @@ import (
 
 func run(ctx context.Context) error {
 	system := glu.NewSystem(ctx, glu.Name("mypipelines"), glu.WithUI(ui.FS()))
-	config, err := system.Configuration()
-	if err != nil {
-		return err
-	}
-
-	if err := pipelines.NewBuilder(config, glu.Name("checkout"), NewCheckoutResource).
+	if err := pipelines.NewBuilder(system, glu.Name("checkout"), NewCheckoutResource).
 		NewPhase(func(b pipelines.Builder[*CheckoutResource]) (edges.Phase[*CheckoutResource], error) {
 			// fetch the configured OCI repositority source named "checkout"
 			return pipelines.OCIPhase(b, glu.Name("oci"), "checkout")
@@ -45,7 +40,7 @@ func run(ctx context.Context) error {
 			// configure it to promote from the staging git phase
 			return pipelines.GitPhase(b, glu.Name("production", glu.Label("env", "production")), "checkout")
 		}).
-		Build(system); err != nil {
+		Build(); err != nil {
 		return err
 	}
 

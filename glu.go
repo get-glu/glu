@@ -127,6 +127,11 @@ func NewSystem(ctx context.Context, meta Metadata, opts ...containers.Option[Sys
 	return r
 }
 
+// Context returns the systems root context.
+func (s *System) Context() context.Context {
+	return s.ctx
+}
+
 // GetPipeline returns a pipeline by name.
 func (s *System) GetPipeline(name string) (*core.Pipeline, error) {
 	pipeline, ok := s.pipelines[name]

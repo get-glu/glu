@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"strings"
+	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/google/uuid"
@@ -20,9 +21,11 @@ type Phase interface {
 
 // State contains a snapshot of a resource version at a point in history
 type State struct {
-	Version     uuid.UUID
-	Resource    Resource
-	Annotations map[string]string
+	Version     uuid.UUID         `json:"version,omitempty"`
+	Resource    Resource          `json:"resource,omitempty"`
+	Digest      string            `json:"digest,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	RecordedAt  time.Time         `json:"recorded_at,omitempty"`
 }
 
 // Pipeline is a collection of phases for a given resource type R.

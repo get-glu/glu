@@ -331,7 +331,7 @@ func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
 
 	history, err := phase.History(r.Context())
 	if err != nil {
-		slog.Error("performing promotion", "path", r.URL.Path, "error", err)
+		slog.Error("getting phase history", "path", r.URL.Path, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

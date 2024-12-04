@@ -14,12 +14,7 @@ import (
 
 func run(ctx context.Context) error {
 	system := glu.NewSystem(ctx, glu.Name("mycorp", glu.Label("team", "ecommerce")), glu.WithUI(ui.FS()))
-	config, err := system.Configuration()
-	if err != nil {
-		return err
-	}
-
-	checkout := pipelines.NewBuilder(config, glu.Name("checkout"), NewMockResource)
+	checkout := pipelines.NewBuilder(system, glu.Name("checkout"), NewMockResource)
 	// oci promotes to staging
 	stagingPhase := checkout.
 		// oci phase
@@ -41,11 +36,11 @@ func run(ctx context.Context) error {
 		return NewMockPhase("checkout", "git", "production-east-2"), nil
 	})
 
-	if err := checkout.Build(system); err != nil {
+	if err := checkout.Build(); err != nil {
 		return err
 	}
 
-	billing := pipelines.NewBuilder(config, glu.Name("billing"), NewMockResource).
+	billing := pipelines.NewBuilder(system, glu.Name("billing"), NewMockResource).
 		// oci phase
 		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
 			return NewMockPhase("billing", "oci", "oci"), nil
@@ -59,7 +54,7 @@ func run(ctx context.Context) error {
 			return NewMockPhase("billing", "git", "production"), nil
 		})
 
-	if err := billing.Build(system); err != nil {
+	if err := billing.Build(); err != nil {
 		return err
 	}
 
