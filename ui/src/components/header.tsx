@@ -1,14 +1,11 @@
-import { useAppSelector } from '@/store/hooks';
-import { RootState } from '@/store';
 import { ThemeToggle } from './theme-toggle';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarTrigger } from './ui/sidebar';
 import { useGetSystemQuery } from '@/services/api';
 
-export function Header({ className }: { className?: string }) {
+export function Header({ className, pipelineId }: { className?: string; pipelineId: string }) {
   const { data: system, isLoading } = useGetSystemQuery();
-  const selectedPipeline = useAppSelector((state: RootState) => state.pipelines.selectedPipeline);
 
   return (
     <div className={cn('h-18 border-b bg-background p-4', className)}>
@@ -17,10 +14,10 @@ export function Header({ className }: { className?: string }) {
         <div className="flex w-full justify-between">
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold">{isLoading ? 'Loading...' : system?.name}</span>
-            {selectedPipeline && (
+            {pipelineId && (
               <>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-lg text-muted-foreground">{selectedPipeline.name}</span>
+                <span className="text-lg text-muted-foreground">{pipelineId}</span>
               </>
             )}
           </div>

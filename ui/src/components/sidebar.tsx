@@ -31,6 +31,11 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const { data: pipelinesData, isLoading } = useListPipelinesQuery();
 
+  const onPipelineSelect = (pipelineName: string) => {
+    setOpen(false);
+    navigate(`/pipelines/${pipelineName}`);
+  };
+
   return (
     <SidebarComponent>
       <SidebarContent className="flex h-full flex-col justify-between">
@@ -77,10 +82,7 @@ export function Sidebar() {
                             <CommandItem
                               key={pipeline.name}
                               value={pipeline.name}
-                              onSelect={(currentValue: string) => {
-                                setOpen(false);
-                                navigate(`/pipelines/${currentValue}`);
-                              }}
+                              onSelect={() => onPipelineSelect(pipeline.name)}
                               className="truncate"
                             >
                               <Check

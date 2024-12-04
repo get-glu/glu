@@ -2,40 +2,23 @@ import '@xyflow/react/dist/style.css';
 import { Pipeline as PipelineComponent } from '@/components/pipeline';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useParams } from 'react-router-dom';
-import { setSelectedPipeline } from '@/store/pipelinesSlice';
-import { useEffect } from 'react';
-import { useAppDispatch } from '@/store/hooks';
-import { useGetPipelineQuery } from '@/services/api';
+import { Header } from '@/components/header';
 
 export default function Pipeline() {
   const { pipelineId } = useParams();
-  const dispatch = useAppDispatch();
 
-  const { data: pipeline, isLoading } = useGetPipelineQuery(pipelineId ?? '', {
-    pollingInterval: 5000,
-    skipPollingIfUnfocused: true
-  });
-
-  useEffect(() => {
-    if (pipeline) {
-      dispatch(setSelectedPipeline(pipeline));
-    }
-    return () => {
-      dispatch(setSelectedPipeline(null));
-    };
-  }, [pipeline, dispatch]);
-
-  if (isLoading || !pipeline) {
-    return <div>Loading pipeline...</div>;
-  }
-
-  if (!pipeline) {
+  if (!pipelineId) {
     return <div>Pipeline not found: {pipelineId}</div>;
   }
 
   return (
-    <ReactFlowProvider key={`provider-${pipelineId}`}>
-      <PipelineComponent key={pipelineId} pipeline={pipeline} />
-    </ReactFlowProvider>
+    <>
+      <Header className="absolute left-0 right-0 top-0 z-10" pipelineId={pipelineId} />
+      <div className="flex h-screen w-full">
+        <ReactFlowProvider key={`provider-${pipelineId}`}>
+          <PipelineComponent pipelineId={pipelineId} />
+        </ReactFlowProvider>
+      </div>
+    </>
   );
 }
