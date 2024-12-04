@@ -118,23 +118,23 @@ interface PhaseHistoryItemProps {
 }
 
 function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemProps) {
-  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
-  const [isPerformingRevert, setIsPerformingRevert] = useState(false);
+  const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
+  const [isPerformingRollback, setIsPerformingRollback] = useState(false);
   const [rollbackPhase] = useRollbackPhaseMutation();
 
-  const performRevert = async () => {
+  const performRollback = async () => {
     try {
-      setIsPerformingRevert(true);
+      setIsPerformingRollback(true);
       await rollbackPhase({ pipeline, phase, version: state.version }).unwrap();
 
-      toast.success('Phase reverted');
+      toast.success('Phase version updated');
     } catch (e) {
       console.error(e);
 
       toast.error('Something went wrong');
     } finally {
-      setIsPerformingRevert(false);
-      setRevertDialogOpen(false);
+      setIsPerformingRollback(false);
+      setRollbackDialogOpen(false);
     }
   };
 
@@ -203,8 +203,8 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
                 Details
               </DropdownMenuItem>
               {index !== 0 && (
-                <DropdownMenuItem onSelect={() => setRevertDialogOpen(true)}>
-                  Revert
+                <DropdownMenuItem onSelect={() => setRollbackDialogOpen(true)}>
+                  Rollback
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -212,28 +212,28 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
         </div>
       </div>
 
-      <Dialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
+      <Dialog open={rollbackDialogOpen} onOpenChange={setRollbackDialogOpen}>
         <DialogContent className="px-4">
           <DialogHeader>
-            <DialogTitle>Revert Phase</DialogTitle>
+            <DialogTitle>Rollback Phase</DialogTitle>
             <DialogDescription className="flex flex-col gap-4">
-              Are you sure you want to revert this phase to this digest?
+              Are you sure you want to rollback this phase to this digest?
               <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1">
                 <span className="font-mono text-xs">{state.digest}</span>
               </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRevertDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setRollbackDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={performRevert}>
-              {isPerformingRevert ? (
+            <Button onClick={performRollback}>
+              {isPerformingRollback ? (
                 <>
                   <Loader2 className="animate-spin" /> Please Wait{' '}
                 </>
               ) : (
-                'Revert'
+                'Rollback'
               )}
             </Button>
           </DialogFooter>
