@@ -88,7 +88,13 @@ export function PhaseHistory({ pipeline, phase }: PhaseHistoryProps) {
               </>
             ) : (
               history?.map((state, index) => (
-                <PhaseHistoryItem pipeline={pipeline} phase={phase} state={state} index={index} />
+                <PhaseHistoryItem
+                  key={index}
+                  pipeline={pipeline}
+                  phase={phase}
+                  state={state}
+                  index={index}
+                />
               ))
             )}
           </div>
@@ -128,7 +134,7 @@ function PhaseHistoryItem({ pipeline, phase, state, index }: PhaseHistoryItemPro
 
   return (
     <>
-      <div key={index} className="relative pl-4">
+      <div className="relative pl-4">
         {/* vertical line */}
         {index !== history.length - 1 && (
           <div className="absolute -bottom-6 left-[0.91rem] top-2 w-[2px] bg-muted" />
