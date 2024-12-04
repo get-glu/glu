@@ -57,15 +57,11 @@ Every Glu codebase starts with a `glu.System`. A system is a container for your 
 In the GitOps example, you will find a `main.go`. In this, you will find `main()` function, which calls a function `run(ctx) error`.
 This function is where we first get introduced to our new glu system instance.
 
-We start by creating a system and getting our pre-built configuration (this comes in handy configuring our phases later).
+We start by creating a system:
 
 ```go
 func run(ctx context.Context) error {
     system := glu.NewSystem(ctx, glu.Name("gitops-example"), glu.WithUI(ui.FS()))
-	config, err := system.Configuration()
-	if err != nil {
-		return err
-	}
 
     // ...
 }
@@ -95,7 +91,7 @@ The package provides lots of useful convenience functions for quickly building i
 Its purpose and goal is to provide a form of cached dependency injection for system and pipeline composition.
 
 ```go
-pipelines.NewBuilder(config, glu.Name("gitops-example-app"), func() *AppResource {
+pipelines.NewBuilder(system, glu.Name("gitops-example-app"), func() *AppResource {
     return &AppResource{
         Image: "ghcr.io/get-glu/gitops-example/app",
     }
@@ -121,15 +117,15 @@ To add a new pipeline, we normally call `system.AddPipeline()`, which takes an i
 system.AddPipeline(glu.Pipeline)
 ```
 
-However, our handy `pipelines.PipelineBuilder` has a final method `build.Build(system)` for registering the built pipeline at the end of the creating and adding all our phases:
+However, our handy `pipelines.PipelineBuilder` has a final method `build.Build()` for registering the built pipeline at the end of the creating and adding all our phases:
 
 ```go
-if err := pipelines.NewBuilder(config, glu.Name("gitops-example-app"), func() *AppResource {
+if err := pipelines.NewBuilder(system, glu.Name("gitops-example-app"), func() *AppResource {
     return &AppResource{
         Image: "ghcr.io/get-glu/gitops-example/app",
     }
 // ...
-}).Build(system); err != nil {
+}).Build(); err != nil {
     return err
 }
 ```
