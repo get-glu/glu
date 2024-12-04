@@ -1,5 +1,3 @@
-import { useAppSelector } from '@/store/hooks';
-import { RootState } from '@/store';
 import { ThemeToggle } from './theme-toggle';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';

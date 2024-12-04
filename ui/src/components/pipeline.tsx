@@ -34,7 +34,7 @@ export function Pipeline({ pipelineId }: { pipelineId: string }) {
   const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
-  const { data: pipeline, isLoading } = useGetPipelineQuery(pipelineId);
+  const { data: pipeline } = useGetPipelineQuery(pipelineId);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as PipelineEdge[]);

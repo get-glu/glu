@@ -7,7 +7,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"sort"
+	"slices"
+	"strings"
 
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
@@ -87,8 +88,6 @@ func (s *Server) getRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 type listPipelinesResponse struct {
-	// TODO: does a system have metadata?
-	//	Metadata  Metadata           `json:"metadata"`
 	Pipelines []pipelineResponse `json:"pipelines"`
 }
 
@@ -158,8 +157,8 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 	}
 
 	// Sort phases by name for stability
-	sort.Slice(phases, func(i, j int) bool {
-		return phases[i].Descriptor.Metadata.Name < phases[j].Descriptor.Metadata.Name
+	slices.SortFunc(phases, func(a, b phaseResponse) int {
+		return strings.Compare(strings.ToLower(a.Descriptor.Metadata.Name), strings.ToLower(b.Descriptor.Metadata.Name))
 	})
 
 	edges := make([]edgeResponse, 0)
@@ -180,8 +179,8 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 	}
 
 	// Sort edges by from for stability
-	sort.Slice(edges, func(i, j int) bool {
-		return edges[i].From.Metadata.Name < edges[j].From.Metadata.Name
+	slices.SortFunc(edges, func(a, b edgeResponse) int {
+		return strings.Compare(strings.ToLower(a.From.Metadata.Name), strings.ToLower(b.From.Metadata.Name))
 	})
 
 	return pipelineResponse{
@@ -210,8 +209,8 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sort pipelines by name for stability
-	sort.Slice(pipelineResponses, func(i, j int) bool {
-		return pipelineResponses[i].Name < pipelineResponses[j].Name
+	slices.SortFunc(pipelineResponses, func(a, b pipelineResponse) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	// TODO: handle pagination
