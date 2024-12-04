@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -76,6 +77,7 @@ func (s *Server) setupRoutes() {
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 			r.Get("/pipelines/{pipeline}/phases/{phase}/history", s.phaseHistory)
 			r.Post("/pipelines/{pipeline}/from/{from}/to/{to}/perform", s.edgePerform)
+			r.Post("/pipelines/{pipeline}/phases/{phase}/rollback/{version}", s.phaseRollback)
 		})
 	})
 }
@@ -192,16 +194,18 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 }
 
 // Handler methods
+
 func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx               = r.Context()
+		slog              = slog.With("path", r.URL.Path)
 		pipelineResponses = make([]pipelineResponse, 0, len(s.system.pipelines))
 	)
 
 	for _, pipeline := range s.system.pipelines {
 		response, err := s.createPipelineResponse(ctx, pipeline)
 		if err != nil {
-			slog.Error("building pipeline response", "path", r.URL.Path, "error", err)
+			slog.Error("building pipeline response", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -217,25 +221,28 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(listPipelinesResponse{
 		Pipelines: pipelineResponses,
 	}); err != nil {
-		slog.Error("encoding pipeline", "path", r.URL.Path, "error", err)
+		slog.Error("encoding pipeline", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	var (
+		ctx  = r.Context()
+		slog = slog.With("path", r.URL.Path)
+	)
 
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
-		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+		slog.Debug("resource not found", "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
 	response, err := s.createPipelineResponse(ctx, pipeline)
 	if err != nil {
-		slog.Error("building pipeline response", "path", r.URL.Path, "error", err)
+		slog.Error("building pipeline response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -244,6 +251,8 @@ func (s *Server) getPipeline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
+	slog := slog.With("path", r.URL.Path)
+
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -255,7 +264,7 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, core.ErrNotFound) {
-			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+			slog.Debug("resource not found", "error", err)
 			status = http.StatusNotFound
 		}
 
@@ -270,16 +279,18 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		slog.Error("encoding response", "path", r.URL.Path, "error", err)
+		slog.Error("encoding response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
+	slog := slog.With("path", r.URL.Path)
+
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
-		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+		slog.Debug("resource not found", "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -291,14 +302,14 @@ func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
 
 	outgoing, ok := pipeline.EdgesFrom()[from]
 	if !ok {
-		slog.Debug("edge not found", "path", r.URL.Path, "error", err, "from", from)
+		slog.Debug("edge not found", "path", err, "from", from)
 		http.Error(w, "edge not found", http.StatusNotFound)
 		return
 	}
 
 	edge, ok := outgoing[to]
 	if !ok {
-		slog.Debug("edge not found", "path", r.URL.Path, "error", err, "from", from, "to", to)
+		slog.Debug("edge not found", "path", err, "from", from, "to", to)
 		http.Error(w, "edge not found", http.StatusNotFound)
 		return
 	}
@@ -311,22 +322,24 @@ func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		slog.Error("performing promotion", "path", r.URL.Path, "error", err)
+		slog.Error("performing promotion", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(&result); err != nil {
-		slog.Error("encoding response", "path", r.URL.Path, "error", err)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		slog.Error("encoding response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
+	slog := slog.With("path", r.URL.Path)
+
 	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
 	if err != nil {
-		slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+		slog.Debug("resource not found", "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -336,7 +349,7 @@ func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, core.ErrNotFound) {
-			slog.Debug("resource not found", "path", r.URL.Path, "error", err)
+			slog.Debug("resource not found", "error", err)
 			status = http.StatusNotFound
 		}
 
@@ -346,13 +359,63 @@ func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
 
 	history, err := phase.History(r.Context())
 	if err != nil {
-		slog.Error("getting phase history", "path", r.URL.Path, "error", err)
+		slog.Error("getting phase history", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := json.NewEncoder(w).Encode(history); err != nil {
-		slog.Error("encoding response", "path", r.URL.Path, "error", err)
+		slog.Error("encoding response", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) phaseRollback(w http.ResponseWriter, r *http.Request) {
+	slog := slog.With("path", r.URL.Path)
+
+	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
+	if err != nil {
+		slog.Debug("resource not found", "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	phaseName := chi.URLParam(r, "phase")
+	phase, err := pipeline.PhaseByName(phaseName)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, core.ErrNotFound) {
+			slog.Debug("resource not found", "error", err)
+			status = http.StatusNotFound
+		}
+
+		http.Error(w, err.Error(), status)
+		return
+	}
+
+	rollback, ok := phase.(core.RollbackPhase)
+	if !ok {
+		http.Error(w, "operation not permitted on phase kind", http.StatusBadRequest)
+		return
+	}
+
+	version, err := uuid.Parse(chi.URLParam(r, "version"))
+	if err != nil {
+		slog.Error("parsing version", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	result, err := rollback.Rollback(r.Context(), version)
+	if err != nil {
+		slog.Error("rolling back phase", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		slog.Error("encoding response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

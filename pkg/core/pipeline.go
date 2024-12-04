@@ -19,6 +19,14 @@ type Phase interface {
 	History(context.Context) ([]State, error)
 }
 
+// RollbackPhase is a phase which can be rolled back to a previous version.
+type RollbackPhase interface {
+	Phase
+	// Rollback performs a rollback operation to a previous state identified
+	// by a version uuid.
+	Rollback(context.Context, uuid.UUID) (*Result, error)
+}
+
 // State contains a snapshot of a resource version at a point in history
 type State struct {
 	Version     uuid.UUID         `json:"version,omitempty"`
@@ -97,7 +105,7 @@ type Edge interface {
 	Kind() string
 	From() Descriptor
 	To() Descriptor
-	Perform(context.Context) (Result, error)
+	Perform(context.Context) (*Result, error)
 	CanPerform(context.Context) (bool, error)
 }
 
