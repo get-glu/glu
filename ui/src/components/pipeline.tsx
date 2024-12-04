@@ -18,6 +18,7 @@ import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
 import { ButtonEdge } from './button-edge';
+import { useGetPipelineQuery } from '@/services/api';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
@@ -27,23 +28,32 @@ const edgeTypes = {
   button: ButtonEdge
 };
 
-export function Pipeline(props: { pipeline: PipelineType }) {
+export function Pipeline({ pipelineId }: { pipelineId: string }) {
   const { theme } = useTheme();
-  const { fitView, getNodes, getEdges } = useReactFlow<PhaseNode, PipelineEdge>();
+  const { fitView } = useReactFlow<PhaseNode, PipelineEdge>();
   const [selectedNode, setSelectedNode] = useState<PhaseNode | null>(null);
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
-  const { pipeline } = props;
-  const { nodes: initNodes, edges: initEdges } = getElements(pipeline);
+  const { data: pipeline, isLoading } = useGetPipelineQuery(pipelineId);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([] as PipelineEdge[]);
 
   const nodesInitialized = useNodesInitialized();
 
   useEffect(() => {
+    if (pipeline) {
+      const { nodes: newNodes, edges: newEdges } = getElements(pipeline);
+      const flow = getLayoutedElements({ nodes: newNodes, edges: newEdges });
+
+      setNodes(flow.nodes);
+      setEdges(flow.edges);
+    }
+  }, [pipeline]);
+
+  useEffect(() => {
     if (nodesInitialized) {
-      const flow = getLayoutedElements({ nodes: getNodes(), edges: getEdges() });
+      const flow = getLayoutedElements({ nodes, edges });
       setNodes(flow.nodes);
       setEdges(flow.edges);
     }

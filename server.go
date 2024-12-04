@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"sort"
 
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
@@ -156,6 +157,11 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 		phases = append(phases, response)
 	}
 
+	// Sort phases by name for stability
+	sort.Slice(phases, func(i, j int) bool {
+		return phases[i].Descriptor.Metadata.Name < phases[j].Descriptor.Metadata.Name
+	})
+
 	edges := make([]edgeResponse, 0)
 	for _, outgoing := range pipeline.EdgesFrom() {
 		for _, edge := range outgoing {
@@ -172,6 +178,11 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 			})
 		}
 	}
+
+	// Sort edges by from for stability
+	sort.Slice(edges, func(i, j int) bool {
+		return edges[i].From.Metadata.Name < edges[j].From.Metadata.Name
+	})
 
 	return pipelineResponse{
 		Name:   pipeline.Metadata().Name,
@@ -197,6 +208,11 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 		}
 		pipelineResponses = append(pipelineResponses, response)
 	}
+
+	// Sort pipelines by name for stability
+	sort.Slice(pipelineResponses, func(i, j int) bool {
+		return pipelineResponses[i].Name < pipelineResponses[j].Name
+	})
 
 	// TODO: handle pagination
 	if err := json.NewEncoder(w).Encode(listPipelinesResponse{

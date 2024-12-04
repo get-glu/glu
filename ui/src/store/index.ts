@@ -1,14 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { api } from '@/services/api';
-import { pipelinesSlice, PipelinesState } from './pipelinesSlice';
 
-export interface StoreState {
-  pipelines: PipelinesState;
-}
+export interface StoreState {}
 
 export const store = configureStore({
   reducer: {
-    pipelines: pipelinesSlice.reducer,
     [api.reducerPath]: api.reducer
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware)
