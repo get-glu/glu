@@ -200,6 +200,9 @@ func TestConfig(t *testing.T) {
 					Enabled:  true,
 					Exporter: MetricsExporterPrometheus,
 				},
+				History: History{
+					Type: HistoryTypeFile,
+				},
 			},
 		},
 		{
