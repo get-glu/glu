@@ -194,15 +194,14 @@ func OCIPhase[R srcoci.Resource](meta glu.Metadata, srcName string, opts ...cont
 			return nil, err
 		}
 
-		phase := srcoci.New(
+		return srcoci.New(
+			builder.Context(),
 			builder.PipelineName(),
 			meta,
 			builder.New,
 			repo,
 			opts...,
 		)
-
-		return phase, nil
 	}
 }
 
