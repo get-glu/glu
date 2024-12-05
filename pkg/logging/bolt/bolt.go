@@ -1,4 +1,4 @@
-package reflog
+package bolt
 
 import (
 	"bytes"

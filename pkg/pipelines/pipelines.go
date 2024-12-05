@@ -7,6 +7,7 @@ import (
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/edges"
+	"github.com/get-glu/glu/pkg/logging/bolt"
 	srcgit "github.com/get-glu/glu/pkg/phases/git"
 	srcoci "github.com/get-glu/glu/pkg/phases/oci"
 	"github.com/get-glu/glu/pkg/triggers"
@@ -67,13 +68,6 @@ func NewBuilder[R glu.Resource](system *glu.System, meta glu.Metadata, newFn fun
 	return builder
 }
 
-// WithLogger sets the phase logger to be passed to each newly built phase.
-func WithLogger[R glu.Resource](logger typed.PhaseLogger[R]) containers.Option[PipelineBuilder[R]] {
-	return func(b *PipelineBuilder[R]) {
-		b.logger = logger
-	}
-}
-
 func (b *PipelineBuilder[R]) Build() error {
 	if b.err != nil {
 		return b.err
@@ -82,6 +76,18 @@ func (b *PipelineBuilder[R]) Build() error {
 	b.system.AddPipeline(b.pipeline)
 
 	return nil
+}
+
+// LogsTo invokes provided function to build a new logger which is then used
+// throughout the rest of the pipeline.
+func (b *PipelineBuilder[R]) LogsTo(fn func(b Builder[R]) (typed.PhaseLogger[R], error)) *PipelineBuilder[R] {
+	if b.err != nil {
+		return b
+	}
+
+	b.logger, b.err = fn(b)
+
+	return b
 }
 
 // NewPhase constructs a new phase and registers it on the resulting pipeline produced by the builder.
@@ -151,47 +157,64 @@ type Builder[R glu.Resource] interface {
 }
 
 // GitPhase is a convenience function for building a git.Phase implementation using a pipeline builder implementation.
-func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName string, opts ...containers.Option[srcgit.Phase[R]]) (*srcgit.Phase[R], error) {
-	repo, proposer, err := builder.Configuration().GitRepository(srcName)
-	if err != nil {
-		return nil, err
-	}
+func GitPhase[R srcgit.Resource](meta glu.Metadata, srcName string, opts ...containers.Option[srcgit.Phase[R]]) func(Builder[R]) (typed.UpdatablePhase[R], error) {
+	return func(builder Builder[R]) (typed.UpdatablePhase[R], error) {
+		repo, proposer, err := builder.Configuration().GitRepository(srcName)
+		if err != nil {
+			return nil, err
+		}
 
-	defaultOpts := []containers.Option[srcgit.Phase[R]]{}
-	if logger := builder.Logger(); logger != nil {
-		defaultOpts = append(defaultOpts, srcgit.WithLogger(logger))
-	}
+		defaultOpts := []containers.Option[srcgit.Phase[R]]{}
+		if logger := builder.Logger(); logger != nil {
+			defaultOpts = append(defaultOpts, srcgit.WithLogger(logger))
+		}
 
-	phase, err := srcgit.New(
-		builder.Context(),
-		builder.PipelineName(),
-		meta,
-		builder.New,
-		repo,
-		proposer,
-		append(defaultOpts, opts...)...,
-	)
-	if err != nil {
-		return nil, err
-	}
+		phase, err := srcgit.New(
+			builder.Context(),
+			builder.PipelineName(),
+			meta,
+			builder.New,
+			repo,
+			proposer,
+			append(defaultOpts, opts...)...,
+		)
+		if err != nil {
+			return nil, err
+		}
 
-	return phase, nil
+		return phase, nil
+	}
 }
 
 // OCIPhase is a convenience function for building an oci.Phase implementation using a pipeline builder implementation.
-func OCIPhase[R srcoci.Resource](builder Builder[R], meta glu.Metadata, srcName string, opts ...containers.Option[srcoci.Phase[R]]) (*srcoci.Phase[R], error) {
-	repo, err := builder.Configuration().OCIRepository(srcName)
-	if err != nil {
-		return nil, err
+func OCIPhase[R srcoci.Resource](meta glu.Metadata, srcName string, opts ...containers.Option[srcoci.Phase[R]]) func(Builder[R]) (typed.Phase[R], error) {
+	return func(builder Builder[R]) (typed.Phase[R], error) {
+		repo, err := builder.Configuration().OCIRepository(srcName)
+		if err != nil {
+			return nil, err
+		}
+
+		phase := srcoci.New(
+			builder.PipelineName(),
+			meta,
+			builder.New,
+			repo,
+			opts...,
+		)
+
+		return phase, nil
 	}
+}
 
-	phase := srcoci.New(
-		builder.PipelineName(),
-		meta,
-		builder.New,
-		repo,
-		opts...,
-	)
+// BoltLogger returns an instance of type.PhaseLogger which writes to a boltdb file
+// as configured by the provided name.
+func BoltLogger[R glu.Resource](name string) func(Builder[R]) (typed.PhaseLogger[R], error) {
+	return func(b Builder[R]) (typed.PhaseLogger[R], error) {
+		db, err := b.Configuration().BoltDB(name)
+		if err != nil {
+			return nil, err
+		}
 
-	return phase, nil
+		return bolt.New[R](db), nil
+	}
 }
