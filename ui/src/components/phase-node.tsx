@@ -24,7 +24,10 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
           {getIcon()}
           <span className="truncate text-sm font-medium">{phase.descriptor.metadata.name}</span>
         </div>
-        <PhaseHistory pipeline={phase.descriptor.pipeline} phase={phase.descriptor.metadata.name} />
+        <PhaseHistory
+          pipelineId={phase.descriptor.pipeline}
+          phaseId={phase.descriptor.metadata.name}
+        />
       </div>
 
       <div className="mt-2 flex items-center gap-2 text-xs">
