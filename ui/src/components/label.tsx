@@ -12,7 +12,7 @@ export function Label({ labelKey, value, className }: LabelProps) {
     <Badge
       key={`${labelKey}-${value}`}
       className={cn(
-        `whitespace-nowrap rounded-md text-xs font-light ${getLabelColor(labelKey, value)}`,
+        `whitespace-nowrap rounded-md text-xs font-medium ${getLabelColor(labelKey, value)}`,
         className
       )}
     >

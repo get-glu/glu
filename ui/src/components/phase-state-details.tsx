@@ -7,6 +7,8 @@ import { Label } from '@/components/label';
 import { Button } from '@/components/ui/button';
 import { PhaseRollbackDialog } from './phase-rollback-dialog';
 import { useState } from 'react';
+import { ANNOTATION_GIT_COMMIT_URL } from '@/types/metadata';
+import { Github } from 'lucide-react';
 
 interface PhaseStateDetailsProps {
   isOpen: boolean;
@@ -71,12 +73,33 @@ export function PhaseStateDetails({
               </div>
 
               <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Links</h3>
+                <div className="flex flex-row flex-wrap gap-2">
+                  {state.annotations?.[ANNOTATION_GIT_COMMIT_URL]?.startsWith(
+                    'https://github.com'
+                  ) && (
+                    <a
+                      href={state.annotations[ANNOTATION_GIT_COMMIT_URL]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-sm hover:bg-muted/80"
+                    >
+                      <Github className="h-3.5 w-3.5" />
+                      Commit
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Annotations</h3>
-                {Object.entries(state.annotations ?? {}).map(([key, value]) => (
-                  <div key={`${key}-${value}`} className="mb-2 flex">
-                    <Label labelKey={key} value={value} />
-                  </div>
-                ))}
+                <div className="flex flex-row flex-wrap gap-2">
+                  {Object.entries(state.annotations ?? {}).map(([key, value]) => (
+                    <span key={`${key}-${value}`}>
+                      <Label labelKey={key} value={value} />
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-4">
