@@ -4,27 +4,26 @@ Glu has an opinionated set of models and abstractions, which when combined, allo
 
 ```go
 if err := pipelines.NewBuilder(system, glu.Name("checkout"), NewCheckoutResource).
-    // build an OCI phase from the OCI source named "checkout"
-    NewPhase(func(b pipelines.Builder[*CheckoutResource]) (edges.Phase[*CheckoutResource], error) {
-        return pipelines.OCIPhase(b, glu.Name("oci"), "checkout")
-    }).
-    // build a phase for the staging environment from the git repo source named "checkout"
-    // and configure it to promote from the OCI phase
-    PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
-        return pipelines.GitPhase(b, glu.Name("staging", glu.Label("env", "staging")), "checkout",
-            git.ProposeChanges[*CheckoutResource](git.ProposalOption{
-                Labels: []string{"automerge"},
-            }))
-    }, schedule.New(
-        // configure the promotion to run every 30 seconds
-        schedule.WithInterval(30*time.Second),
+    // configure a phase logging sink called history
+    LogsTo(pipelines.BoltLogger[*CheckoutResource]("history")).
+    // fetch the configured OCI repositority source named "checkout"
+    NewPhase(pipelines.OCIPhase[*CheckoutResource](glu.Name("oci"), "checkout")).
+    // build a phase for the staging environment which source from the git repository
+    // configure it to promote from the OCI phase
+    PromotesTo(pipelines.GitPhase(
+        glu.Name("staging", glu.Label("env", "staging")),
+        "checkout",
+        git.ProposeChanges[*CheckoutResource](git.ProposalOption{
+            Labels: []string{"automerge"},
+        }),
+    ), schedule.New(schedule.WithInterval(30*time.Second))).
+    // build a phase for the production environment which source from the git repository
+    // configure it to promote from the staging git phase
+    PromotesTo(pipelines.GitPhase[*CheckoutResource](
+        glu.Name("production", glu.Label("env", "production")),
+        "checkout",
     )).
-    // build a phase for the production environment from the git repo source named "checkout"
-    // and configure it to promote from the staging git phase
-    PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
-        return pipelines.GitPhase(b, glu.Name("production", glu.Label("env", "production")), "checkout")
-    }).
-    Build(system); err != nil {
+    Build(); err != nil {
     return err
 }
 ```

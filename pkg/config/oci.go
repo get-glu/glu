@@ -5,15 +5,15 @@ import (
 )
 
 var (
-	_ validater = (*OCIRepositories)(nil)
-	_ defaulter = (*OCIRepositories)(nil)
+	_ validater = (*OCISources)(nil)
+	_ defaulter = (*OCISources)(nil)
 )
 
-type OCIRepositories map[string]*OCIRepository
+type OCISources map[string]*OCIRepository
 
-func (o OCIRepositories) setDefaults() error {
+func (o OCISources) setDefaults() error {
 	for name, repo := range o {
-		if err := repo.setDefaults(); err != nil {
+		if err := repo.setDefaults(name); err != nil {
 			return fmt.Errorf("oci %q: %w", name, err)
 		}
 	}
@@ -21,7 +21,7 @@ func (o OCIRepositories) setDefaults() error {
 	return nil
 }
 
-func (o OCIRepositories) validate() error {
+func (o OCISources) validate() error {
 	for name, repo := range o {
 		if err := repo.validate(); err != nil {
 			return fmt.Errorf("oci %q: %w", name, err)
@@ -32,11 +32,16 @@ func (o OCIRepositories) validate() error {
 }
 
 type OCIRepository struct {
+	Name       string `glu:"name"`
 	Reference  string `glu:"reference"`
 	Credential string `glu:"credential"`
 }
 
-func (o *OCIRepository) setDefaults() error {
+func (o *OCIRepository) setDefaults(name string) error {
+	if o.Name == "" {
+		o.Name = name
+	}
+
 	return nil
 }
 

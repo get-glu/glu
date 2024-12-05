@@ -143,10 +143,8 @@ Remember, we said that we plan to define three phases:
 ### OCI
 
 ```go
-}).NewPhase(func(b pipelines.Builder[*AppResource]) (edges.Phase[*AppResource], error) {
-    // build a phase which sources from the OCI repository
-    return pipelines.OCIPhase(b, glu.Name("oci"), "app")
-})
+// build a phase which sources from the OCI repository
+NewPhase(pipelines.OCIPhase[*AppResource](glu.Name("oci"), "app"))
 ```
 
 The initial phase is nice and simple. We're going to use the `NewPhase` method on the builder to make a new phase using our builder.
@@ -184,10 +182,11 @@ This is where we will configure access to configuration stored in respective pat
 #### Staging
 
 ```go
-//...
-.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
-    return pipelines.GitPhase(b, glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")), "gitopsexample")
-})
+// build a phase which sources the staging env from Git and promotes from OCI.
+PromotesTo(pipelines.GitPhase[*AppResource](
+    glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")),
+    "gitopsexample",
+))
 ```
 
 Again, here we are building a new phase, passing it a function which takes a builder.
@@ -198,10 +197,6 @@ This particular function both creates a phase and it creates a _promotion_ edge 
 In other words, we make it so that you can promote from _oci_ to _staging_.
 This is how we create the promotion paths from one phase to the next in Glu.
 
-Here we're returning an `edges.UpdatePhase[*AppResource]` instead of just an `edges.Phase[*AppResource]`.
-This interface includes an additional method to the phase abstraction, which means the phase is writable.
-In order to support promoting to a phase, it needs to be writable so that we can update it.
-
 Also, this time we use `pipelines.GitPhase` instead of `pipelines.OCIPhase`.
 This gives us a phase which is backed by configuration in a Git Repository.
 This function, similarly to OCI, takes a builder, some identifying metadata and a source name.
@@ -209,10 +204,11 @@ This function, similarly to OCI, takes a builder, some identifying metadata and 
 #### Production
 
 ```go
-//...
-.PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
-    return pipelines.GitPhase(b, glu.Name("production", glu.Label("url", "http://0.0.0.0:30082")), "gitopsexample")
-})
+// build a phase which sources the production env from Git and promotes from the staging env.
+PromotesTo(pipelines.GitPhase[*AppResource](
+    glu.Name("production", glu.Label("url", "http://0.0.0.0:30082")),
+    "gitopsexample",
+))
 ```
 
 Finally, we describe our _production_ phase. As with staging, we pass the builder, metadata, a source name and we chain it onto the staging phase instead.
@@ -456,10 +452,11 @@ These will only get scheduled when Glu is run in serving mode (not as a CLI).
 The `pipelines.PhaseBuilder[R]` has a simplified method for registering triggers on promotion kind edges when calling `PromotesTo()`:
 
 ```diff
-PromotesTo(func(b pipelines.Builder[*AppResource]) (edges.UpdatablePhase[*AppResource], error) {
-   return pipelines.GitPhase(b, glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")), "gitopsexample")
--}).
-+}, schedule.New(
+PromotesTo(pipelines.GitPhase[*AppResource](
+    glu.Name("staging", glu.Label("url", "http://0.0.0.0:30081")),
+    "gitopsexample",
+-))
++), schedule.New(
 +    schedule.WithInterval(10*time.Second),
 +)).
 ```
