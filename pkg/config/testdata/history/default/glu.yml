@@ -1,0 +1,4 @@
+sources:
+  history:
+    default:
+      path: "history.db"

@@ -180,7 +180,7 @@ func TestConfig(t *testing.T) {
 			expected: &Config{
 				Log: Log{Level: "info"},
 				Sources: Sources{
-					Git: GitRepositories{
+					Git: GitSources{
 						"default": &GitRepository{
 							Remote: &Remote{
 								Name:     "upstream",
@@ -207,7 +207,7 @@ func TestConfig(t *testing.T) {
 			expected: &Config{
 				Log: Log{Level: "info"},
 				Sources: Sources{
-					Git: GitRepositories{
+					Git: GitSources{
 						"custom": &GitRepository{
 							Remote: &Remote{
 								Name:       "origin",
@@ -232,11 +232,34 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		{
+			path: "testdata/history/default",
+			expected: &Config{
+				Log: Log{Level: "info"},
+				Sources: Sources{
+					History: HistorySources{
+						"default": &HistorySource{
+							Type: HistorySourceTypeBoltDB,
+							Path: "history.db",
+						},
+					},
+				},
+				Server: Server{
+					Port:     8080,
+					Host:     "0.0.0.0",
+					Protocol: "http",
+				},
+				Metrics: Metrics{
+					Enabled:  true,
+					Exporter: MetricsExporterPrometheus,
+				},
+			},
+		},
+		{
 			path: "testdata/json",
 			expected: &Config{
 				Log: Log{Level: "info"},
 				Sources: Sources{
-					Git: GitRepositories{
+					Git: GitSources{
 						"custom": &GitRepository{
 							Remote: &Remote{
 								Name:       "origin",

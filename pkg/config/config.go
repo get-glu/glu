@@ -22,8 +22,9 @@ type Config struct {
 }
 
 type Sources struct {
-	Git GitRepositories `glu:"git"`
-	OCI OCIRepositories `glu:"oci"`
+	Git     GitSources     `glu:"git"`
+	OCI     OCISources     `glu:"oci"`
+	History HistorySources `glu:"history"`
 }
 
 type defaulter interface {
