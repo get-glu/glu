@@ -60,10 +60,8 @@ export function PhaseHistory({ pipelineId, phaseId }: PhaseHistoryProps) {
           </TooltipProvider>
         </SheetTrigger>
         <SheetContent>
-          <SheetHeader className="flex flex-col gap-1">
-            <SheetTitle className="underline decoration-primary decoration-1 underline-offset-8">
-              {phaseId}
-            </SheetTitle>
+          <SheetHeader className="flex flex-col gap-1 border-b border-b-muted pb-4">
+            <SheetTitle>{phaseId}</SheetTitle>
             <SheetDescription>Phase History</SheetDescription>
           </SheetHeader>
           <div className="mt-6 max-h-[calc(100vh-8rem)] space-y-6">
