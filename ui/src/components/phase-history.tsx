@@ -18,7 +18,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { useState } from 'react';
 import { History, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useGetPhaseHistoryQuery, useRollbackPhaseMutation } from '@/services/api';
+import { useGetPhaseHistoryQuery } from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from './ui/button';
 import { State } from '@/types/pipeline';
