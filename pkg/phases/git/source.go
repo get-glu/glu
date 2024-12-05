@@ -62,14 +62,6 @@ type Proposal struct {
 	Annotations map[string]string
 }
 
-// RefLog is a logging abstraction used to store the history of resource versions over time per phase.
-type RefLog[R core.Resource] interface {
-	CreateReference(context.Context, core.Descriptor) error
-	RecordLatest(context.Context, core.Descriptor, R, map[string]string) error
-	GetResourceAtVersion(context.Context, core.Descriptor, uuid.UUID) (R, error)
-	History(context.Context, core.Descriptor) ([]core.State, error)
-}
-
 // Phase is a Git storage backed phase implementation.
 // It is used to manage the state of a resource as represented in a target Git repository.
 type Phase[R Resource] struct {
@@ -81,7 +73,7 @@ type Phase[R Resource] struct {
 	proposer        Proposer
 	proposeChange   bool
 	proposalOptions ProposalOption
-	log             RefLog[R]
+	log             typed.PhaseLogger[R]
 }
 
 // Descriptor returns the phases descriptor.
@@ -107,8 +99,8 @@ func ProposeChanges[R Resource](opts ProposalOption) containers.Option[Phase[R]]
 	}
 }
 
-// WithLog sets of the reflog on the phase for tracking history
-func WithLog[R Resource](log RefLog[R]) containers.Option[Phase[R]] {
+// WithLogger sets of the reflog on the phase for tracking history
+func WithLogger[R Resource](log typed.PhaseLogger[R]) containers.Option[Phase[R]] {
 	return func(p *Phase[R]) {
 		p.log = log
 	}
@@ -135,7 +127,7 @@ func New[R Resource](
 	containers.ApplyAll(phase, opts...)
 
 	if phase.log != nil {
-		if err := phase.log.CreateReference(ctx, phase.Descriptor()); err != nil {
+		if err := phase.log.CreateLog(ctx, phase.Descriptor()); err != nil {
 			return nil, err
 		}
 

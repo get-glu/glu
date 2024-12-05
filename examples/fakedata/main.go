@@ -6,8 +6,9 @@ import (
 	"os"
 
 	"github.com/get-glu/glu"
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
-	"github.com/get-glu/glu/pkg/edges"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/pipelines"
 	"github.com/get-glu/glu/ui"
 )
@@ -18,21 +19,21 @@ func run(ctx context.Context) error {
 	// oci promotes to staging
 	stagingPhase := checkout.
 		// oci phase
-		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
+		NewPhase(func(pipelines.Builder[*MockResource]) (typed.Phase[*MockResource], error) {
 			return NewMockPhase("checkout", "oci", "oci"), nil
 		}).
 		// staging phase
-		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+		PromotesTo(func(pipelines.Builder[*MockResource]) (typed.UpdatablePhase[*MockResource], error) {
 			return NewMockPhase("checkout", "git", "staging"), nil
 		})
 
 	// staging promotes to prod-east-1
-	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (typed.UpdatablePhase[*MockResource], error) {
 		return NewMockPhase("checkout", "git", "production-east-1"), nil
 	})
 
 	// staging promotes to prod-west-1
-	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+	stagingPhase.PromotesTo(func(pipelines.Builder[*MockResource]) (typed.UpdatablePhase[*MockResource], error) {
 		return NewMockPhase("checkout", "git", "production-east-2"), nil
 	})
 
@@ -42,15 +43,15 @@ func run(ctx context.Context) error {
 
 	billing := pipelines.NewBuilder(system, glu.Name("billing"), NewMockResource).
 		// oci phase
-		NewPhase(func(pipelines.Builder[*MockResource]) (edges.Phase[*MockResource], error) {
+		NewPhase(func(pipelines.Builder[*MockResource]) (typed.Phase[*MockResource], error) {
 			return NewMockPhase("billing", "oci", "oci"), nil
 		}).
 		// staging phase
-		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+		PromotesTo(func(pipelines.Builder[*MockResource]) (typed.UpdatablePhase[*MockResource], error) {
 			return NewMockPhase("billing", "git", "staging"), nil
 		}).
 		// production phase
-		PromotesTo(func(pipelines.Builder[*MockResource]) (edges.UpdatablePhase[*MockResource], error) {
+		PromotesTo(func(pipelines.Builder[*MockResource]) (typed.UpdatablePhase[*MockResource], error) {
 			return NewMockPhase("billing", "git", "production"), nil
 		})
 
@@ -110,6 +111,6 @@ func (m *MockPhase) History(_ context.Context) ([]core.State, error) {
 	return nil, nil
 }
 
-func (m *MockPhase) Update(_ context.Context, to *MockResource) (map[string]string, error) {
-	return map[string]string{}, nil
+func (m *MockPhase) Update(context.Context, *MockResource, ...containers.Option[typed.UpdateOptions]) (*core.Result, error) {
+	return nil, nil
 }

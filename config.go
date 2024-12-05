@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	giturls "github.com/whilp/git-urls"
+	"go.etcd.io/bbolt"
 )
 
 // Config is a utility for extracting configured sources by their name
@@ -30,6 +31,7 @@ type Config struct {
 		oci      map[string]*oci.Repository
 		repo     map[string]*git.Repository
 		proposer map[string]srcgit.Proposer
+		bolt     map[string]*bbolt.DB
 	}
 }
 
@@ -43,6 +45,7 @@ func newConfigSource(ctx context.Context, conf *config.Config) *Config {
 	c.cache.oci = map[string]*oci.Repository{}
 	c.cache.repo = map[string]*git.Repository{}
 	c.cache.proposer = map[string]srcgit.Proposer{}
+	c.cache.bolt = map[string]*bbolt.DB{}
 
 	return c
 }
@@ -191,4 +194,27 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 	c.cache.oci[name] = repo
 
 	return repo, nil
+}
+
+// BoltDB constructs and configures a boltdb instance from configuration.
+// It caches built instances and returns the same instance for subsequent
+// calls with the same name.
+func (c *Config) BoltDB(name string) (*bbolt.DB, error) {
+	if db, ok := c.cache.bolt[name]; ok {
+		return db, nil
+	}
+
+	conf, ok := c.conf.Sources.Bolt[name]
+	if !ok {
+		return nil, fmt.Errorf("bolt %q: configuration not found", name)
+	}
+
+	db, err := bbolt.Open(conf.Path, 0666, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	c.cache.bolt[name] = db
+
+	return db, nil
 }

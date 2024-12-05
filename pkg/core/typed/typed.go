@@ -7,6 +7,7 @@ import (
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/google/uuid"
 )
 
 var (
@@ -14,6 +15,14 @@ var (
 	KindPromotion = "promotion"
 	KindRollback  = "rollback"
 )
+
+// PhaseLogger is a logging abstraction used to store the history of resource versions over time per phase.
+type PhaseLogger[R core.Resource] interface {
+	CreateLog(_ context.Context, phase core.Descriptor) error
+	RecordLatest(_ context.Context, phase core.Descriptor, _ R, _ map[string]string) error
+	GetResourceAtVersion(_ context.Context, phase core.Descriptor, version uuid.UUID) (R, error)
+	History(_ context.Context, phase core.Descriptor) ([]core.State, error)
+}
 
 // Phase is an interface around storage for resources.
 type Phase[R core.Resource] interface {
