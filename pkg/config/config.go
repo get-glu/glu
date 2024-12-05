@@ -19,12 +19,12 @@ type Config struct {
 	Sources     Sources     `glu:"sources"`
 	Server      Server      `glu:"server"`
 	Metrics     Metrics     `glu:"metrics"`
+	History     History     `glu:"history"`
 }
 
 type Sources struct {
-	Git  GitSources `glu:"git"`
-	OCI  OCISources `glu:"oci"`
-	Bolt BoltDBs    `glu:"bolt"`
+	Git GitSources `glu:"git"`
+	OCI OCISources `glu:"oci"`
 }
 
 type defaulter interface {

@@ -142,6 +142,25 @@ type Edge interface {
 }
 ```
 
+### History
+
+Pipelines can be configured to record the history of resource state transitions in a target phase. This enables a number of features:
+
+- Visualization of resource state transitions in the Glu UI.
+- Reversion of resource state to a previous version.
+- Triggering of promotion based on the presence of a new version (upcoming feature).
+- Pinning of resource versions to prevent them from being overwritten (upcoming feature).
+
+To enable history for a pipeline, you must configure a logging sink for the pipeline.
+
+We currently support a file-based logger, which writes to a database file on the local filesystem.
+
+```go
+pipeline.LogsTo(pipelines.FileLogger[*SomeResource]("history"))
+```
+
+File-based history is configured in the [configuration file](./configuration.md).
+
 #### Promotion
 
 The core `promotion` kind edge promotes one phase to the next on a call to `Perform(ctx)`.

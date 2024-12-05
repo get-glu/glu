@@ -31,6 +31,10 @@ sources:
       name: origin
       url: https://github.com/get-glu/example-app
       credential: github # name of the credential (above) to be used for this source
+
+history:
+  file:
+    path: /tmp/glu-history.db # path to the file on the local filesystem (optional, defaults to a temporary file)
 ```
 
 Credentials are used to authenticate with the source. [Sources](/?id=sources) allow for viewing and updating of resources (e.g. git repositories, OCI images).
@@ -63,7 +67,9 @@ Valid values are `debug`, `info`, `warn`, and `error`.
 
 ### credentials
 
-#### `credentials.<name>`
+Credentials are used to authenticate with sources. They are referenced by name in the configuration for sources.
+
+#### credentials.\<name\>
 
 The configuration for a named credential.
 
@@ -143,7 +149,11 @@ The path to the private key of the GitHub App.
 
 ### sources
 
-#### `sources.<name>`
+Sources are used to configure resources (e.g. git repositories, OCI images, files on the local filesystem).
+
+Different sources have different configuration options and are configured under a key corresponding to the source type.
+
+#### sources.\<name\>
 
 The configuration for a named source.
 
@@ -209,6 +219,24 @@ The reference to the OCI repository.
 
 The name of the credential to use for the OCI repository.
 
+### history
+
+History is used to store the history of the resources and actions performed on them.
+
+#### `history.type`
+
+The type of history to use.
+
+Valid values are `file`. (default)
+
+#### history.file.\<name\>
+
+The configuration for a file history.
+
+#### `history.file.<name>.path`
+
+The path to the file on the local filesystem.
+
 ### server
 
 #### `server.port`
@@ -232,3 +260,23 @@ The path to the certificate file to use for HTTPS.
 #### `server.key_file`
 
 The path to the key file to use for HTTPS.
+
+### metrics
+
+#### `metrics.enabled`
+
+Whether to enable metrics collection.
+
+#### `metrics.exporter`
+
+The exporter to use for metrics collection. Defaults to `prometheus`.
+
+Valid values are `prometheus` and `otlp`.
+
+#### `metrics.otlp.endpoint`
+
+The endpoint to use for OTLP metrics collection.
+
+#### `metrics.otlp.headers`
+
+Additional headers to use for OTLP metrics collection. This can be used to add authentication headers, etc.

@@ -1,5 +1,4 @@
-GitOps and Glu: Implementation
-==============================
+# GitOps and Glu: Implementation
 
 This guide follows on from the previous [GitOps and Glu: Overview](/guides/gitops-overview.md) guide.
 
@@ -412,7 +411,7 @@ func (r *AppResource) WriteTo(ctx context.Context, phase glu.Descriptor, fs fs.F
 	}
 
 	defer fi.Close()
-    
+
     // re-encode the deployment and copy it into the file
 	data, err := yaml.Marshal(deployment)
 	if err != nil {
