@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/get-glu/glu"
-	"github.com/get-glu/glu/pkg/edges"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/get-glu/glu/pkg/phases/git"
 	"github.com/get-glu/glu/pkg/phases/oci"
@@ -21,11 +21,11 @@ import (
 func run(ctx context.Context) error {
 	system := glu.NewSystem(ctx, glu.Name("mypipelines"), glu.WithUI(ui.FS()))
 	if err := pipelines.NewBuilder(system, glu.Name("checkout"), NewCheckoutResource).
-		NewPhase(func(b pipelines.Builder[*CheckoutResource]) (edges.Phase[*CheckoutResource], error) {
+		NewPhase(func(b pipelines.Builder[*CheckoutResource]) (typed.Phase[*CheckoutResource], error) {
 			// fetch the configured OCI repositority source named "checkout"
 			return pipelines.OCIPhase(b, glu.Name("oci"), "checkout")
 		}).
-		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
+		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (typed.UpdatablePhase[*CheckoutResource], error) {
 			// build a phase for the staging environment which source from the git repository
 			// configure it to promote from the OCI phase
 			return pipelines.GitPhase(b, glu.Name("staging", glu.Label("env", "staging")), "checkout",
@@ -35,7 +35,7 @@ func run(ctx context.Context) error {
 		}, schedule.New(
 			schedule.WithInterval(30*time.Second),
 		)).
-		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (edges.UpdatablePhase[*CheckoutResource], error) {
+		PromotesTo(func(b pipelines.Builder[*CheckoutResource]) (typed.UpdatablePhase[*CheckoutResource], error) {
 			// build a phase for the production environment which source from the git repository
 			// configure it to promote from the staging git phase
 			return pipelines.GitPhase(b, glu.Name("production", glu.Label("env", "production")), "checkout")

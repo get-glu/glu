@@ -6,80 +6,63 @@ import (
 	"os"
 )
 
-type HistorySources map[string]*HistorySource
+type BoltDBs map[string]*BoltDB
 
-func (s HistorySources) validate() error {
-	for name, source := range s {
+func (b BoltDBs) validate() error {
+	for name, source := range b {
 		if err := source.validate(); err != nil {
-			return fmt.Errorf("history %q: %w", name, err)
+			return fmt.Errorf("bolt %q: %w", name, err)
 		}
 	}
 
 	return nil
 }
 
-func (s HistorySources) setDefaults() error {
-	for name, source := range s {
+func (b BoltDBs) setDefaults() error {
+	for name, source := range b {
 		if err := source.setDefaults(name); err != nil {
-			return fmt.Errorf("history %q: %w", name, err)
+			return fmt.Errorf("bolt %q: %w", name, err)
 		}
 	}
 
 	return nil
 }
 
-type HistorySourceType string
-
-const (
-	HistorySourceTypeBoltDB = "bolt"
-)
-
-type HistorySource struct {
-	Name string            `glu:"name"`
-	Type HistorySourceType `glu:"type"`
-	Path string            `glu:"path"`
+type BoltDB struct {
+	Name string `glu:"name"`
+	Path string `glu:"path"`
 }
 
-func (s *HistorySource) validate() error {
+func (s *BoltDB) validate() error {
 	if s == nil {
-		return errFieldRequired("history")
+		return errFieldRequired("bolt")
 	}
 
-	switch s.Type {
-	case HistorySourceTypeBoltDB:
-		return nil
+	if s.Path == "" {
+		return errFieldRequired("path")
 	}
 
-	return fmt.Errorf("unexpected history source type: %q", s.Type)
+	return nil
 }
 
-func (s *HistorySource) setDefaults(name string) error {
+func (s *BoltDB) setDefaults(name string) error {
 	if s == nil {
 		return nil
 	}
 
-	switch s.Type {
-	case "", HistorySourceTypeBoltDB:
-		if s.Type == "" {
-			slog.Debug("setting missing default", "source.history.type", HistorySourceTypeBoltDB)
-
-			s.Type = HistorySourceTypeBoltDB
+	if s.Path == "" {
+		fi, err := os.CreateTemp("", "bolt-*.db")
+		if err != nil {
+			return fmt.Errorf("creating temp dir: %w", err)
 		}
 
-		if s.Path == "" {
-			fi, err := os.CreateTemp("", "history-*.db")
-			if err != nil {
-				return fmt.Errorf("creating temp dir: %w", err)
-			}
-
-			if err := fi.Close(); err != nil {
-				return err
-			}
-
-			s.Path = fi.Name()
-
-			slog.Info("created temporary file for history", "source.history", name, "path", s.Path)
+		if err := fi.Close(); err != nil {
+			return err
 		}
+
+		s.Path = fi.Name()
+
+		slog.Info("created temporary file for bolt", "source.bolt", name, "path", s.Path)
 	}
 
 	return nil

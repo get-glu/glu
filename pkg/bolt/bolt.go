@@ -25,15 +25,15 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-type Log[R core.Resource] struct {
+type PhaseLogger[R core.Resource] struct {
 	db      *bbolt.DB
 	encoder func(any) ([]byte, error)
 	decoder func([]byte, any) error
 	last    map[string]map[string]version
 }
 
-func New[R core.Resource](db *bbolt.DB) *Log[R] {
-	return &Log[R]{
+func New[R core.Resource](db *bbolt.DB) *PhaseLogger[R] {
+	return &PhaseLogger[R]{
 		db:      db,
 		encoder: json.Marshal,
 		decoder: json.Unmarshal,
@@ -46,7 +46,7 @@ type version struct {
 	Annotations map[string]string
 }
 
-func (l *Log[R]) CreateReference(ctx context.Context, phase core.Descriptor) error {
+func (l *PhaseLogger[R]) CreateLog(ctx context.Context, phase core.Descriptor) error {
 	return l.db.Update(func(tx *bbolt.Tx) error {
 		if _, err := createBucketPath(tx, versionBucket, refBucket, phase.Pipeline, phase.Metadata.Name); err != nil {
 			return err
@@ -57,7 +57,7 @@ func (l *Log[R]) CreateReference(ctx context.Context, phase core.Descriptor) err
 	})
 }
 
-func (l *Log[R]) RecordLatest(ctx context.Context, phase core.Descriptor, resource R, annotations map[string]string) error {
+func (l *PhaseLogger[R]) RecordLatest(ctx context.Context, phase core.Descriptor, resource R, annotations map[string]string) error {
 	slog := slog.With("pipeline", phase.Pipeline, "phase", phase.Metadata.Name)
 	return l.db.Update(func(tx *bbolt.Tx) error {
 		digest, err := resource.Digest()
@@ -112,7 +112,7 @@ func (l *Log[R]) RecordLatest(ctx context.Context, phase core.Descriptor, resour
 	})
 }
 
-func (l *Log[R]) getLatestVersion(refs *bbolt.Bucket, phase core.Descriptor) (version, bool) {
+func (l *PhaseLogger[R]) getLatestVersion(refs *bbolt.Bucket, phase core.Descriptor) (version, bool) {
 	phases, ok := l.last[phase.Pipeline]
 	if !ok {
 		phases = map[string]version{}
@@ -132,7 +132,7 @@ func (l *Log[R]) getLatestVersion(refs *bbolt.Bucket, phase core.Descriptor) (ve
 	return version, true
 }
 
-func (l *Log[R]) fetchLatestVersion(refs *bbolt.Bucket) (v version, _ bool) {
+func (l *PhaseLogger[R]) fetchLatestVersion(refs *bbolt.Bucket) (v version, _ bool) {
 	k, data := refs.Cursor().Last()
 	if k == nil {
 		return v, false
@@ -146,7 +146,7 @@ func (l *Log[R]) fetchLatestVersion(refs *bbolt.Bucket) (v version, _ bool) {
 }
 
 // GetResourceAtVersion returns the state of the resource at a given point in history identified by the provided version
-func (l *Log[R]) GetResourceAtVersion(ctx context.Context, phase core.Descriptor, v uuid.UUID) (r R, _ error) {
+func (l *PhaseLogger[R]) GetResourceAtVersion(ctx context.Context, phase core.Descriptor, v uuid.UUID) (r R, _ error) {
 	return r, l.db.View(func(tx *bbolt.Tx) error {
 		refs, err := getRefsBucket(phase, tx)
 		if err != nil {
@@ -183,7 +183,7 @@ func (l *Log[R]) GetResourceAtVersion(ctx context.Context, phase core.Descriptor
 }
 
 // Histort returns a slice of states for a provided phase descriptor.
-func (l *Log[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
+func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
 	return states, l.db.View(func(tx *bbolt.Tx) error {
 		refs, err := getRefsBucket(phase, tx)
 		if err != nil {

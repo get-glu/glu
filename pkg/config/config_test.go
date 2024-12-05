@@ -232,13 +232,12 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		{
-			path: "testdata/history/default",
+			path: "testdata/bolt/default",
 			expected: &Config{
 				Log: Log{Level: "info"},
 				Sources: Sources{
-					History: HistorySources{
-						"default": &HistorySource{
-							Type: HistorySourceTypeBoltDB,
+					Bolt: BoltDBs{
+						"default": &BoltDB{
 							Path: "history.db",
 						},
 					},

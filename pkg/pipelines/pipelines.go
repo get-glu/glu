@@ -23,6 +23,7 @@ type PipelineBuilder[R glu.Resource] struct {
 	system *glu.System
 	config *glu.Config
 	newFn  func() R
+	logger typed.PhaseLogger[R]
 
 	err error
 }
@@ -43,18 +44,33 @@ func (p *PipelineBuilder[R]) Context() context.Context {
 	return p.system.Context()
 }
 
+func (p *PipelineBuilder[R]) Logger() typed.PhaseLogger[R] {
+	return p.logger
+}
+
 // NewBuilder constructs and configures a new pipeline builder.
-func NewBuilder[R glu.Resource](system *glu.System, meta glu.Metadata, newFn func() R) *PipelineBuilder[R] {
+func NewBuilder[R glu.Resource](system *glu.System, meta glu.Metadata, newFn func() R, opts ...containers.Option[PipelineBuilder[R]]) *PipelineBuilder[R] {
 	config, err := system.Configuration()
 	if err != nil {
 		return &PipelineBuilder[R]{err: err}
 	}
 
-	return &PipelineBuilder[R]{
+	builder := &PipelineBuilder[R]{
 		system:   system,
 		config:   config,
 		pipeline: glu.NewPipeline(meta),
 		newFn:    newFn,
+	}
+
+	containers.ApplyAll(builder, opts...)
+
+	return builder
+}
+
+// WithLogger sets the phase logger to be passed to each newly built phase.
+func WithLogger[R glu.Resource](logger typed.PhaseLogger[R]) containers.Option[PipelineBuilder[R]] {
+	return func(b *PipelineBuilder[R]) {
+		b.logger = logger
 	}
 }
 
@@ -127,10 +143,11 @@ func (b *PhaseBuilder[R]) PromotesTo(fn func(b Builder[R]) (typed.UpdatablePhase
 
 // Builder is used carry dependencies for building new phases
 type Builder[R glu.Resource] interface {
-	Context() context.Context
-	Configuration() *glu.Config
-	PipelineName() string
 	New() R
+	Context() context.Context
+	PipelineName() string
+	Configuration() *glu.Config
+	Logger() typed.PhaseLogger[R]
 }
 
 // GitPhase is a convenience function for building a git.Phase implementation using a pipeline builder implementation.
@@ -140,16 +157,19 @@ func GitPhase[R srcgit.Resource](builder Builder[R], meta glu.Metadata, srcName 
 		return nil, err
 	}
 
-	ctx := builder.Context()
+	defaultOpts := []containers.Option[srcgit.Phase[R]]{}
+	if logger := builder.Logger(); logger != nil {
+		defaultOpts = append(defaultOpts, srcgit.WithLogger(logger))
+	}
 
 	phase, err := srcgit.New(
-		ctx,
+		builder.Context(),
 		builder.PipelineName(),
 		meta,
 		builder.New,
 		repo,
 		proposer,
-		opts...,
+		append(defaultOpts, opts...)...,
 	)
 	if err != nil {
 		return nil, err

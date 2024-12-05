@@ -1,4 +1,4 @@
 sources:
-  history:
+  bolt:
     default:
       path: "history.db"
