@@ -16,16 +16,14 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
 
   return (
     <div className="flex flex-col border-t bg-background">
-      <div className="flex items-center justify-between px-4 py-2">
+      <div className="flex items-center justify-between border-b border-b-muted px-4 py-2">
         <div className="flex items-center gap-2">
           {node.data.kind === 'oci' ? (
             <Package className="h-4 w-4" />
           ) : (
             <GitBranch className="h-4 w-4" />
           )}
-          <h2 className="text-lg font-semibold underline decoration-primary decoration-1 underline-offset-8">
-            {descriptor.metadata.name}
-          </h2>
+          <h2 className="text-lg font-semibold">{descriptor.metadata.name}</h2>
         </div>
         <Button variant="ghost" size="sm" onClick={onToggle}>
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}

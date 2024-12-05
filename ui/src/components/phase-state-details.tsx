@@ -33,11 +33,9 @@ export function PhaseStateDetails({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col rounded-lg p-10 shadow-lg">
-          <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogHeader className="flex flex-row items-center justify-between border-b border-b-muted pb-4">
             <div className="flex w-full items-center justify-between">
-              <DialogTitle className="text-xl font-semibold underline decoration-primary decoration-1 underline-offset-8">
-                {phaseId}
-              </DialogTitle>
+              <DialogTitle className="text-xl font-semibold">{phaseId}</DialogTitle>
               {latest ? (
                 <Button variant="outline" className="cursor-default dark:text-primary" size="sm">
                   Current Version
