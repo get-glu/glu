@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/get-glu/glu/internal/git"
@@ -16,11 +17,13 @@ import (
 	"github.com/get-glu/glu/pkg/fs"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/uuid"
+	giturls "github.com/whilp/git-urls"
 )
 
 const (
 	AnnotationGitBaseRefKey     = "dev.getglu.git.base_ref"
 	AnnotationGitHeadSHAKey     = "dev.getglu.git.head_sha"
+	AnnotationGitCommitURLKey   = "dev.getglu.git.commit.url"
 	AnnotationProposalNumberKey = "dev.getglu.git.proposal.number"
 	AnnotationProposalURLKey    = "dev.getglu.git.proposal.url"
 )
@@ -218,10 +221,41 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 		return err
 	}
 
-	// record latest
-	p.log.RecordLatest(ctx, p.Descriptor(), r, map[string]string{
+	annotations := map[string]string{
 		AnnotationGitHeadSHAKey: ref,
-	})
+	}
+
+	defer func() {
+		// record latest
+		p.log.RecordLatest(ctx, p.Descriptor(), r, annotations)
+	}()
+
+	repoURL, err := giturls.Parse(p.repo.Remote().URLs[0])
+	if err != nil {
+		slog.Warn("while attempting to parse remote URL", "error", err)
+		return nil
+	}
+
+	// TODO: abstract this and support other SCM providers and self-hosted solutions
+	if !strings.HasPrefix(repoURL.Host, "github.com") {
+		slog.Warn("unsupported remote host", "host", repoURL.Host)
+		return nil
+	}
+
+	parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
+	if len(parts) < 2 {
+		slog.Warn("unexpected repository URL path", "path", repoURL.Path)
+		return nil
+	}
+
+	var (
+		repoOwner = parts[0]
+		repoName  = strings.TrimSuffix(parts[1], ".git")
+	)
+
+	if repoOwner != "" && repoName != "" {
+		annotations[AnnotationGitCommitURLKey] = fmt.Sprintf("https://github.com/%s/%s/commit/%s", repoOwner, repoName, ref)
+	}
 
 	return nil
 }

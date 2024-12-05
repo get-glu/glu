@@ -215,6 +215,10 @@ func (r *Repository) startPolling(ctx context.Context) {
 	}()
 }
 
+func (r *Repository) Remote() *config.RemoteConfig {
+	return r.remote
+}
+
 func (r *Repository) DefaultBranch() string {
 	return r.defaultBranch
 }

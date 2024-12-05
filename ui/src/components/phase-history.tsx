@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useState } from 'react';
-import { History, MoreVertical } from 'lucide-react';
+import { Github, History, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useGetPhaseHistoryQuery } from '@/services/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,7 @@ import { Button } from './ui/button';
 import { State } from '@/types/pipeline';
 import { PhaseStateDetails } from './phase-state-details';
 import { PhaseRollbackDialog } from './phase-rollback-dialog';
+import { ANNOTATION_GIT_COMMIT_URL } from '@/types/metadata';
 
 interface PhaseHistoryProps {
   pipelineId: string;
@@ -151,33 +152,54 @@ function PhaseHistoryItem({ pipelineId, phaseId, state, index }: PhaseHistoryIte
         {/* history card */}
         <div className="ml-6 mt-2 flex justify-between">
           {/* digest and hover */}
-          <HoverCard>
-            <HoverCardTrigger asChild className="cursor-default">
-              <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1">
-                <span className="font-mono text-xs">{state.digest?.slice(0, 30)}</span>
-              </span>
-            </HoverCardTrigger>
-            <HoverCardContent className="flex w-full flex-col gap-1">
-              <div className="text-sm">
-                <span className="text-foreground">Recorded At: </span>
-                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 text-xs">
-                  {new Date(state.recorded_at).toUTCString()}
+          <div className="flex flex-col gap-2">
+            <HoverCard>
+              <HoverCardTrigger asChild className="cursor-default">
+                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1">
+                  <span className="font-mono text-xs">{state.digest?.slice(0, 30)}</span>
                 </span>
-              </div>
-              <div className="text-sm">
-                <span className="text-foreground">Digest: </span>
-                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
-                  {state.digest}
-                </span>
-              </div>
-              <div className="text-sm">
-                <span className="text-foreground">Version: </span>
-                <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
-                  {state.version}
-                </span>
-              </div>
-            </HoverCardContent>
-          </HoverCard>
+              </HoverCardTrigger>
+              <HoverCardContent className="flex w-full flex-col gap-1">
+                <div className="text-sm">
+                  <span className="text-foreground">Recorded At: </span>
+                  <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 text-xs">
+                    {new Date(state.recorded_at).toUTCString()}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-foreground">Digest: </span>
+                  <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
+                    {state.digest}
+                  </span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-foreground">Version: </span>
+                  <span className="inline-flex items-center truncate rounded-md bg-muted px-2 py-1 font-mono text-xs">
+                    {state.version}
+                  </span>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+
+            <div className="group flex flex-row flex-wrap gap-2 hover:underline">
+              {Object.entries(state.annotations ?? {}).map(
+                ([key, value]) =>
+                  key === ANNOTATION_GIT_COMMIT_URL &&
+                  value.startsWith('https://github.com') && (
+                    <a
+                      key={`${key}-${value}`}
+                      href={value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs"
+                    >
+                      <Github className="h-2.5 w-2.5" />
+                      Commit
+                    </a>
+                  )
+              )}
+            </div>
+          </div>
 
           {/* dropdown menu */}
           <DropdownMenu>
