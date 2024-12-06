@@ -53,7 +53,7 @@ func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err er
 			return nil, err
 		}
 
-		// wrap the transport in the cache
+		// wrap the transport with the cache
 		cache.Transport = transport
 		return github.NewClient(cache.Client()), nil
 	}
@@ -63,7 +63,7 @@ func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err er
 		return nil, err
 	}
 
-	// wrap the client in the cache
+	// wrap the transport with the cache
 	cache.Transport = client.Transport
 	return github.NewClient(cache.Client()), nil
 }
