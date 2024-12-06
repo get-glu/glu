@@ -1,4 +1,4 @@
-package bolt
+package logger
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/kv"
 	"github.com/google/uuid"
 )
@@ -22,6 +23,8 @@ const (
 
 var (
 	ErrNotFound = errors.New("not found")
+
+	_ typed.PhaseLogger[core.Resource] = (*PhaseLogger[core.Resource])(nil)
 )
 
 type PhaseLogger[R core.Resource] struct {
@@ -136,37 +139,31 @@ func (l *PhaseLogger[R]) isUpToDate(refs kv.Bucket, phase core.Descriptor, diges
 	return false
 }
 
-func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket, phase core.Descriptor) (version, bool) {
-	phases, ok := l.last[phase.Pipeline]
-	if !ok {
-		phases = map[string]version{}
-		l.last[phase.Metadata.Name] = phases
-	}
-
-	version, ok := phases[phase.Metadata.Name]
-	if !ok {
-		version, ok = l.fetchLatestVersion(refs)
-		if !ok {
-			return version, false
+// GetLatestResource returns the state of the latest resource recorded.
+func (l *PhaseLogger[R]) GetLatestResource(ctx context.Context, phase core.Descriptor) (r R, _ error) {
+	return r, l.db.View(func(tx kv.Tx) error {
+		refs, err := getRefsBucket(phase, tx)
+		if err != nil {
+			return err
 		}
 
-		phases[phase.Metadata.Name] = version
-	}
+		curLatest, ok := l.getLatestVersion(refs, phase)
+		if !ok {
+			return fmt.Errorf("latest version: %w", ErrNotFound)
+		}
 
-	return version, true
-}
+		blobs, err := getBlobBucket(phase, tx)
+		if err != nil {
+			return err
+		}
 
-func (l *PhaseLogger[R]) fetchLatestVersion(refs kv.Bucket) (v version, _ bool) {
-	_, data, err := refs.Last()
-	if err != nil {
-		return v, false
-	}
+		blob, err := blobs.Get(curLatest.Digest)
+		if err != nil {
+			return fmt.Errorf("version data for %q: %w", curLatest.Digest, err)
+		}
 
-	if err := l.decoder(data, &v); err != nil {
-		return v, false
-	}
-
-	return v, true
+		return l.decoder(blob, &r)
+	})
 }
 
 // GetResourceAtVersion returns the state of the resource at a given point in history identified by the provided version
@@ -204,6 +201,39 @@ func (l *PhaseLogger[R]) GetResourceAtVersion(ctx context.Context, phase core.De
 
 		return l.decoder(blob, &r)
 	})
+}
+
+func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket, phase core.Descriptor) (version, bool) {
+	phases, ok := l.last[phase.Pipeline]
+	if !ok {
+		phases = map[string]version{}
+		l.last[phase.Metadata.Name] = phases
+	}
+
+	version, ok := phases[phase.Metadata.Name]
+	if !ok {
+		version, ok = l.fetchLatestVersion(refs)
+		if !ok {
+			return version, false
+		}
+
+		phases[phase.Metadata.Name] = version
+	}
+
+	return version, true
+}
+
+func (l *PhaseLogger[R]) fetchLatestVersion(refs kv.Bucket) (v version, _ bool) {
+	_, data, err := refs.Last()
+	if err != nil {
+		return v, false
+	}
+
+	if err := l.decoder(data, &v); err != nil {
+		return v, false
+	}
+
+	return v, true
 }
 
 // Histort returns a slice of states for a provided phase descriptor.

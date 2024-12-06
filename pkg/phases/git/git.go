@@ -15,6 +15,8 @@ import (
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/kv/memory"
+	"github.com/get-glu/glu/pkg/phases/logger"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/uuid"
 	giturls "github.com/whilp/git-urls"
@@ -76,7 +78,7 @@ type Phase[R Resource] struct {
 	proposer        Proposer
 	proposeChange   bool
 	proposalOptions ProposalOption
-	log             typed.PhaseLogger[R]
+	logger          typed.PhaseLogger[R]
 }
 
 // Descriptor returns the phases descriptor.
@@ -105,7 +107,7 @@ func ProposeChanges[R Resource](opts ProposalOption) containers.Option[Phase[R]]
 // WithLogger sets of the reflog on the phase for tracking history
 func WithLogger[R Resource](log typed.PhaseLogger[R]) containers.Option[Phase[R]] {
 	return func(p *Phase[R]) {
-		p.log = log
+		p.logger = log
 	}
 }
 
@@ -125,17 +127,17 @@ func New[R Resource](
 		newFn:    newFn,
 		repo:     repo,
 		proposer: proposer,
+		// logger defaults to in-memory logger
+		logger: logger.New[R](memory.New()),
 	}
 
 	containers.ApplyAll(phase, opts...)
 
-	if phase.log != nil {
-		if err := phase.log.CreateLog(ctx, phase.Descriptor()); err != nil {
-			return nil, err
-		}
-
-		phase.repo.Subscribe(phase)
+	if err := phase.logger.CreateLog(ctx, phase.Descriptor()); err != nil {
+		return nil, err
 	}
+
+	phase.repo.Subscribe(phase)
 
 	return phase, nil
 }
@@ -179,16 +181,16 @@ func (p *Phase[R]) getResource(ctx context.Context) (R, error) {
 
 // History returns the history of the phase (given a log has been configured).
 func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
-	if p.log == nil {
+	if p.logger == nil {
 		return nil, nil
 	}
 
-	return p.log.History(ctx, p.Descriptor())
+	return p.logger.History(ctx, p.Descriptor())
 }
 
 // Rollback updates the state of the phase to a previous known version in history.
 func (p *Phase[R]) Rollback(ctx context.Context, version uuid.UUID) (*core.Result, error) {
-	resource, err := p.log.GetResourceAtVersion(ctx, p.Descriptor(), version)
+	resource, err := p.logger.GetResourceAtVersion(ctx, p.Descriptor(), version)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +229,7 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 
 	defer func() {
 		// record latest
-		p.log.RecordLatest(ctx, p.Descriptor(), r, annotations)
+		p.logger.RecordLatest(ctx, p.Descriptor(), r, annotations)
 	}()
 
 	repoURL, err := giturls.Parse(p.repo.Remote().URLs[0])

@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
+	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
+	"github.com/get-glu/glu/pkg/kv/memory"
+	"github.com/get-glu/glu/pkg/phases/logger"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
 )
@@ -42,6 +46,7 @@ type Phase[R Resource] struct {
 	newFn    func() R
 	resolver Resolver
 	logger   typed.PhaseLogger[R]
+	interval time.Duration
 }
 
 func New[R Resource](
@@ -61,37 +66,69 @@ func New[R Resource](
 		meta:     meta,
 		newFn:    newFn,
 		resolver: resolver,
+		logger:   logger.New[R](memory.New()),
+		interval: 20 * time.Second,
 	}
 
 	containers.ApplyAll(phase, opts...)
 
 	meta.Annotations[ANNOTATION_OCI_IMAGE_URL] = phase.resolver.Reference()
 
-	if phase.logger != nil {
-		if err := phase.logger.CreateLog(ctx, phase.Descriptor()); err != nil {
-			return nil, err
-		}
+	if err := phase.logger.CreateLog(ctx, phase.Descriptor()); err != nil {
+		return nil, err
 	}
+
+	// do initial fetch and set for resource
+	if err := phase.updateResource(ctx); err != nil {
+		return nil, err
+	}
+
+	ticker := time.NewTicker(phase.interval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := phase.updateResource(ctx); err != nil {
+					slog.Error("updating phase resource", "type", "oci", "phase", meta.Name, "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	return phase, nil
 }
 
-func (s *Phase[R]) Descriptor() core.Descriptor {
+func (p *Phase[R]) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		Kind:     "oci",
-		Pipeline: s.pipeline,
-		Metadata: s.meta,
+		Pipeline: p.pipeline,
+		Metadata: p.meta,
 	}
 }
 
-func (s *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
-	return s.GetResource(ctx)
+func (p *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
+	return p.GetResource(ctx)
 }
 
-func (s *Phase[R]) GetResource(ctx context.Context) (R, error) {
-	r := s.newFn()
+func (p *Phase[R]) GetResource(ctx context.Context) (R, error) {
+	return p.logger.GetLatestResource(ctx, p.Descriptor())
+}
 
-	desc, reader, err := s.resolver.Resolve(ctx)
+func (p *Phase[R]) updateResource(ctx context.Context) error {
+	r, err := p.fetchResource(ctx)
+	if err != nil {
+		return err
+	}
+
+	return p.logger.RecordLatest(ctx, p.Descriptor(), r, nil)
+}
+
+func (p *Phase[R]) fetchResource(ctx context.Context) (R, error) {
+	r := p.newFn()
+
+	desc, reader, err := p.resolver.Resolve(ctx)
 	if err != nil {
 		return r, err
 	}
