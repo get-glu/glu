@@ -265,11 +265,9 @@ func (r *Repository) Fetch(ctx context.Context, specific ...string) (err error) 
 	defer func() {
 		r.mu.Unlock()
 
-		// update subscribers if any matching and requested references
-		// are updated while processing this fetch
-		if len(updatedRefs) > 0 {
-			r.updateSubs(ctx, updatedRefs)
-		}
+		// we update outside the lock as subscribers often re-enter
+		// the repo with view in reaction to updates to get new state
+		r.updateSubs(ctx, updatedRefs)
 	}()
 
 	heads := specific
@@ -511,8 +509,10 @@ func (r *Repository) updateSubs(ctx context.Context, refs map[string]plumbing.Ha
 			}
 		}
 
-		if err := sub.Notify(ctx, matched); err != nil {
-			r.logger.Error("while updating subscriber", "error", err)
+		if len(matched) > 0 {
+			if err := sub.Notify(ctx, matched); err != nil {
+				r.logger.Error("while updating subscriber", "error", err)
+			}
 		}
 	}
 }

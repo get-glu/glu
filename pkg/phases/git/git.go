@@ -8,13 +8,14 @@ import (
 	"maps"
 	"path"
 	"strings"
-	"sync"
 
 	"github.com/get-glu/glu/internal/git"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/fs"
+	"github.com/get-glu/glu/pkg/kv/memory"
+	"github.com/get-glu/glu/pkg/phases/logger"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/uuid"
 	giturls "github.com/whilp/git-urls"
@@ -68,7 +69,6 @@ type Proposal struct {
 // Phase is a Git storage backed phase implementation.
 // It is used to manage the state of a resource as represented in a target Git repository.
 type Phase[R Resource] struct {
-	mu              sync.RWMutex
 	pipeline        string
 	meta            core.Metadata
 	newFn           func() R
@@ -76,7 +76,7 @@ type Phase[R Resource] struct {
 	proposer        Proposer
 	proposeChange   bool
 	proposalOptions ProposalOption
-	log             typed.PhaseLogger[R]
+	logger          typed.PhaseLogger[R]
 }
 
 // Descriptor returns the phases descriptor.
@@ -105,7 +105,7 @@ func ProposeChanges[R Resource](opts ProposalOption) containers.Option[Phase[R]]
 // WithLogger sets of the reflog on the phase for tracking history
 func WithLogger[R Resource](log typed.PhaseLogger[R]) containers.Option[Phase[R]] {
 	return func(p *Phase[R]) {
-		p.log = log
+		p.logger = log
 	}
 }
 
@@ -125,16 +125,23 @@ func New[R Resource](
 		newFn:    newFn,
 		repo:     repo,
 		proposer: proposer,
+		// logger defaults to in-memory logger
+		logger: logger.New[R](memory.New()),
 	}
 
 	containers.ApplyAll(phase, opts...)
 
-	if phase.log != nil {
-		if err := phase.log.CreateLog(ctx, phase.Descriptor()); err != nil {
-			return nil, err
-		}
+	if err := phase.logger.CreateLog(ctx, phase.Descriptor()); err != nil {
+		return nil, err
+	}
 
-		phase.repo.Subscribe(phase)
+	// subscribe to updates whenever the repo observes
+	// an update for the phases associated base branch
+	phase.repo.Subscribe(phase)
+
+	// record initial phase state for base branch
+	if err := phase.recordPhaseState(ctx, git.WithBranch(phase.branch())); err != nil {
+		return nil, err
 	}
 
 	return phase, nil
@@ -151,44 +158,23 @@ func (p *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
 }
 
 func (p *Phase[R]) GetResource(ctx context.Context) (R, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	return p.getResource(ctx)
-}
-
-func (p *Phase[R]) getResource(ctx context.Context) (R, error) {
-	var (
-		r    = p.newFn()
-		desc = p.Descriptor()
-	)
-
-	opts := []containers.Option[git.ViewUpdateOptions]{}
-	if branched, ok := core.Resource(r).(Branched); ok {
-		opts = append(opts, git.WithBranch(branched.Branch(desc)))
-	}
-
-	if err := p.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
-		return r.ReadFrom(ctx, desc, fs)
-	}, opts...); err != nil {
-		return r, err
-	}
-
-	return r, nil
+	// we fetch directly from the logger since we always log resource
+	// state here on update
+	return p.logger.GetLatestResource(ctx, p.Descriptor())
 }
 
 // History returns the history of the phase (given a log has been configured).
 func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
-	if p.log == nil {
+	if p.logger == nil {
 		return nil, nil
 	}
 
-	return p.log.History(ctx, p.Descriptor())
+	return p.logger.History(ctx, p.Descriptor())
 }
 
 // Rollback updates the state of the phase to a previous known version in history.
 func (p *Phase[R]) Rollback(ctx context.Context, version uuid.UUID) (*core.Result, error) {
-	resource, err := p.log.GetResourceAtVersion(ctx, p.Descriptor(), version)
+	resource, err := p.logger.GetResourceAtVersion(ctx, p.Descriptor(), version)
 	if err != nil {
 		return nil, err
 	}
@@ -207,6 +193,10 @@ func (p *Phase[R]) Branches() []string {
 	return []string{p.branch()}
 }
 
+// Notify records the phases state based on the revision of the repository
+// as identified in the provided map of branches to revisions.
+// This is required and called by repo.Subscribe whenever the phases matching branch
+// is updated.
 func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 	ref, ok := refs[p.branch()]
 	if !ok {
@@ -214,38 +204,49 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 		return nil
 	}
 
-	r := p.newFn()
-	if err := p.repo.View(ctx, func(hash plumbing.Hash, fs fs.Filesystem) error {
+	return p.recordPhaseState(ctx, git.WithRevision(plumbing.NewHash(ref)))
+}
+
+func (p *Phase[R]) recordPhaseState(ctx context.Context, opts ...containers.Option[git.ViewUpdateOptions]) (err error) {
+	var (
+		r    = p.newFn()
+		hash plumbing.Hash
+	)
+
+	if err := p.repo.View(ctx, func(h plumbing.Hash, fs fs.Filesystem) error {
+		hash = h
 		return r.ReadFrom(ctx, p.Descriptor(), fs)
-	}, git.WithRevision(plumbing.NewHash(ref))); err != nil {
+	}, opts...); err != nil {
 		return err
 	}
 
 	annotations := map[string]string{
-		AnnotationGitHeadSHAKey: ref,
+		AnnotationGitHeadSHAKey: hash.String(),
 	}
 
-	defer func() {
-		// record latest
-		p.log.RecordLatest(ctx, p.Descriptor(), r, annotations)
-	}()
+	p.annotateCommitURL(annotations, hash)
 
+	// record latest
+	return p.logger.RecordLatest(ctx, p.Descriptor(), r, annotations)
+}
+
+func (p *Phase[R]) annotateCommitURL(annotations map[string]string, hash plumbing.Hash) {
 	repoURL, err := giturls.Parse(p.repo.Remote().URLs[0])
 	if err != nil {
 		slog.Warn("while attempting to parse remote URL", "error", err)
-		return nil
+		return
 	}
 
 	// TODO: abstract this and support other SCM providers and self-hosted solutions
 	if !strings.HasPrefix(repoURL.Host, "github.com") {
 		slog.Warn("unsupported remote host", "host", repoURL.Host)
-		return nil
+		return
 	}
 
 	parts := strings.SplitN(strings.TrimPrefix(repoURL.Path, "/"), "/", 2)
 	if len(parts) < 2 {
 		slog.Warn("unexpected repository URL path", "path", repoURL.Path)
-		return nil
+		return
 	}
 
 	var (
@@ -254,24 +255,22 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 	)
 
 	if repoOwner != "" && repoName != "" {
-		annotations[AnnotationGitCommitURLKey] = fmt.Sprintf("https://github.com/%s/%s/commit/%s", repoOwner, repoName, ref)
+		annotations[AnnotationGitCommitURLKey] = fmt.Sprintf("https://github.com/%s/%s/commit/%s", repoOwner, repoName, hash)
 	}
 
-	return nil
+	return
 }
 
+// Update sets the phases state to the provided resource using the resource types
+// ReadFrom and WriteTo methods to update state accordingly.
+// Given a propose is configured, a proposal will be made and the update will be asynchronous.
 func (p *Phase[R]) Update(ctx context.Context, to R, opts ...containers.Option[typed.UpdateOptions]) (*core.Result, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// perform an initial fetch to ensure we're up to date
-	// TODO(georgmac): scope to phase branch and proposal prefix
-	err := p.repo.Fetch(ctx)
-	if err != nil {
+	// inital fetch to ensure we're up to date and avoid conflicts
+	if err := p.repo.Fetch(ctx, p.branch()); err != nil {
 		return nil, fmt.Errorf("fetching upstream during update: %w", err)
 	}
 
-	from, err := p.getResource(ctx)
+	from, err := p.GetResource(ctx)
 	if err != nil {
 		return nil, err
 	}

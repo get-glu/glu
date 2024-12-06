@@ -7,8 +7,8 @@ import (
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/edges"
-	"github.com/get-glu/glu/pkg/logging/bolt"
 	srcgit "github.com/get-glu/glu/pkg/phases/git"
+	"github.com/get-glu/glu/pkg/phases/logger"
 	srcoci "github.com/get-glu/glu/pkg/phases/oci"
 	"github.com/get-glu/glu/pkg/triggers"
 )
@@ -194,15 +194,14 @@ func OCIPhase[R srcoci.Resource](meta glu.Metadata, srcName string, opts ...cont
 			return nil, err
 		}
 
-		phase := srcoci.New(
+		return srcoci.New(
+			builder.Context(),
 			builder.PipelineName(),
 			meta,
 			builder.New,
 			repo,
 			opts...,
 		)
-
-		return phase, nil
 	}
 }
 
@@ -215,6 +214,6 @@ func FileLogger[R glu.Resource](name string) func(Builder[R]) (typed.PhaseLogger
 			return nil, err
 		}
 
-		return bolt.New[R](db), nil
+		return logger.New[R](db), nil
 	}
 }

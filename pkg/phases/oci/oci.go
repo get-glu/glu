@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
+	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
-	"github.com/opencontainers/go-digest"
+	"github.com/get-glu/glu/pkg/kv/memory"
+	"github.com/get-glu/glu/pkg/phases/logger"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
 )
@@ -42,9 +45,18 @@ type Phase[R Resource] struct {
 	meta     core.Metadata
 	newFn    func() R
 	resolver Resolver
+	logger   typed.PhaseLogger[R]
+	interval time.Duration
 }
 
-func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolver Resolver, opts ...containers.Option[Phase[R]]) *Phase[R] {
+func New[R Resource](
+	ctx context.Context,
+	pipeline string,
+	meta core.Metadata,
+	newFn func() R,
+	resolver Resolver,
+	opts ...containers.Option[Phase[R]],
+) (*Phase[R], error) {
 	if meta.Annotations == nil {
 		meta.Annotations = map[string]string{}
 	}
@@ -54,31 +66,69 @@ func New[R Resource](pipeline string, meta core.Metadata, newFn func() R, resolv
 		meta:     meta,
 		newFn:    newFn,
 		resolver: resolver,
+		logger:   logger.New[R](memory.New()),
+		interval: 20 * time.Second,
 	}
 
 	containers.ApplyAll(phase, opts...)
 
 	meta.Annotations[ANNOTATION_OCI_IMAGE_URL] = phase.resolver.Reference()
 
-	return phase
+	if err := phase.logger.CreateLog(ctx, phase.Descriptor()); err != nil {
+		return nil, err
+	}
+
+	// do initial fetch and set for resource
+	if err := phase.updateResource(ctx); err != nil {
+		return nil, err
+	}
+
+	ticker := time.NewTicker(phase.interval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := phase.updateResource(ctx); err != nil {
+					slog.Error("updating phase resource", "type", "oci", "phase", meta.Name, "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return phase, nil
 }
 
-func (s *Phase[R]) Descriptor() core.Descriptor {
+func (p *Phase[R]) Descriptor() core.Descriptor {
 	return core.Descriptor{
 		Kind:     "oci",
-		Pipeline: s.pipeline,
-		Metadata: s.meta,
+		Pipeline: p.pipeline,
+		Metadata: p.meta,
 	}
 }
 
-func (s *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
-	return s.GetResource(ctx)
+func (p *Phase[R]) Get(ctx context.Context) (core.Resource, error) {
+	return p.GetResource(ctx)
 }
 
-func (s *Phase[R]) GetResource(ctx context.Context) (R, error) {
-	r := s.newFn()
+func (p *Phase[R]) GetResource(ctx context.Context) (R, error) {
+	return p.logger.GetLatestResource(ctx, p.Descriptor())
+}
 
-	desc, reader, err := s.resolver.Resolve(ctx)
+func (p *Phase[R]) updateResource(ctx context.Context) error {
+	r, err := p.fetchResource(ctx)
+	if err != nil {
+		return err
+	}
+
+	return p.logger.RecordLatest(ctx, p.Descriptor(), r, nil)
+}
+
+func (p *Phase[R]) fetchResource(ctx context.Context) (R, error) {
+	r := p.newFn()
+
+	desc, reader, err := p.resolver.Resolve(ctx)
 	if err != nil {
 		return r, err
 	}
@@ -129,45 +179,6 @@ func (s *Phase[R]) GetResource(ctx context.Context) (R, error) {
 	return r, r.ReadFromOCIDescriptor(desc)
 }
 
-func (s *Phase[A]) History(ctx context.Context) ([]core.State, error) {
-	// TODO: implement
-	return []core.State{}, nil
-}
-
-var (
-	_ ResourceFromIndex    = (*BaseResource)(nil)
-	_ ResourceFromManifest = (*BaseResource)(nil)
-)
-
-type BaseResource struct {
-	// ImageName   string // TODO: add this when we have a use case for it
-	ImageDigest digest.Digest `json:"image_digest,omitempty"`
-	annotations map[string]string
-}
-
-func (r *BaseResource) Digest() (string, error) {
-	return r.ImageDigest.Encoded(), nil
-}
-
-func (r *BaseResource) Annotations() map[string]string {
-	return r.annotations
-}
-
-func (r *BaseResource) ReadFromOCIDescriptor(desc v1.Descriptor) error {
-	r.ImageDigest = desc.Digest
-	r.annotations = desc.Annotations
-	return nil
-}
-
-func (r *BaseResource) ReadFromOCIManifest(desc v1.Descriptor, manifest v1.Manifest) error {
-	r.ImageDigest = desc.Digest
-	r.annotations = manifest.Annotations
-
-	return nil
-}
-
-func (r *BaseResource) ReadFromOCIIndex(desc v1.Descriptor, index v1.Index) error {
-	r.ImageDigest = desc.Digest
-	r.annotations = index.Annotations
-	return nil
+func (p *Phase[A]) History(ctx context.Context) ([]core.State, error) {
+	return p.logger.History(ctx, p.Descriptor())
 }

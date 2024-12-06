@@ -20,6 +20,7 @@ var (
 type PhaseLogger[R core.Resource] interface {
 	CreateLog(_ context.Context, phase core.Descriptor) error
 	RecordLatest(_ context.Context, phase core.Descriptor, _ R, _ map[string]string) error
+	GetLatestResource(_ context.Context, phase core.Descriptor) (R, error)
 	GetResourceAtVersion(_ context.Context, phase core.Descriptor, version uuid.UUID) (R, error)
 	History(_ context.Context, phase core.Descriptor) ([]core.State, error)
 }

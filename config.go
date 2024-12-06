@@ -12,12 +12,12 @@ import (
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/credentials"
+	"github.com/get-glu/glu/pkg/kv/bolt"
 	srcgit "github.com/get-glu/glu/pkg/phases/git"
 	"github.com/get-glu/glu/pkg/scm/github"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	giturls "github.com/whilp/git-urls"
-	"go.etcd.io/bbolt"
 )
 
 // Config is a utility for extracting configured sources by their name
@@ -31,7 +31,7 @@ type Config struct {
 		oci      map[string]*oci.Repository
 		repo     map[string]*git.Repository
 		proposer map[string]srcgit.Proposer
-		bolt     map[string]*bbolt.DB
+		bolt     map[string]*bolt.DB
 	}
 }
 
@@ -45,7 +45,7 @@ func newConfigSource(ctx context.Context, conf *config.Config) *Config {
 	c.cache.oci = map[string]*oci.Repository{}
 	c.cache.repo = map[string]*git.Repository{}
 	c.cache.proposer = map[string]srcgit.Proposer{}
-	c.cache.bolt = map[string]*bbolt.DB{}
+	c.cache.bolt = map[string]*bolt.DB{}
 
 	return c
 }
@@ -199,7 +199,7 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 // FileDB constructs and configures a boltdb instance from configuration.
 // It caches built instances and returns the same instance for subsequent
 // calls with the same name.
-func (c *Config) FileDB(name string) (*bbolt.DB, error) {
+func (c *Config) FileDB(name string) (*bolt.DB, error) {
 	if db, ok := c.cache.bolt[name]; ok {
 		return db, nil
 	}
@@ -209,7 +209,7 @@ func (c *Config) FileDB(name string) (*bbolt.DB, error) {
 		return nil, fmt.Errorf("file db %q: configuration not found", name)
 	}
 
-	db, err := bbolt.Open(conf.Path, 0666, nil)
+	db, err := bolt.Open(conf.Path, 0666, nil)
 	if err != nil {
 		return nil, err
 	}

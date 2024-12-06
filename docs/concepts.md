@@ -151,9 +151,17 @@ Pipelines can be configured to record the history of resource state transitions 
 - Triggering of promotion based on the presence of a new version (upcoming feature).
 - Pinning of resource versions to prevent them from being overwritten (upcoming feature).
 
-To enable history for a pipeline, you must configure a logging sink for the pipeline.
+#### In-Memory
 
-We currently support a file-based logger, which writes to a database file on the local filesystem.
+History is enabled by default, however, it is persisted in-memory.
+With the default in-memory log enabled, your history will not persist between restarts.
+The first state recorded in-memory is always the most recent state of the target source (e.g. HEAD of main in Git, or digest for latest tag in OCI).
+
+#### File
+
+We also support a file-based logger, which writes to a database file on the local filesystem.
+Using this method allows you to persist the log between Glu restarts.
+The database is currently implemented using [bbolt](https://github.com/etcd-io/bbolt).
 
 ```go
 pipeline.LogsTo(pipelines.FileLogger[*SomeResource]("history"))
