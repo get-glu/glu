@@ -6,36 +6,46 @@ import (
 	"os"
 )
 
-type BoltDBs map[string]*BoltDB
+type HistoryType string
 
-func (b BoltDBs) validate() error {
+const (
+	HistoryTypeFile HistoryType = "file"
+)
+
+type History struct {
+	File FileDBs `glu:"file"`
+}
+
+type FileDBs map[string]*FileDB
+
+func (b FileDBs) validate() error {
 	for name, source := range b {
 		if err := source.validate(); err != nil {
-			return fmt.Errorf("bolt %q: %w", name, err)
+			return fmt.Errorf("history: file %q: %w", name, err)
 		}
 	}
 
 	return nil
 }
 
-func (b BoltDBs) setDefaults() error {
+func (b FileDBs) setDefaults() error {
 	for name, source := range b {
 		if err := source.setDefaults(name); err != nil {
-			return fmt.Errorf("bolt %q: %w", name, err)
+			return fmt.Errorf("history: file %q: %w", name, err)
 		}
 	}
 
 	return nil
 }
 
-type BoltDB struct {
+type FileDB struct {
 	Name string `glu:"name"`
 	Path string `glu:"path"`
 }
 
-func (s *BoltDB) validate() error {
+func (s *FileDB) validate() error {
 	if s == nil {
-		return errFieldRequired("bolt")
+		return errFieldRequired("file")
 	}
 
 	if s.Path == "" {
@@ -45,9 +55,13 @@ func (s *BoltDB) validate() error {
 	return nil
 }
 
-func (s *BoltDB) setDefaults(name string) error {
+func (s *FileDB) setDefaults(name string) error {
 	if s == nil {
 		return nil
+	}
+
+	if s.Name == "" {
+		s.Name = name
 	}
 
 	if s.Path == "" {
@@ -62,7 +76,7 @@ func (s *BoltDB) setDefaults(name string) error {
 
 		s.Path = fi.Name()
 
-		slog.Info("created temporary file for bolt", "source.bolt", name, "path", s.Path)
+		slog.Info("created temporary file for file db", "history.file", name, "path", s.Path)
 	}
 
 	return nil

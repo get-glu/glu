@@ -21,7 +21,7 @@ func run(ctx context.Context) error {
 	system := glu.NewSystem(ctx, glu.Name("mypipelines"), glu.WithUI(ui.FS()))
 	if err := pipelines.NewBuilder(system, glu.Name("checkout"), NewCheckoutResource).
 		// configure a phase logging sink called history
-		LogsTo(pipelines.BoltLogger[*CheckoutResource]("history")).
+		LogsTo(pipelines.FileLogger[*CheckoutResource]("history")).
 		// fetch the configured OCI repositority source named "checkout"
 		NewPhase(pipelines.OCIPhase[*CheckoutResource](glu.Name("oci"), "checkout")).
 		// build a phase for the staging environment which source from the git repository

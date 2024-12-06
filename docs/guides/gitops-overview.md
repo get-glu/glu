@@ -1,5 +1,4 @@
-GitOps and Glu: Overview
-========================
+# GitOps and Glu: Overview
 
 In this guide, we will create a GitOps pipeline for deploying some simple applications to multiple "environments".
 For the purposes of keeping the illustration simple to create (and destroy), our environments are simply two separate pods in the same cluster. However, Glu can extend to multiple namespaces, clusters, or even non-Kubernetes deployment environments.

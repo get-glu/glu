@@ -196,17 +196,17 @@ func (c *Config) OCIRepository(name string) (_ *oci.Repository, err error) {
 	return repo, nil
 }
 
-// BoltDB constructs and configures a boltdb instance from configuration.
+// FileDB constructs and configures a boltdb instance from configuration.
 // It caches built instances and returns the same instance for subsequent
 // calls with the same name.
-func (c *Config) BoltDB(name string) (*bbolt.DB, error) {
+func (c *Config) FileDB(name string) (*bbolt.DB, error) {
 	if db, ok := c.cache.bolt[name]; ok {
 		return db, nil
 	}
 
-	conf, ok := c.conf.Sources.Bolt[name]
+	conf, ok := c.conf.History.File[name]
 	if !ok {
-		return nil, fmt.Errorf("bolt %q: configuration not found", name)
+		return nil, fmt.Errorf("file db %q: configuration not found", name)
 	}
 
 	db, err := bbolt.Open(conf.Path, 0666, nil)

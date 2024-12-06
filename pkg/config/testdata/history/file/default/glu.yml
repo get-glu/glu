@@ -1,4 +1,4 @@
-sources:
-  bolt:
+history:
+  file:
     default:
       path: "history.db"

@@ -206,11 +206,11 @@ func OCIPhase[R srcoci.Resource](meta glu.Metadata, srcName string, opts ...cont
 	}
 }
 
-// BoltLogger returns an instance of type.PhaseLogger which writes to a boltdb file
+// FileLogger returns an instance of type.PhaseLogger which writes to a file db
 // as configured by the provided name.
-func BoltLogger[R glu.Resource](name string) func(Builder[R]) (typed.PhaseLogger[R], error) {
+func FileLogger[R glu.Resource](name string) func(Builder[R]) (typed.PhaseLogger[R], error) {
 	return func(b Builder[R]) (typed.PhaseLogger[R], error) {
-		db, err := b.Configuration().BoltDB(name)
+		db, err := b.Configuration().FileDB(name)
 		if err != nil {
 			return nil, err
 		}
