@@ -13,16 +13,7 @@ const (
 )
 
 type History struct {
-	Type HistoryType `glu:"type"`
-	File FileDBs     `glu:"file"`
-}
-
-func (h *History) setDefaults() error {
-	if h.Type == "" {
-		h.Type = HistoryTypeFile
-	}
-
-	return nil
+	File FileDBs `glu:"file"`
 }
 
 type FileDBs map[string]*FileDB
@@ -30,7 +21,7 @@ type FileDBs map[string]*FileDB
 func (b FileDBs) validate() error {
 	for name, source := range b {
 		if err := source.validate(); err != nil {
-			return fmt.Errorf("file db %q: %w", name, err)
+			return fmt.Errorf("history: file %q: %w", name, err)
 		}
 	}
 
@@ -40,7 +31,7 @@ func (b FileDBs) validate() error {
 func (b FileDBs) setDefaults() error {
 	for name, source := range b {
 		if err := source.setDefaults(name); err != nil {
-			return fmt.Errorf("file db %q: %w", name, err)
+			return fmt.Errorf("history: file %q: %w", name, err)
 		}
 	}
 
@@ -67,6 +58,10 @@ func (s *FileDB) validate() error {
 func (s *FileDB) setDefaults(name string) error {
 	if s == nil {
 		return nil
+	}
+
+	if s.Name == "" {
+		s.Name = name
 	}
 
 	if s.Path == "" {

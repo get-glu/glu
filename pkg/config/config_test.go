@@ -200,9 +200,6 @@ func TestConfig(t *testing.T) {
 					Enabled:  true,
 					Exporter: MetricsExporterPrometheus,
 				},
-				History: History{
-					Type: HistoryTypeFile,
-				},
 			},
 		},
 		{
@@ -239,10 +236,9 @@ func TestConfig(t *testing.T) {
 			expected: &Config{
 				Log: Log{Level: "info"},
 				History: History{
-					Type: HistoryTypeFile,
 					File: FileDBs{
 						"default": &FileDB{
-							Name: "history",
+							Name: "default",
 							Path: "history.db",
 						},
 					},

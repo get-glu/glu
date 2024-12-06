@@ -1,5 +1,4 @@
 history:
-  type: file
   file:
     default:
       path: "history.db"
