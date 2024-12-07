@@ -14,6 +14,7 @@ import (
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/google/go-github/v64/github"
+	"github.com/gregjones/httpcache"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 	"oras.land/oras-go/v2/registry/remote/auth"
@@ -45,13 +46,16 @@ type Credential struct {
 }
 
 func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err error) {
+	cache := httpcache.NewMemoryCacheTransport()
 	if c.config.Type == config.CredentialTypeGitHubApp {
 		transport, err := c.githubInstallationTransport()
 		if err != nil {
 			return nil, err
 		}
 
-		return github.NewClient(&http.Client{Transport: transport}), nil
+		// wrap the transport with the cache
+		cache.Transport = transport
+		return github.NewClient(cache.Client()), nil
 	}
 
 	client, err := c.HTTPClient(ctx)
@@ -59,7 +63,9 @@ func (c *Credential) GitHubClient(ctx context.Context) (_ *github.Client, err er
 		return nil, err
 	}
 
-	return github.NewClient(client), nil
+	// wrap the transport with the cache
+	cache.Transport = client.Transport
+	return github.NewClient(cache.Client()), nil
 }
 
 func (c *Credential) HTTPClient(ctx context.Context) (*http.Client, error) {
