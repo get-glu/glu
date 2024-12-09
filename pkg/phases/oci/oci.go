@@ -179,6 +179,6 @@ func (p *Phase[R]) fetchResource(ctx context.Context) (R, error) {
 	return r, r.ReadFromOCIDescriptor(desc)
 }
 
-func (p *Phase[A]) History(ctx context.Context) ([]core.State, error) {
-	return p.logger.History(ctx, p.Descriptor())
+func (p *Phase[A]) History(ctx context.Context, opts ...containers.Option[core.HistoryOptions]) ([]core.State, error) {
+	return p.logger.History(ctx, p.Descriptor(), opts...)
 }

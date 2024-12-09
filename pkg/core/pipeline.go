@@ -16,7 +16,7 @@ import (
 type Phase interface {
 	Descriptor() Descriptor
 	Get(context.Context) (Resource, error)
-	History(context.Context) ([]State, error)
+	History(context.Context, ...containers.Option[HistoryOptions]) ([]State, error)
 }
 
 // RollbackPhase is a phase which can be rolled back to a previous version.
@@ -175,6 +175,19 @@ func (p *Pipeline) Edges(o ...containers.Option[EdgeOptions]) iter.Seq[Edge] {
 			}
 		}
 	})
+}
+
+// HistoryOptions are options for filtering history entries.
+type HistoryOptions struct {
+	Start uuid.UUID
+}
+
+// WithStart returns a HistoryOption that filters history entries after the given
+// version uuid.
+func WithStart(u uuid.UUID) containers.Option[HistoryOptions] {
+	return func(opts *HistoryOptions) {
+		opts.Start = u
+	}
 }
 
 // PhaseOptions scopes a call to get phases from a pipeline.

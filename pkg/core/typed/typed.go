@@ -22,7 +22,7 @@ type PhaseLogger[R core.Resource] interface {
 	RecordLatest(_ context.Context, phase core.Descriptor, _ R, _ map[string]string) error
 	GetLatestResource(_ context.Context, phase core.Descriptor) (R, error)
 	GetResourceAtVersion(_ context.Context, phase core.Descriptor, version uuid.UUID) (R, error)
-	History(_ context.Context, phase core.Descriptor) ([]core.State, error)
+	History(_ context.Context, phase core.Descriptor, opts ...containers.Option[core.HistoryOptions]) ([]core.State, error)
 }
 
 // Phase is an interface around storage for resources.

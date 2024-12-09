@@ -117,12 +117,17 @@ func (b *Bucket) Range(opts ...containers.Option[kv.RangeOptions]) iter.Seq2[[]b
 		k, v   []byte
 	)
 
-	switch options.Order {
-	case kv.Descending:
-		k, v = cursor.Last()
-	default:
-		// ascending
-		k, v = cursor.First()
+	if options.Start != nil {
+		// Seek moves the cursor to a given key using a b-tree search and returns it. If the key does not exist then the next key is used. If no keys follow, a nil key is returned
+		k, v = cursor.Seek(options.Start)
+	} else {
+		switch options.Order {
+		case kv.Descending:
+			k, v = cursor.Last()
+		default:
+			// ascending
+			k, v = cursor.First()
+		}
 	}
 
 	return iter.Seq2[[]byte, []byte](func(yield func(k, v []byte) bool) {
