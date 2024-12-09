@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/get-glu/glu/pkg/core"
@@ -32,6 +33,8 @@ type PhaseLogger[R core.Resource] struct {
 	encoder func(any) ([]byte, error)
 	decoder func([]byte, any) error
 	last    map[string]map[string]version
+
+	subscribers sync.Map // map[uuid.UUID]Subscriber
 }
 
 func New[R core.Resource](db kv.DB) *PhaseLogger[R] {
@@ -46,6 +49,29 @@ func New[R core.Resource](db kv.DB) *PhaseLogger[R] {
 type version struct {
 	Digest      []byte
 	Annotations map[string]string
+}
+
+func (l *PhaseLogger[R]) Subscribe(ctx context.Context, subscriber Subscriber) (*Subscription, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	l.subscribers.Store(id, subscriber)
+
+	go func() {
+		<-ctx.Done()
+		l.Unsubscribe(context.Background(), id)
+	}()
+
+	return &Subscription{ID: id, Cancel: cancel}, nil
+}
+
+func (l *PhaseLogger[R]) Unsubscribe(ctx context.Context, id uuid.UUID) error {
+	l.subscribers.Delete(id)
+	return nil
 }
 
 func (l *PhaseLogger[R]) CreateLog(ctx context.Context, phase core.Descriptor) error {
@@ -123,7 +149,42 @@ func (l *PhaseLogger[R]) RecordLatest(ctx context.Context, phase core.Descriptor
 			return err
 		}
 
+		var (
+			timestamp = time.Unix(id.Time().UnixTime())
+			event     = Event{
+				Phase: phase,
+				State: core.State{
+					Version:     id,
+					Digest:      string(digest),
+					Resource:    resource,
+					Annotations: annotations,
+					RecordedAt:  timestamp.UTC(),
+				},
+			}
+		)
+
+		// TODO: determine if we should notify subscribers before or after the write since the write could fail
+		l.notifySubscribers(ctx, event)
+
 		return refs.Put(idBytes, encoded)
+	})
+}
+
+func (l *PhaseLogger[R]) notifySubscribers(ctx context.Context, event Event) {
+	l.subscribers.Range(func(key, value any) bool {
+		subscriber := value.(Subscriber)
+		// notify subscriber in a new goroutine to avoid blocking the main thread
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if err := subscriber.OnEvent(ctx, event); err != nil {
+					slog.Error("subscriber error", "error", err, "subscriber", key.(uuid.UUID), "event", event)
+				}
+			}
+		}()
+		return true
 	})
 }
 
