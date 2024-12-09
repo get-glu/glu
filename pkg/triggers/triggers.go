@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -47,6 +48,13 @@ func (t triggerableEdge) RunTriggers(ctx context.Context) (err error) {
 		}
 	}()
 
+	ctx, cancel := context.WithCancel(ctx)
+
+	slog := slog.With("kind", t.Kind(),
+		"from", t.From().Metadata.Name,
+		"to", t.To().Metadata.Name,
+	)
+
 	var wg sync.WaitGroup
 	for _, trigger := range t.triggers {
 		wg.Add(1)
@@ -59,7 +67,12 @@ func (t triggerableEdge) RunTriggers(ctx context.Context) (err error) {
 
 	finished := make(chan struct{})
 	go func() {
-		defer close(finished)
+		defer func() {
+			cancel()
+
+			close(finished)
+		}()
+
 		wg.Wait()
 	}()
 
@@ -69,6 +82,8 @@ func (t triggerableEdge) RunTriggers(ctx context.Context) (err error) {
 	case <-time.After(15 * time.Second):
 		return errors.New("timedout waiting on shutdown of triggers")
 	case <-finished:
+		slog.Info("edge triggers finished")
+
 		return ctx.Err()
 	}
 }

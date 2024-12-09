@@ -204,9 +204,8 @@ func (s *System) Run() error {
 	}
 
 	var (
-		conf  = sConf.conf
-		group *errgroup.Group
-		srv   = http.Server{
+		conf = sConf.conf
+		srv  = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
 			Handler: s.server,
 		}
@@ -256,8 +255,7 @@ func (s *System) Run() error {
 		}
 	}
 
-	group, ctx = errgroup.WithContext(ctx)
-
+	var group errgroup.Group
 	group.Go(func() error {
 		<-ctx.Done()
 
@@ -309,6 +307,7 @@ func (s *System) runTriggers(ctx context.Context) error {
 		for edge := range pipeline.Edges() {
 			tedge, ok := edge.(core.TriggerableEdge)
 			if !ok {
+				slog.Debug("skipping non-triggerable edge", "kind", edge.Kind())
 				continue
 			}
 

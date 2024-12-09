@@ -44,12 +44,11 @@ func (t *Trigger) Run(ctx context.Context, edge core.Edge) {
 			return
 		case <-ticker.C:
 			if _, err := edge.Perform(ctx); err != nil {
-				if !errors.Is(err, edges.ErrSkipped) {
-					return
+				if errors.Is(err, edges.ErrSkipped) {
+					continue
 				}
 
 				slog.Error("triggered edge", "error", err)
-				return
 			}
 		}
 	}
