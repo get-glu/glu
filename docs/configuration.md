@@ -223,11 +223,7 @@ The name of the credential to use for the OCI repository.
 
 History is used to store the history of the resources and actions performed on them.
 
-#### `history.type`
-
-The type of history to use.
-
-Valid values are `file`. (default)
+If no file is specified, history is not persisted and only kept in memory.
 
 #### history.file.\<name\>
 
