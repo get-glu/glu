@@ -49,11 +49,19 @@ const (
 // RangeOptions configures a call to Bucket.Range
 type RangeOptions struct {
 	Order Order
+	Start []byte
 }
 
 // WithOrder configures a call to Range with the provided order
 func WithOrder(o Order) containers.Option[RangeOptions] {
 	return func(ro *RangeOptions) {
 		ro.Order = o
+	}
+}
+
+// WithStart configures a call to Range with the provided start key
+func WithStart(k []byte) containers.Option[RangeOptions] {
+	return func(ro *RangeOptions) {
+		ro.Start = k
 	}
 }
