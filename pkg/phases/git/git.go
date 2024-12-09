@@ -208,6 +208,7 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 }
 
 func (p *Phase[R]) recordPhaseState(ctx context.Context, opts ...containers.Option[git.ViewUpdateOptions]) (err error) {
+
 	var (
 		r    = p.newFn()
 		hash plumbing.Hash
