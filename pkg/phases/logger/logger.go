@@ -31,7 +31,6 @@ type PhaseLogger[R core.Resource] struct {
 	db      kv.DB
 	encoder func(any) ([]byte, error)
 	decoder func([]byte, any) error
-	last    map[string]map[string]version
 }
 
 func New[R core.Resource](db kv.DB) *PhaseLogger[R] {
@@ -39,7 +38,6 @@ func New[R core.Resource](db kv.DB) *PhaseLogger[R] {
 		db:      db,
 		encoder: json.Marshal,
 		decoder: json.Unmarshal,
-		last:    map[string]map[string]version{},
 	}
 }
 
@@ -130,7 +128,7 @@ func (l *PhaseLogger[R]) RecordLatest(ctx context.Context, phase core.Descriptor
 func (l *PhaseLogger[R]) isUpToDate(refs kv.Bucket, phase core.Descriptor, digest string) bool {
 	slog := slog.With("pipeline", phase.Pipeline, "phase", phase.Metadata.Name)
 
-	curLatest, ok := l.getLatestVersion(refs, phase)
+	curLatest, ok := l.getLatestVersion(refs)
 	if ok && bytes.Equal(curLatest.Digest, []byte(digest)) {
 		slog.Debug("skipped recording latest", "reason", "NoChange")
 		return true
@@ -147,7 +145,7 @@ func (l *PhaseLogger[R]) GetLatestResource(ctx context.Context, phase core.Descr
 			return err
 		}
 
-		curLatest, ok := l.getLatestVersion(refs, phase)
+		curLatest, ok := l.getLatestVersion(refs)
 		if !ok {
 			return fmt.Errorf("latest version: %w", ErrNotFound)
 		}
@@ -203,27 +201,7 @@ func (l *PhaseLogger[R]) GetResourceAtVersion(ctx context.Context, phase core.De
 	})
 }
 
-func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket, phase core.Descriptor) (version, bool) {
-	phases, ok := l.last[phase.Pipeline]
-	if !ok {
-		phases = map[string]version{}
-		l.last[phase.Metadata.Name] = phases
-	}
-
-	version, ok := phases[phase.Metadata.Name]
-	if !ok {
-		version, ok = l.fetchLatestVersion(refs)
-		if !ok {
-			return version, false
-		}
-
-		phases[phase.Metadata.Name] = version
-	}
-
-	return version, true
-}
-
-func (l *PhaseLogger[R]) fetchLatestVersion(refs kv.Bucket) (v version, _ bool) {
+func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket) (v version, _ bool) {
 	_, data, err := refs.Last()
 	if err != nil {
 		return v, false

@@ -341,16 +341,10 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, updateOpts *typed.Up
 		return nil, err
 	}
 
-	options := []containers.Option[git.BranchOptions]{git.WithBranch(branch), git.WithBase(baseBranch)}
-
-	title, err := p.proposalTitle(to, desc, from, updateOpts)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := p.proposalBody(to, desc, from, updateOpts)
-	if err != nil {
-		return nil, err
+	options := []containers.Option[git.BranchOptions]{
+		git.WithBranch(branch),
+		git.WithBase(baseBranch),
+		git.WithPushIfEmpty,
 	}
 
 	makeComment := func(*Proposal) error { return nil }
@@ -358,7 +352,11 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, updateOpts *typed.Up
 	proposal, err := p.getCurrentProposal(ctx)
 	if err == nil {
 		// there is an existing proposal
-		slog.Debug("proposal found", "base", proposal.BaseBranch, "base_revision", proposal.BaseRevision)
+		slog.Debug("proposal found",
+			"base", proposal.BaseBranch, "base_revision", proposal.BaseRevision,
+			"proposal_digest", proposal.Digest,
+			"destination_digest", toDigest,
+		)
 
 		// we're potentially going to force update the branch to move the base
 		options = append(options, git.WithForce)
@@ -403,10 +401,21 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, updateOpts *typed.Up
 		return nil, err
 	}
 
+	title, err := p.proposalTitle(to, desc, from, updateOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.proposalBody(to, desc, from, updateOpts)
+	if err != nil {
+		return nil, err
+	}
+
 	proposal = &Proposal{
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
+		Digest:       toDigest,
 		Title:        title,
 		Body:         body,
 	}
@@ -414,6 +423,9 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, updateOpts *typed.Up
 	if err := p.proposer.CreateProposal(ctx, proposal, p.proposalOptions); err != nil {
 		return nil, err
 	}
+
+	// set current proposal
+	p.currentProposal = proposal
 
 	return annotations(proposal), makeComment(proposal)
 }

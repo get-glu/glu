@@ -364,7 +364,6 @@ func (r *Repository) ListCommits(ctx context.Context, branch, from string, filte
 
 type BranchOptions struct {
 	// base on CreateBranchIfNotExists sets the created branch to be based on the head of base
-	// base on Update is used to see if the updated branch has changes compared with the base before pushing
 	// base on View is not used
 	base string
 	// branch on View resolves to the branch if revision is not explicitly supplied
@@ -375,6 +374,8 @@ type BranchOptions struct {
 	revision plumbing.Hash
 	// force configures an update to ignore any conflicts when attempting to push
 	force bool
+	// pushIfEmpty on Update causes a push to happen even if commit is empty
+	pushIfEmpty bool
 }
 
 func (r *Repository) getOptions(opts ...containers.Option[BranchOptions]) *BranchOptions {
@@ -403,6 +404,10 @@ func WithRevision(rev plumbing.Hash) containers.Option[BranchOptions] {
 
 func WithForce(o *BranchOptions) {
 	o.force = true
+}
+
+func WithPushIfEmpty(o *BranchOptions) {
+	o.pushIfEmpty = true
 }
 
 func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[BranchOptions]) (err error) {
@@ -461,21 +466,18 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 
 	commit, err := fs.commit(ctx, msg)
 	if err != nil {
-		if !errors.Is(err, git.ErrEmptyCommit) {
+		if !errors.Is(err, ErrEmptyCommit) {
 			return hash, err
 		}
 
-		// given the change produced an empty commit we only
-		// skip pushing if the branch matches the base branch
-		// if they dont match then we potentially still have
-		// unpushed contents
-		base, err := r.Resolve(options.base)
+		if !options.pushIfEmpty {
+			return hash, err
+		}
+
+		// fetch commit for hash and we will attempt to re-push
+		commit, err = r.repo.CommitObject(hash)
 		if err != nil {
 			return hash, err
-		}
-
-		if base == hash {
-			return hash, git.ErrEmptyCommit
 		}
 	}
 

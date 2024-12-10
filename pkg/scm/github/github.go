@@ -128,7 +128,7 @@ func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
 		return err
 	}
 
-	slog.Info("proposal updated", "scm_type", "github", "proposal_url", pr.GetHTMLURL())
+	slog.Info("proposal closed", "scm_type", "github", "proposal_url", pr.GetHTMLURL())
 
 	proposal.BaseRevision = pr.Base.GetSHA()
 	proposal.HeadRevision = pr.Head.GetSHA()
