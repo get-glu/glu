@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/kv"
@@ -214,8 +215,11 @@ func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket) (v version, _ bool) {
 	return v, true
 }
 
-// Histort returns a slice of states for a provided phase descriptor.
-func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
+// History returns a slice of states for a provided phase descriptor.
+func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor, opts ...containers.Option[core.HistoryOptions]) (states []core.State, _ error) {
+	options := &core.HistoryOptions{}
+	containers.ApplyAll(options, opts...)
+
 	return states, l.db.View(func(tx kv.Tx) error {
 		refs, err := getRefsBucket(phase, tx)
 		if err != nil {
@@ -227,7 +231,18 @@ func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor) (st
 			return err
 		}
 
-		for k, v := range refs.Range(kv.WithOrder(kv.Descending)) {
+		var rangeOpts []containers.Option[kv.RangeOptions]
+		if options.Start != uuid.Nil {
+			idBytes, err := options.Start.MarshalText()
+			if err != nil {
+				return err
+			}
+			rangeOpts = append(rangeOpts, kv.WithStart(idBytes))
+		}
+
+		rangeOpts = append(rangeOpts, kv.WithOrder(kv.Descending))
+
+		for k, v := range refs.Range(rangeOpts...) {
 			id, err := uuid.ParseBytes(k)
 			if err != nil {
 				return err

@@ -152,11 +152,20 @@ func (b *Bucket) Range(opts ...containers.Option[kv.RangeOptions]) iter.Seq2[[]b
 	go func() {
 		defer close(ch)
 
-		switch options.Order {
-		case kv.Descending:
-			b.contents.Descend(fn)
-		default:
-			b.contents.Ascend(fn)
+		if options.Start != nil {
+			switch options.Order {
+			case kv.Descending:
+				b.contents.DescendLessOrEqual(node{k: options.Start}, fn)
+			default:
+				b.contents.AscendGreaterOrEqual(node{k: options.Start}, fn)
+			}
+		} else {
+			switch options.Order {
+			case kv.Descending:
+				b.contents.Descend(fn)
+			default:
+				b.contents.Ascend(fn)
+			}
 		}
 	}()
 

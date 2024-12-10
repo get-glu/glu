@@ -174,12 +174,12 @@ func (p *Phase[R]) GetResource(ctx context.Context) (R, error) {
 }
 
 // History returns the history of the phase (given a log has been configured).
-func (p *Phase[R]) History(ctx context.Context) ([]core.State, error) {
+func (p *Phase[R]) History(ctx context.Context, opts ...containers.Option[core.HistoryOptions]) ([]core.State, error) {
 	if p.logger == nil {
 		return nil, nil
 	}
 
-	return p.logger.History(ctx, p.Descriptor())
+	return p.logger.History(ctx, p.Descriptor(), opts...)
 }
 
 // Rollback updates the state of the phase to a previous known version in history.
