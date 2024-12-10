@@ -22,11 +22,10 @@ import (
 )
 
 const (
-	AnnotationGitBaseRefKey     = "dev.getglu.git.base_ref"
-	AnnotationGitHeadSHAKey     = "dev.getglu.git.head_sha"
-	AnnotationGitCommitURLKey   = "dev.getglu.git.commit.url"
-	AnnotationProposalNumberKey = "dev.getglu.git.proposal.number"
-	AnnotationProposalURLKey    = "dev.getglu.git.proposal.url"
+	AnnotationGitBaseRefKey   = "dev.getglu.git.base_ref"
+	AnnotationGitHeadSHAKey   = "dev.getglu.git.head_sha"
+	AnnotationGitCommitURLKey = "dev.getglu.git.commit.url"
+	AnnotationProposalURLKey  = "dev.getglu.git.proposal.url"
 )
 
 var (
@@ -47,14 +46,18 @@ type Resource interface {
 // Proposer is a type which can be used to create and manage proposals.
 type Proposer interface {
 	GetCurrentProposal(_ context.Context, baseBranch, branchPrefix string) (*Proposal, error)
+	IsProposalOpen(context.Context, *Proposal) bool
 	CreateProposal(context.Context, *Proposal, ProposalOption) error
-	MergeProposal(context.Context, *Proposal) error
 	CloseProposal(context.Context, *Proposal) error
+	CommentProposal(context.Context, *Proposal, string) error
 }
 
 // Proposal contains the fields necessary to propose a resource update
 // to a Repository.
 type Proposal struct {
+	ID  string
+	URL string
+
 	BaseRevision string
 	BaseBranch   string
 	Branch       string
@@ -69,14 +72,16 @@ type Proposal struct {
 // Phase is a Git storage backed phase implementation.
 // It is used to manage the state of a resource as represented in a target Git repository.
 type Phase[R Resource] struct {
-	pipeline        string
-	meta            core.Metadata
-	newFn           func() R
-	repo            *git.Repository
+	pipeline string
+	meta     core.Metadata
+	newFn    func() R
+	repo     *git.Repository
+	logger   typed.PhaseLogger[R]
+
 	proposer        Proposer
 	proposeChange   bool
 	proposalOptions ProposalOption
-	logger          typed.PhaseLogger[R]
+	currentProposal *Proposal
 }
 
 // Descriptor returns the phases descriptor.
@@ -144,6 +149,11 @@ func New[R Resource](
 		return nil, err
 	}
 
+	// attempt to populate cache with current proposal
+	if _, err := phase.getCurrentProposal(ctx); err != nil && !errors.Is(err, ErrProposalNotFound) {
+		return nil, err
+	}
+
 	return phase, nil
 }
 
@@ -207,8 +217,7 @@ func (p *Phase[R]) Notify(ctx context.Context, refs map[string]string) error {
 	return p.recordPhaseState(ctx, git.WithRevision(plumbing.NewHash(ref)))
 }
 
-func (p *Phase[R]) recordPhaseState(ctx context.Context, opts ...containers.Option[git.ViewUpdateOptions]) (err error) {
-
+func (p *Phase[R]) recordPhaseState(ctx context.Context, opts ...containers.Option[git.BranchOptions]) (err error) {
 	var (
 		r    = p.newFn()
 		hash plumbing.Hash
@@ -276,20 +285,13 @@ func (p *Phase[R]) Update(ctx context.Context, to R, opts ...containers.Option[t
 		return nil, err
 	}
 
-	// use the target resources branch if it implementes an override
-	desc := p.Descriptor()
-	baseBranch := p.repo.DefaultBranch()
-	if branched, ok := core.Resource(to).(Branched); ok {
-		baseBranch = branched.Branch(desc)
-	}
-
 	annotations := map[string]string{
-		AnnotationGitBaseRefKey: baseBranch,
+		AnnotationGitBaseRefKey: p.branch(),
 	}
 
 	updateOpts := typed.NewUpdateOptions(opts...)
 	if !p.proposeChange {
-		annotations[AnnotationGitHeadSHAKey], err = p.updateAndPush(ctx, from, to, updateOpts, git.WithBranch(baseBranch))
+		annotations[AnnotationGitHeadSHAKey], err = p.updateAndPush(ctx, from, to, updateOpts, git.WithBranch(p.branch()))
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +303,7 @@ func (p *Phase[R]) Update(ctx context.Context, to R, opts ...containers.Option[t
 		return nil, errors.New("proposal requested but not configured")
 	}
 
-	annotations, err = p.propose(ctx, from, to, baseBranch, updateOpts)
+	annotations, err = p.propose(ctx, from, to, updateOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -309,10 +311,11 @@ func (p *Phase[R]) Update(ctx context.Context, to R, opts ...containers.Option[t
 	return &core.Result{Annotations: annotations}, nil
 }
 
-func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string, updateOpts *typed.UpdateOptions) (map[string]string, error) {
+func (p *Phase[R]) propose(ctx context.Context, from, to R, updateOpts *typed.UpdateOptions) (map[string]string, error) {
 	slog := slog.With("name", p.meta.Name)
 	desc := p.Descriptor()
 
+	baseBranch := p.branch()
 	baseRev, err := p.repo.Resolve(baseBranch)
 	if err != nil {
 		return nil, fmt.Errorf("resolving base branch %q: %w", baseBranch, err)
@@ -323,59 +326,75 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string, u
 		return nil, err
 	}
 
-	digest, err := to.Digest()
+	toDigest, err := to.Digest()
 	if err != nil {
 		return nil, err
 	}
 
-	slog.Debug("proposing update", "from", fromDigest, "to", digest)
+	slog.Debug("proposing update", "from", fromDigest, "to", toDigest)
 
 	// create branch name and check if this phase, resource and state has previously been observed
-	var (
-		branchPrefix = fmt.Sprintf("glu/%s/%s", p.pipeline, p.meta.Name)
-		branch       = path.Join(branchPrefix, digest)
-	)
+	branch := path.Join(p.branchPrefix(), toDigest)
 
 	// ensure branch exists locally either way
 	if err := p.repo.CreateBranchIfNotExists(branch, git.WithBase(baseBranch)); err != nil {
 		return nil, err
 	}
 
-	proposal, err := p.proposer.GetCurrentProposal(ctx, baseBranch, branchPrefix)
-	if err != nil {
-		if !errors.Is(err, ErrProposalNotFound) {
-			return nil, err
-		}
-
-		slog.Debug("proposal not found")
+	options := []containers.Option[git.BranchOptions]{
+		git.WithBranch(branch),
+		git.WithBase(baseBranch),
+		git.WithPushIfEmpty,
 	}
 
-	options := []containers.Option[git.ViewUpdateOptions]{git.WithBranch(branch)}
-	if proposal != nil {
+	makeComment := func(*Proposal) error { return nil }
+
+	proposal, err := p.getCurrentProposal(ctx)
+	if err == nil {
 		// there is an existing proposal
-		slog.Debug("proposal found", "base", proposal.BaseBranch, "base_revision", proposal.BaseRevision)
+		slog.Debug("proposal found",
+			"base", proposal.BaseBranch, "base_revision", proposal.BaseRevision,
+			"proposal_digest", proposal.Digest,
+			"destination_digest", toDigest,
+		)
+
+		// we're potentially going to force update the branch to move the base
+		options = append(options, git.WithForce)
+
 		if proposal.BaseRevision != baseRev.String() {
-			// we're potentially going to force update the branch to move the base
-			options = append(options, git.WithForce)
-		} else if proposal.Digest == digest {
+			head, err := p.updateAndPush(ctx, from, to, updateOpts, options...)
+			if err != nil {
+				return nil, fmt.Errorf("updating existing proposal: %w", err)
+			}
+
+			// we're updating the head position of an existing proposal
+			// so we need to update the value of head in the returned annotations
+			annotations := annotations(proposal)
+			annotations[AnnotationGitHeadSHAKey] = head
+
+			return annotations, nil
+		} else if proposal.Digest == toDigest {
 			// nothing has changed since the last promotion and proposals
 			slog.Debug("skipping proposal", "reason", "AlreadyExistsAndUpToDate")
 
 			return annotations(proposal), nil
 		}
 
-		head, err := p.updateAndPush(ctx, from, to, updateOpts, options...)
-		if err != nil {
-			return nil, fmt.Errorf("updating existing proposal: %w", err)
+		// close the proposal as we're creating a new branch for the new proposal
+		if err := p.proposer.CloseProposal(ctx, proposal); err != nil {
+			return nil, fmt.Errorf("closing existing proposal: %w", err)
 		}
 
-		// we're updating the head position of an existing proposal
-		// so we need to update the value of head in the returned annotations
-		annotations := annotations(proposal)
-		annotations[AnnotationGitHeadSHAKey] = head
-
-		return annotations, nil
+		// configure commenting on the old proposal with a link to the new one
+		oldProposal := proposal
+		makeComment = func(newProposal *Proposal) error {
+			return p.proposer.CommentProposal(ctx, oldProposal, fmt.Sprintf("Closed in favour of new proposal #%v", newProposal.ID))
+		}
+	} else if !errors.Is(err, ErrProposalNotFound) {
+		return nil, err
 	}
+
+	slog.Debug("proposal not found")
 
 	if head, err := p.updateAndPush(ctx, from, to, updateOpts, options...); err != nil {
 		slog.Error("while attempting update", "head", head, "error", err)
@@ -396,6 +415,7 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string, u
 		BaseRevision: baseRev.String(),
 		BaseBranch:   baseBranch,
 		Branch:       branch,
+		Digest:       toDigest,
 		Title:        title,
 		Body:         body,
 	}
@@ -404,10 +424,42 @@ func (p *Phase[R]) propose(ctx context.Context, from, to R, baseBranch string, u
 		return nil, err
 	}
 
-	return annotations(proposal), nil
+	// set current proposal
+	p.currentProposal = proposal
+
+	return annotations(proposal), makeComment(proposal)
 }
 
-func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, updateOpts *typed.UpdateOptions, opts ...containers.Option[git.ViewUpdateOptions]) (string, error) {
+func (p *Phase[R]) getCurrentProposal(ctx context.Context) (*Proposal, error) {
+	if p.proposer == nil {
+		return nil, ErrProposalNotFound
+	}
+
+	if p.currentProposal != nil {
+		if !p.proposer.IsProposalOpen(ctx, p.currentProposal) {
+			p.currentProposal = nil
+
+			return nil, ErrProposalNotFound
+		}
+
+		return p.currentProposal, nil
+	}
+
+	proposal, err := p.proposer.GetCurrentProposal(ctx, p.branch(), p.branchPrefix())
+	if err != nil {
+		return nil, err
+	}
+
+	p.currentProposal = proposal
+
+	return proposal, nil
+}
+
+func (p *Phase[R]) branchPrefix() string {
+	return fmt.Sprintf("glu/%s/%s", p.pipeline, p.meta.Name)
+}
+
+func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, updateOpts *typed.UpdateOptions, opts ...containers.Option[git.BranchOptions]) (string, error) {
 	desc := p.Descriptor()
 	update := func(fs fs.Filesystem) (message string, err error) {
 		if err := to.WriteTo(ctx, desc, fs); err != nil {
@@ -431,8 +483,9 @@ func (p *Phase[R]) updateAndPush(ctx context.Context, from, to R, updateOpts *ty
 
 func annotations(proposal *Proposal) map[string]string {
 	a := map[string]string{
-		AnnotationGitBaseRefKey: proposal.BaseBranch,
-		AnnotationGitHeadSHAKey: proposal.HeadRevision,
+		AnnotationProposalURLKey: proposal.URL,
+		AnnotationGitBaseRefKey:  proposal.BaseBranch,
+		AnnotationGitHeadSHAKey:  proposal.HeadRevision,
 	}
 
 	maps.Insert(a, maps.All(proposal.Annotations))

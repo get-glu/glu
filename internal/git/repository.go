@@ -362,38 +362,55 @@ func (r *Repository) ListCommits(ctx context.Context, branch, from string, filte
 	}), nil
 }
 
-type ViewUpdateOptions struct {
+type BranchOptions struct {
+	// base on CreateBranchIfNotExists sets the created branch to be based on the head of base
+	// base on View is not used
+	base string
+	// branch on View resolves to the branch if revision is not explicitly supplied
+	// branch on Update will commit to and push the branch
 	branch string
 	// revision on View predicates it to the specific hash
 	// revision on Update returns a conflict error if the branch head does not match
 	revision plumbing.Hash
 	// force configures an update to ignore any conflicts when attempting to push
 	force bool
+	// pushIfEmpty on Update causes a push to happen even if commit is empty
+	pushIfEmpty bool
 }
 
-func (r *Repository) getOptions(opts ...containers.Option[ViewUpdateOptions]) *ViewUpdateOptions {
-	defaultOptions := &ViewUpdateOptions{branch: r.defaultBranch}
+func (r *Repository) getOptions(opts ...containers.Option[BranchOptions]) *BranchOptions {
+	defaultOptions := &BranchOptions{base: r.defaultBranch, branch: r.defaultBranch}
 	containers.ApplyAll(defaultOptions, opts...)
 	return defaultOptions
 }
 
-func WithBranch(branch string) containers.Option[ViewUpdateOptions] {
-	return func(vuo *ViewUpdateOptions) {
-		vuo.branch = branch
+func WithBase(name string) containers.Option[BranchOptions] {
+	return func(o *BranchOptions) {
+		o.base = name
 	}
 }
 
-func WithRevision(rev plumbing.Hash) containers.Option[ViewUpdateOptions] {
-	return func(vuo *ViewUpdateOptions) {
-		vuo.revision = rev
+func WithBranch(branch string) containers.Option[BranchOptions] {
+	return func(o *BranchOptions) {
+		o.branch = branch
 	}
 }
 
-func WithForce(vuo *ViewUpdateOptions) {
-	vuo.force = true
+func WithRevision(rev plumbing.Hash) containers.Option[BranchOptions] {
+	return func(o *BranchOptions) {
+		o.revision = rev
+	}
 }
 
-func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[ViewUpdateOptions]) (err error) {
+func WithForce(o *BranchOptions) {
+	o.force = true
+}
+
+func WithPushIfEmpty(o *BranchOptions) {
+	o.pushIfEmpty = true
+}
+
+func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs.Filesystem) error, opts ...containers.Option[BranchOptions]) (err error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -417,7 +434,7 @@ func (r *Repository) View(ctx context.Context, fn func(hash plumbing.Hash, fs fs
 	return fn(hash, fs)
 }
 
-func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem) (string, error), opts ...containers.Option[ViewUpdateOptions]) (hash plumbing.Hash, err error) {
+func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem) (string, error), opts ...containers.Option[BranchOptions]) (hash plumbing.Hash, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -449,7 +466,19 @@ func (r *Repository) UpdateAndPush(ctx context.Context, fn func(fs fs.Filesystem
 
 	commit, err := fs.commit(ctx, msg)
 	if err != nil {
-		return hash, err
+		if !errors.Is(err, ErrEmptyCommit) {
+			return hash, err
+		}
+
+		if !options.pushIfEmpty {
+			return hash, err
+		}
+
+		// fetch commit for hash and we will attempt to re-push
+		commit, err = r.repo.CommitObject(hash)
+		if err != nil {
+			return hash, err
+		}
 	}
 
 	if r.remote != nil {
@@ -534,17 +563,7 @@ func (r *Repository) Resolve(branch string) (plumbing.Hash, error) {
 	return reference.Hash(), nil
 }
 
-type CreateBranchOptions struct {
-	base string
-}
-
-func WithBase(name string) containers.Option[CreateBranchOptions] {
-	return func(cbo *CreateBranchOptions) {
-		cbo.base = name
-	}
-}
-
-func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.Option[CreateBranchOptions]) error {
+func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.Option[BranchOptions]) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -559,9 +578,7 @@ func (r *Repository) CreateBranchIfNotExists(branch string, opts ...containers.O
 		return nil
 	}
 
-	opt := CreateBranchOptions{base: r.defaultBranch}
-
-	containers.ApplyAll(&opt, opts...)
+	opt := r.getOptions(opts...)
 
 	reference, err := r.repo.Reference(plumbing.NewRemoteReferenceName(remoteName, opt.base), true)
 	if err != nil {
