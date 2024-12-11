@@ -32,20 +32,23 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix s
 
 	for pr := range prs.All() {
 		parts := strings.Split(pr.Head.GetRef(), "/")
-		if strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
-			proposal = &git.Proposal{
-				BaseBranch:   pr.Base.GetRef(),
-				BaseRevision: pr.Base.GetSHA(),
-				Branch:       pr.Head.GetRef(),
-				HeadRevision: pr.Head.GetSHA(),
-				Digest:       parts[len(parts)-1],
-				Annotations: map[string]string{
-					git.AnnotationProposalNumberKey: strconv.Itoa(pr.GetNumber()),
-					git.AnnotationProposalURLKey:    pr.GetHTMLURL(),
-				},
-			}
-			break
+		if !strings.HasPrefix(pr.Head.GetRef(), branchPrefix) {
+			continue
 		}
+
+		proposal = &git.Proposal{
+			ID:  strconv.Itoa(pr.GetNumber()),
+			URL: pr.GetHTMLURL(),
+
+			BaseBranch:   pr.Base.GetRef(),
+			BaseRevision: pr.Base.GetSHA(),
+			Branch:       pr.Head.GetRef(),
+			HeadRevision: pr.Head.GetSHA(),
+			Digest:       parts[len(parts)-1],
+
+			Annotations: map[string]string{},
+		}
+		break
 	}
 
 	if err := prs.Err(); err != nil {
@@ -59,12 +62,25 @@ func (s *SCM) GetCurrentProposal(ctx context.Context, baseBranch, branchPrefix s
 	return proposal, nil
 }
 
+func (s *SCM) IsProposalOpen(ctx context.Context, proposal *git.Proposal) bool {
+	number, ok := prNumber(proposal)
+	if !ok {
+		return false
+	}
+
+	pr, _, err := s.client.PullRequests.Get(ctx, s.repoOwner, s.repoName, number)
+	if err != nil {
+		slog.Warn("could not check if PR is open", "reason", "error getting PR", "error", err)
+		return false
+	}
+
+	return pr.GetState() == "open"
+}
+
 func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts git.ProposalOption) error {
-	slog.Debug("creating proposal",
+	slog := slog.With(
 		"branch", proposal.Branch,
 		"base", proposal.BaseBranch,
-		"title", proposal.Title,
-		"body", proposal.Body,
 	)
 
 	pr, _, err := s.client.PullRequests.Create(ctx, s.repoOwner, s.repoName, &github.NewPullRequest{
@@ -79,12 +95,11 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts g
 
 	slog.Info("proposal created", "scm_type", "github", "proposal_url", pr.GetHTMLURL())
 
+	proposal.ID = strconv.Itoa(pr.GetNumber())
+	proposal.URL = pr.GetHTMLURL()
 	proposal.BaseRevision = pr.Base.GetSHA()
 	proposal.HeadRevision = pr.Head.GetSHA()
-	proposal.Annotations = map[string]string{
-		git.AnnotationProposalNumberKey: strconv.Itoa(pr.GetNumber()),
-		git.AnnotationProposalURLKey:    pr.GetHTMLURL(),
-	}
+	proposal.Annotations = map[string]string{}
 
 	if len(opts.Labels) > 0 {
 		if _, _, err := s.client.Issues.AddLabelsToIssue(ctx, s.repoOwner, s.repoName, pr.GetNumber(), opts.Labels); err != nil {
@@ -95,32 +110,56 @@ func (s *SCM) CreateProposal(ctx context.Context, proposal *git.Proposal, opts g
 	return nil
 }
 
-func (s *SCM) MergeProposal(ctx context.Context, proposal *git.Proposal) error {
-	number, err := strconv.Atoi(proposal.Annotations[git.AnnotationProposalNumberKey])
-	if err != nil {
-		slog.Warn("could not close pr", "reason", "missing PR number on proposal", "error", err)
-		return nil
-	}
-
-	_, _, err = s.client.PullRequests.Merge(ctx, s.repoOwner, s.repoName, number, "", &github.PullRequestOptions{
-		MergeMethod: "merge",
-	})
-
-	return err
-}
-
 func (s *SCM) CloseProposal(ctx context.Context, proposal *git.Proposal) error {
-	number, err := strconv.Atoi(proposal.Annotations[git.AnnotationProposalNumberKey])
-	if err != nil {
-		slog.Warn("could not close pr", "reason", "missing PR number on proposal", "error", err)
+	slog := slog.With(
+		"branch", proposal.Branch,
+		"base", proposal.BaseBranch,
+	)
+
+	number, ok := prNumber(proposal)
+	if !ok {
 		return nil
 	}
 
-	_, _, err = s.client.PullRequests.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
+	pr, _, err := s.client.PullRequests.Edit(ctx, s.repoOwner, s.repoName, number, &github.PullRequest{
 		State: github.String("closed"),
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	slog.Info("proposal closed", "scm_type", "github", "proposal_url", pr.GetHTMLURL())
+
+	proposal.BaseRevision = pr.Base.GetSHA()
+	proposal.HeadRevision = pr.Head.GetSHA()
+
+	return nil
+}
+
+func (s *SCM) CommentProposal(ctx context.Context, proposal *git.Proposal, message string) error {
+	number, ok := prNumber(proposal)
+	if !ok {
+		return nil
+	}
+
+	_, _, err := s.client.Issues.CreateComment(ctx, s.repoOwner, s.repoName, number, &github.IssueComment{
+		Body: github.String(message),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func prNumber(proposal *git.Proposal) (int, bool) {
+	number, err := strconv.Atoi(proposal.ID)
+	if err != nil {
+		slog.Warn("could not check if PR is open", "reason", "missing PR number on proposal", "error", err)
+		return 0, false
+	}
+
+	return number, true
 }
 
 type prs struct {
