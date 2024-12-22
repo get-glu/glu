@@ -20,6 +20,9 @@
 
 Glu is a framework built to help manage and coordinate multi-environment deployments using configuration stored in Git.
 
+> [!TIP]
+> Read the [CD Pipeline Manifesto](https://manifesto.getglu.dev) to learn about the principles that guide Glu.
+
 <p align="center">
 
 https://github.com/user-attachments/assets/b6f4d20b-e166-4ec9-8aa3-0c4d5e0cf410
