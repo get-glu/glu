@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/pkg/core/typed"
 	"github.com/get-glu/glu/pkg/kv"
@@ -42,7 +43,6 @@ func New[R core.Resource](db kv.DB) *PhaseLogger[R] {
 		db:      db,
 		encoder: json.Marshal,
 		decoder: json.Unmarshal,
-		last:    map[string]map[string]version{},
 	}
 }
 
@@ -191,7 +191,7 @@ func (l *PhaseLogger[R]) notifySubscribers(ctx context.Context, event Event) {
 func (l *PhaseLogger[R]) isUpToDate(refs kv.Bucket, phase core.Descriptor, digest string) bool {
 	slog := slog.With("pipeline", phase.Pipeline, "phase", phase.Metadata.Name)
 
-	curLatest, ok := l.getLatestVersion(refs, phase)
+	curLatest, ok := l.getLatestVersion(refs)
 	if ok && bytes.Equal(curLatest.Digest, []byte(digest)) {
 		slog.Debug("skipped recording latest", "reason", "NoChange")
 		return true
@@ -208,7 +208,7 @@ func (l *PhaseLogger[R]) GetLatestResource(ctx context.Context, phase core.Descr
 			return err
 		}
 
-		curLatest, ok := l.getLatestVersion(refs, phase)
+		curLatest, ok := l.getLatestVersion(refs)
 		if !ok {
 			return fmt.Errorf("latest version: %w", ErrNotFound)
 		}
@@ -264,27 +264,7 @@ func (l *PhaseLogger[R]) GetResourceAtVersion(ctx context.Context, phase core.De
 	})
 }
 
-func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket, phase core.Descriptor) (version, bool) {
-	phases, ok := l.last[phase.Pipeline]
-	if !ok {
-		phases = map[string]version{}
-		l.last[phase.Metadata.Name] = phases
-	}
-
-	version, ok := phases[phase.Metadata.Name]
-	if !ok {
-		version, ok = l.fetchLatestVersion(refs)
-		if !ok {
-			return version, false
-		}
-
-		phases[phase.Metadata.Name] = version
-	}
-
-	return version, true
-}
-
-func (l *PhaseLogger[R]) fetchLatestVersion(refs kv.Bucket) (v version, _ bool) {
+func (l *PhaseLogger[R]) getLatestVersion(refs kv.Bucket) (v version, _ bool) {
 	_, data, err := refs.Last()
 	if err != nil {
 		return v, false
@@ -297,8 +277,11 @@ func (l *PhaseLogger[R]) fetchLatestVersion(refs kv.Bucket) (v version, _ bool) 
 	return v, true
 }
 
-// Histort returns a slice of states for a provided phase descriptor.
-func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor) (states []core.State, _ error) {
+// History returns a slice of states for a provided phase descriptor.
+func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor, opts ...containers.Option[core.HistoryOptions]) (states []core.State, _ error) {
+	options := &core.HistoryOptions{}
+	containers.ApplyAll(options, opts...)
+
 	return states, l.db.View(func(tx kv.Tx) error {
 		refs, err := getRefsBucket(phase, tx)
 		if err != nil {
@@ -310,7 +293,18 @@ func (l *PhaseLogger[R]) History(ctx context.Context, phase core.Descriptor) (st
 			return err
 		}
 
-		for k, v := range refs.Range(kv.WithOrder(kv.Descending)) {
+		var rangeOpts []containers.Option[kv.RangeOptions]
+		if options.Start != uuid.Nil {
+			idBytes, err := options.Start.MarshalText()
+			if err != nil {
+				return err
+			}
+			rangeOpts = append(rangeOpts, kv.WithStart(idBytes))
+		}
+
+		rangeOpts = append(rangeOpts, kv.WithOrder(kv.Descending))
+
+		for k, v := range refs.Range(rangeOpts...) {
 			id, err := uuid.ParseBytes(k)
 			if err != nil {
 				return err

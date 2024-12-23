@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -357,7 +358,23 @@ func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	history, err := phase.History(r.Context())
+	var (
+		opts       = []containers.Option[core.HistoryOptions]{}
+		startParam = r.URL.Query().Get("start")
+	)
+
+	if startParam != "" {
+		start, err := uuid.Parse(startParam)
+		if err != nil {
+			slog.Error("parsing start query param", "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		opts = append(opts, containers.Option[core.HistoryOptions](core.WithStart(start)))
+	}
+
+	history, err := phase.History(r.Context(), opts...)
 	if err != nil {
 		slog.Error("getting phase history", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
