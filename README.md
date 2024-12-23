@@ -45,7 +45,7 @@ Glu has an opinionated set of models and abstractions, which when combined, allo
 Use it to implement anything that involves automating updates to Git repositories via commits and pull requests.
 
 - ✅ Track new versions of applications in source repositories (OCI, Helm, etc) and trigger updates to target configuration repositories (Git).
-  ⌛️ Coordinate any combination of scheduled, event-driven, or manually triggered promotions from one environment to the next.
+- ⌛️ Coordinate any combination of scheduled, event-driven, or manually triggered promotions from one environment to the next.
 - 🔍 Expose a single pane of glass to compare and manipulate the state of your resources in one environment to the next.
 - 🗓️ Export standardized telemetry which ties together your entire end-to-end CI/CD and promotion pipeline sequence of events.
 
