@@ -15,6 +15,12 @@
 </div>
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/get-glu/glu.svg)](https://pkg.go.dev/github.com/get-glu/glu)
+[![Discord](https://img.shields.io/discord/1318634968808947752?style=flat&cacheSeconds=120
+)](https://discord.gg/Vkz3BPy5ba)
+
+## Mission Statement
+
+To simplify application deployments through a code-first framework that streamlines CI/CD processes. Glu replaces fragmented, manual workflows with maintainable pipelines, providing teams with enhanced visibility, traceability, and control over their deployment journey.
 
 ## What Is It?
 
@@ -25,7 +31,7 @@ Glu is a framework built to help manage and coordinate multi-environment deploym
 
 <p align="center">
 
-https://github.com/user-attachments/assets/b6f4d20b-e166-4ec9-8aa3-0c4d5e0cf410
+<img src="./.github/images/dashboard.png" alt="Glu Dashboard" width="800" />
 
 </p>
 
