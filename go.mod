@@ -7,7 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.0
 	github.com/go-chi/cors v1.2.1
 	github.com/go-git/go-billy/v5 v5.6.1
-	github.com/go-git/go-git/v5 v5.12.0
+	github.com/go-git/go-git/v5 v5.13.0
 	github.com/google/btree v1.1.3
 	github.com/google/go-github/v64 v64.0.0
 	github.com/google/uuid v1.6.0
