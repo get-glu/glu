@@ -86,15 +86,3 @@ func (s *BaseGluDSLListener) EnterLabelPair(ctx *LabelPairContext) {}
 
 // ExitLabelPair is called when production labelPair is exited.
 func (s *BaseGluDSLListener) ExitLabelPair(ctx *LabelPairContext) {}
-
-// EnterTrigger is called when production trigger is entered.
-func (s *BaseGluDSLListener) EnterTrigger(ctx *TriggerContext) {}
-
-// ExitTrigger is called when production trigger is exited.
-func (s *BaseGluDSLListener) ExitTrigger(ctx *TriggerContext) {}
-
-// EnterTriggerBody is called when production triggerBody is entered.
-func (s *BaseGluDSLListener) EnterTriggerBody(ctx *TriggerBodyContext) {}
-
-// ExitTriggerBody is called when production triggerBody is exited.
-func (s *BaseGluDSLListener) ExitTriggerBody(ctx *TriggerBodyContext) {}

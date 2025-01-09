@@ -33,63 +33,52 @@ var GluDSLParserStaticData struct {
 func gludslParserInit() {
 	staticData := &GluDSLParserStaticData
 	staticData.LiteralNames = []string{
-		"", "'type'", "'name'", "','", "'system'", "'pipeline'", "'source'",
-		"'phase'", "'trigger'", "'labels'", "'promotes_from'", "'interval'",
-		"'matches_label'", "'{'", "'}'", "'='",
+		"", "'type'", "'name'", "'system'", "'pipeline'", "'source'", "'phase'",
+		"'labels'", "'promotes_from'", "'{'", "'}'", "'='",
 	}
 	staticData.SymbolicNames = []string{
-		"", "", "", "", "SYSTEM", "PIPELINE", "SOURCE", "PHASE", "TRIGGER",
-		"LABELS", "PROMOTES_FROM", "INTERVAL", "MATCHES_LABEL", "LBRACE", "RBRACE",
-		"EQUALS", "STRING", "IDENTIFIER", "WS",
+		"", "", "", "SYSTEM", "PIPELINE", "SOURCE", "PHASE", "LABELS", "PROMOTES_FROM",
+		"LBRACE", "RBRACE", "EQUALS", "STRING", "IDENTIFIER", "WS",
 	}
 	staticData.RuleNames = []string{
 		"program", "system", "systemBody", "pipeline", "pipelineBody", "source",
-		"sourceBody", "phase", "phaseBody", "labels", "labelPair", "trigger",
-		"triggerBody",
+		"sourceBody", "phase", "phaseBody", "labels", "labelPair",
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 18, 109, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 14, 90, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
-		10, 2, 11, 7, 11, 2, 12, 7, 12, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-		1, 1, 1, 1, 2, 5, 2, 36, 8, 2, 10, 2, 12, 2, 39, 9, 2, 1, 3, 1, 3, 1, 3,
-		1, 3, 1, 3, 1, 3, 1, 4, 1, 4, 1, 4, 5, 4, 50, 8, 4, 10, 4, 12, 4, 53, 9,
-		4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1,
-		7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 1, 8, 3, 8, 76, 8, 8,
-		1, 8, 3, 8, 79, 8, 8, 1, 9, 1, 9, 1, 9, 5, 9, 84, 8, 9, 10, 9, 12, 9, 87,
-		9, 9, 1, 9, 1, 9, 1, 10, 1, 10, 1, 10, 1, 10, 1, 11, 1, 11, 1, 11, 1, 11,
-		1, 11, 1, 11, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 3, 12, 107, 8,
-		12, 1, 12, 0, 0, 13, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 0,
-		0, 103, 0, 26, 1, 0, 0, 0, 2, 28, 1, 0, 0, 0, 4, 37, 1, 0, 0, 0, 6, 40,
-		1, 0, 0, 0, 8, 51, 1, 0, 0, 0, 10, 54, 1, 0, 0, 0, 12, 60, 1, 0, 0, 0,
-		14, 65, 1, 0, 0, 0, 16, 71, 1, 0, 0, 0, 18, 80, 1, 0, 0, 0, 20, 90, 1,
-		0, 0, 0, 22, 94, 1, 0, 0, 0, 24, 100, 1, 0, 0, 0, 26, 27, 3, 2, 1, 0, 27,
-		1, 1, 0, 0, 0, 28, 29, 5, 4, 0, 0, 29, 30, 5, 17, 0, 0, 30, 31, 5, 13,
-		0, 0, 31, 32, 3, 4, 2, 0, 32, 33, 5, 14, 0, 0, 33, 3, 1, 0, 0, 0, 34, 36,
-		3, 6, 3, 0, 35, 34, 1, 0, 0, 0, 36, 39, 1, 0, 0, 0, 37, 35, 1, 0, 0, 0,
-		37, 38, 1, 0, 0, 0, 38, 5, 1, 0, 0, 0, 39, 37, 1, 0, 0, 0, 40, 41, 5, 5,
-		0, 0, 41, 42, 5, 17, 0, 0, 42, 43, 5, 13, 0, 0, 43, 44, 3, 8, 4, 0, 44,
-		45, 5, 14, 0, 0, 45, 7, 1, 0, 0, 0, 46, 50, 3, 10, 5, 0, 47, 50, 3, 14,
-		7, 0, 48, 50, 3, 22, 11, 0, 49, 46, 1, 0, 0, 0, 49, 47, 1, 0, 0, 0, 49,
-		48, 1, 0, 0, 0, 50, 53, 1, 0, 0, 0, 51, 49, 1, 0, 0, 0, 51, 52, 1, 0, 0,
-		0, 52, 9, 1, 0, 0, 0, 53, 51, 1, 0, 0, 0, 54, 55, 5, 6, 0, 0, 55, 56, 5,
-		17, 0, 0, 56, 57, 5, 13, 0, 0, 57, 58, 3, 12, 6, 0, 58, 59, 5, 14, 0, 0,
-		59, 11, 1, 0, 0, 0, 60, 61, 5, 1, 0, 0, 61, 62, 5, 17, 0, 0, 62, 63, 5,
-		2, 0, 0, 63, 64, 5, 17, 0, 0, 64, 13, 1, 0, 0, 0, 65, 66, 5, 7, 0, 0, 66,
-		67, 5, 17, 0, 0, 67, 68, 5, 13, 0, 0, 68, 69, 3, 16, 8, 0, 69, 70, 5, 14,
-		0, 0, 70, 15, 1, 0, 0, 0, 71, 72, 5, 6, 0, 0, 72, 75, 5, 17, 0, 0, 73,
-		74, 5, 10, 0, 0, 74, 76, 5, 17, 0, 0, 75, 73, 1, 0, 0, 0, 75, 76, 1, 0,
-		0, 0, 76, 78, 1, 0, 0, 0, 77, 79, 3, 18, 9, 0, 78, 77, 1, 0, 0, 0, 78,
-		79, 1, 0, 0, 0, 79, 17, 1, 0, 0, 0, 80, 81, 5, 9, 0, 0, 81, 85, 5, 13,
-		0, 0, 82, 84, 3, 20, 10, 0, 83, 82, 1, 0, 0, 0, 84, 87, 1, 0, 0, 0, 85,
-		83, 1, 0, 0, 0, 85, 86, 1, 0, 0, 0, 86, 88, 1, 0, 0, 0, 87, 85, 1, 0, 0,
-		0, 88, 89, 5, 14, 0, 0, 89, 19, 1, 0, 0, 0, 90, 91, 5, 17, 0, 0, 91, 92,
-		5, 15, 0, 0, 92, 93, 5, 16, 0, 0, 93, 21, 1, 0, 0, 0, 94, 95, 5, 8, 0,
-		0, 95, 96, 5, 17, 0, 0, 96, 97, 5, 13, 0, 0, 97, 98, 3, 24, 12, 0, 98,
-		99, 5, 14, 0, 0, 99, 23, 1, 0, 0, 0, 100, 101, 5, 11, 0, 0, 101, 106, 5,
-		16, 0, 0, 102, 103, 5, 12, 0, 0, 103, 104, 5, 17, 0, 0, 104, 105, 5, 3,
-		0, 0, 105, 107, 5, 17, 0, 0, 106, 102, 1, 0, 0, 0, 106, 107, 1, 0, 0, 0,
-		107, 25, 1, 0, 0, 0, 7, 37, 49, 51, 75, 78, 85, 106,
+		10, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 5, 2, 32, 8,
+		2, 10, 2, 12, 2, 35, 9, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 4, 1,
+		4, 5, 4, 45, 8, 4, 10, 4, 12, 4, 48, 9, 4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
+		1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7,
+		1, 8, 1, 8, 1, 8, 1, 8, 3, 8, 71, 8, 8, 1, 8, 3, 8, 74, 8, 8, 1, 9, 1,
+		9, 1, 9, 5, 9, 79, 8, 9, 10, 9, 12, 9, 82, 9, 9, 1, 9, 1, 9, 1, 10, 1,
+		10, 1, 10, 1, 10, 1, 10, 0, 0, 11, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
+		0, 1, 1, 0, 12, 13, 84, 0, 22, 1, 0, 0, 0, 2, 24, 1, 0, 0, 0, 4, 33, 1,
+		0, 0, 0, 6, 36, 1, 0, 0, 0, 8, 46, 1, 0, 0, 0, 10, 49, 1, 0, 0, 0, 12,
+		55, 1, 0, 0, 0, 14, 60, 1, 0, 0, 0, 16, 66, 1, 0, 0, 0, 18, 75, 1, 0, 0,
+		0, 20, 85, 1, 0, 0, 0, 22, 23, 3, 2, 1, 0, 23, 1, 1, 0, 0, 0, 24, 25, 5,
+		3, 0, 0, 25, 26, 7, 0, 0, 0, 26, 27, 5, 9, 0, 0, 27, 28, 3, 4, 2, 0, 28,
+		29, 5, 10, 0, 0, 29, 3, 1, 0, 0, 0, 30, 32, 3, 6, 3, 0, 31, 30, 1, 0, 0,
+		0, 32, 35, 1, 0, 0, 0, 33, 31, 1, 0, 0, 0, 33, 34, 1, 0, 0, 0, 34, 5, 1,
+		0, 0, 0, 35, 33, 1, 0, 0, 0, 36, 37, 5, 4, 0, 0, 37, 38, 7, 0, 0, 0, 38,
+		39, 5, 9, 0, 0, 39, 40, 3, 8, 4, 0, 40, 41, 5, 10, 0, 0, 41, 7, 1, 0, 0,
+		0, 42, 45, 3, 10, 5, 0, 43, 45, 3, 14, 7, 0, 44, 42, 1, 0, 0, 0, 44, 43,
+		1, 0, 0, 0, 45, 48, 1, 0, 0, 0, 46, 44, 1, 0, 0, 0, 46, 47, 1, 0, 0, 0,
+		47, 9, 1, 0, 0, 0, 48, 46, 1, 0, 0, 0, 49, 50, 5, 5, 0, 0, 50, 51, 7, 0,
+		0, 0, 51, 52, 5, 9, 0, 0, 52, 53, 3, 12, 6, 0, 53, 54, 5, 10, 0, 0, 54,
+		11, 1, 0, 0, 0, 55, 56, 5, 1, 0, 0, 56, 57, 7, 0, 0, 0, 57, 58, 5, 2, 0,
+		0, 58, 59, 7, 0, 0, 0, 59, 13, 1, 0, 0, 0, 60, 61, 5, 6, 0, 0, 61, 62,
+		7, 0, 0, 0, 62, 63, 5, 9, 0, 0, 63, 64, 3, 16, 8, 0, 64, 65, 5, 10, 0,
+		0, 65, 15, 1, 0, 0, 0, 66, 67, 5, 5, 0, 0, 67, 70, 7, 0, 0, 0, 68, 69,
+		5, 8, 0, 0, 69, 71, 7, 0, 0, 0, 70, 68, 1, 0, 0, 0, 70, 71, 1, 0, 0, 0,
+		71, 73, 1, 0, 0, 0, 72, 74, 3, 18, 9, 0, 73, 72, 1, 0, 0, 0, 73, 74, 1,
+		0, 0, 0, 74, 17, 1, 0, 0, 0, 75, 76, 5, 7, 0, 0, 76, 80, 5, 9, 0, 0, 77,
+		79, 3, 20, 10, 0, 78, 77, 1, 0, 0, 0, 79, 82, 1, 0, 0, 0, 80, 78, 1, 0,
+		0, 0, 80, 81, 1, 0, 0, 0, 81, 83, 1, 0, 0, 0, 82, 80, 1, 0, 0, 0, 83, 84,
+		5, 10, 0, 0, 84, 19, 1, 0, 0, 0, 85, 86, 7, 0, 0, 0, 86, 87, 5, 11, 0,
+		0, 87, 88, 5, 12, 0, 0, 88, 21, 1, 0, 0, 0, 6, 33, 44, 46, 70, 73, 80,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -130,22 +119,18 @@ const (
 	GluDSLParserEOF           = antlr.TokenEOF
 	GluDSLParserT__0          = 1
 	GluDSLParserT__1          = 2
-	GluDSLParserT__2          = 3
-	GluDSLParserSYSTEM        = 4
-	GluDSLParserPIPELINE      = 5
-	GluDSLParserSOURCE        = 6
-	GluDSLParserPHASE         = 7
-	GluDSLParserTRIGGER       = 8
-	GluDSLParserLABELS        = 9
-	GluDSLParserPROMOTES_FROM = 10
-	GluDSLParserINTERVAL      = 11
-	GluDSLParserMATCHES_LABEL = 12
-	GluDSLParserLBRACE        = 13
-	GluDSLParserRBRACE        = 14
-	GluDSLParserEQUALS        = 15
-	GluDSLParserSTRING        = 16
-	GluDSLParserIDENTIFIER    = 17
-	GluDSLParserWS            = 18
+	GluDSLParserSYSTEM        = 3
+	GluDSLParserPIPELINE      = 4
+	GluDSLParserSOURCE        = 5
+	GluDSLParserPHASE         = 6
+	GluDSLParserLABELS        = 7
+	GluDSLParserPROMOTES_FROM = 8
+	GluDSLParserLBRACE        = 9
+	GluDSLParserRBRACE        = 10
+	GluDSLParserEQUALS        = 11
+	GluDSLParserSTRING        = 12
+	GluDSLParserIDENTIFIER    = 13
+	GluDSLParserWS            = 14
 )
 
 // GluDSLParser rules.
@@ -161,8 +146,6 @@ const (
 	GluDSLParserRULE_phaseBody    = 8
 	GluDSLParserRULE_labels       = 9
 	GluDSLParserRULE_labelPair    = 10
-	GluDSLParserRULE_trigger      = 11
-	GluDSLParserRULE_triggerBody  = 12
 )
 
 // IProgramContext is an interface to support dynamic dispatch.
@@ -252,7 +235,7 @@ func (p *GluDSLParser) Program() (localctx IProgramContext) {
 	p.EnterRule(localctx, 0, GluDSLParserRULE_program)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(26)
+		p.SetState(22)
 		p.System()
 	}
 
@@ -278,10 +261,11 @@ type ISystemContext interface {
 
 	// Getter signatures
 	SYSTEM() antlr.TerminalNode
-	IDENTIFIER() antlr.TerminalNode
 	LBRACE() antlr.TerminalNode
 	SystemBody() ISystemBodyContext
 	RBRACE() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	STRING() antlr.TerminalNode
 
 	// IsSystemContext differentiates from other interfaces.
 	IsSystemContext()
@@ -323,10 +307,6 @@ func (s *SystemContext) SYSTEM() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserSYSTEM, 0)
 }
 
-func (s *SystemContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
 func (s *SystemContext) LBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserLBRACE, 0)
 }
@@ -349,6 +329,14 @@ func (s *SystemContext) SystemBody() ISystemBodyContext {
 
 func (s *SystemContext) RBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserRBRACE, 0)
+}
+
+func (s *SystemContext) IDENTIFIER() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserIDENTIFIER, 0)
+}
+
+func (s *SystemContext) STRING() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, 0)
 }
 
 func (s *SystemContext) GetRuleContext() antlr.RuleContext {
@@ -374,9 +362,11 @@ func (s *SystemContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) System() (localctx ISystemContext) {
 	localctx = NewSystemContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, GluDSLParserRULE_system)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(28)
+		p.SetState(24)
 		p.Match(GluDSLParserSYSTEM)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -384,15 +374,18 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 		}
 	}
 	{
-		p.SetState(29)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(25)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(30)
+		p.SetState(26)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -400,11 +393,11 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 		}
 	}
 	{
-		p.SetState(31)
+		p.SetState(27)
 		p.SystemBody()
 	}
 	{
-		p.SetState(32)
+		p.SetState(28)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -539,7 +532,7 @@ func (p *GluDSLParser) SystemBody() (localctx ISystemBodyContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(37)
+	p.SetState(33)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -548,11 +541,11 @@ func (p *GluDSLParser) SystemBody() (localctx ISystemBodyContext) {
 
 	for _la == GluDSLParserPIPELINE {
 		{
-			p.SetState(34)
+			p.SetState(30)
 			p.Pipeline()
 		}
 
-		p.SetState(39)
+		p.SetState(35)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -582,10 +575,11 @@ type IPipelineContext interface {
 
 	// Getter signatures
 	PIPELINE() antlr.TerminalNode
-	IDENTIFIER() antlr.TerminalNode
 	LBRACE() antlr.TerminalNode
 	PipelineBody() IPipelineBodyContext
 	RBRACE() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	STRING() antlr.TerminalNode
 
 	// IsPipelineContext differentiates from other interfaces.
 	IsPipelineContext()
@@ -627,10 +621,6 @@ func (s *PipelineContext) PIPELINE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserPIPELINE, 0)
 }
 
-func (s *PipelineContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
 func (s *PipelineContext) LBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserLBRACE, 0)
 }
@@ -653,6 +643,14 @@ func (s *PipelineContext) PipelineBody() IPipelineBodyContext {
 
 func (s *PipelineContext) RBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserRBRACE, 0)
+}
+
+func (s *PipelineContext) IDENTIFIER() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserIDENTIFIER, 0)
+}
+
+func (s *PipelineContext) STRING() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, 0)
 }
 
 func (s *PipelineContext) GetRuleContext() antlr.RuleContext {
@@ -678,9 +676,11 @@ func (s *PipelineContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 	localctx = NewPipelineContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 6, GluDSLParserRULE_pipeline)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(40)
+		p.SetState(36)
 		p.Match(GluDSLParserPIPELINE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -688,15 +688,18 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 		}
 	}
 	{
-		p.SetState(41)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(37)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(42)
+		p.SetState(38)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -704,11 +707,11 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 		}
 	}
 	{
-		p.SetState(43)
+		p.SetState(39)
 		p.PipelineBody()
 	}
 	{
-		p.SetState(44)
+		p.SetState(40)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -741,8 +744,6 @@ type IPipelineBodyContext interface {
 	Source(i int) ISourceContext
 	AllPhase() []IPhaseContext
 	Phase(i int) IPhaseContext
-	AllTrigger() []ITriggerContext
-	Trigger(i int) ITriggerContext
 
 	// IsPipelineBodyContext differentiates from other interfaces.
 	IsPipelineBodyContext()
@@ -862,47 +863,6 @@ func (s *PipelineBodyContext) Phase(i int) IPhaseContext {
 	return t.(IPhaseContext)
 }
 
-func (s *PipelineBodyContext) AllTrigger() []ITriggerContext {
-	children := s.GetChildren()
-	len := 0
-	for _, ctx := range children {
-		if _, ok := ctx.(ITriggerContext); ok {
-			len++
-		}
-	}
-
-	tst := make([]ITriggerContext, len)
-	i := 0
-	for _, ctx := range children {
-		if t, ok := ctx.(ITriggerContext); ok {
-			tst[i] = t.(ITriggerContext)
-			i++
-		}
-	}
-
-	return tst
-}
-
-func (s *PipelineBodyContext) Trigger(i int) ITriggerContext {
-	var t antlr.RuleContext
-	j := 0
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ITriggerContext); ok {
-			if j == i {
-				t = ctx.(antlr.RuleContext)
-				break
-			}
-			j++
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(ITriggerContext)
-}
-
 func (s *PipelineBodyContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -929,15 +889,15 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(51)
+	p.SetState(46)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&448) != 0 {
-		p.SetState(49)
+	for _la == GluDSLParserSOURCE || _la == GluDSLParserPHASE {
+		p.SetState(44)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -946,20 +906,14 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 		switch p.GetTokenStream().LA(1) {
 		case GluDSLParserSOURCE:
 			{
-				p.SetState(46)
+				p.SetState(42)
 				p.Source()
 			}
 
 		case GluDSLParserPHASE:
 			{
-				p.SetState(47)
+				p.SetState(43)
 				p.Phase()
-			}
-
-		case GluDSLParserTRIGGER:
-			{
-				p.SetState(48)
-				p.Trigger()
 			}
 
 		default:
@@ -967,7 +921,7 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 			goto errorExit
 		}
 
-		p.SetState(53)
+		p.SetState(48)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -997,10 +951,11 @@ type ISourceContext interface {
 
 	// Getter signatures
 	SOURCE() antlr.TerminalNode
-	IDENTIFIER() antlr.TerminalNode
 	LBRACE() antlr.TerminalNode
 	SourceBody() ISourceBodyContext
 	RBRACE() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	STRING() antlr.TerminalNode
 
 	// IsSourceContext differentiates from other interfaces.
 	IsSourceContext()
@@ -1042,10 +997,6 @@ func (s *SourceContext) SOURCE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserSOURCE, 0)
 }
 
-func (s *SourceContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
 func (s *SourceContext) LBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserLBRACE, 0)
 }
@@ -1068,6 +1019,14 @@ func (s *SourceContext) SourceBody() ISourceBodyContext {
 
 func (s *SourceContext) RBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserRBRACE, 0)
+}
+
+func (s *SourceContext) IDENTIFIER() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserIDENTIFIER, 0)
+}
+
+func (s *SourceContext) STRING() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, 0)
 }
 
 func (s *SourceContext) GetRuleContext() antlr.RuleContext {
@@ -1093,9 +1052,11 @@ func (s *SourceContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) Source() (localctx ISourceContext) {
 	localctx = NewSourceContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 10, GluDSLParserRULE_source)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(54)
+		p.SetState(49)
 		p.Match(GluDSLParserSOURCE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1103,15 +1064,18 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 		}
 	}
 	{
-		p.SetState(55)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(50)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(56)
+		p.SetState(51)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1119,11 +1083,11 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 		}
 	}
 	{
-		p.SetState(57)
+		p.SetState(52)
 		p.SourceBody()
 	}
 	{
-		p.SetState(58)
+		p.SetState(53)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1154,6 +1118,8 @@ type ISourceBodyContext interface {
 	// Getter signatures
 	AllIDENTIFIER() []antlr.TerminalNode
 	IDENTIFIER(i int) antlr.TerminalNode
+	AllSTRING() []antlr.TerminalNode
+	STRING(i int) antlr.TerminalNode
 
 	// IsSourceBodyContext differentiates from other interfaces.
 	IsSourceBodyContext()
@@ -1199,6 +1165,14 @@ func (s *SourceBodyContext) IDENTIFIER(i int) antlr.TerminalNode {
 	return s.GetToken(GluDSLParserIDENTIFIER, i)
 }
 
+func (s *SourceBodyContext) AllSTRING() []antlr.TerminalNode {
+	return s.GetTokens(GluDSLParserSTRING)
+}
+
+func (s *SourceBodyContext) STRING(i int) antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, i)
+}
+
 func (s *SourceBodyContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -1222,9 +1196,11 @@ func (s *SourceBodyContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 	localctx = NewSourceBodyContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 12, GluDSLParserRULE_sourceBody)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(60)
+		p.SetState(55)
 		p.Match(GluDSLParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1232,15 +1208,18 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 		}
 	}
 	{
-		p.SetState(61)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(56)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(62)
+		p.SetState(57)
 		p.Match(GluDSLParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1248,11 +1227,14 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 		}
 	}
 	{
-		p.SetState(63)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(58)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 
@@ -1278,10 +1260,11 @@ type IPhaseContext interface {
 
 	// Getter signatures
 	PHASE() antlr.TerminalNode
-	IDENTIFIER() antlr.TerminalNode
 	LBRACE() antlr.TerminalNode
 	PhaseBody() IPhaseBodyContext
 	RBRACE() antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
+	STRING() antlr.TerminalNode
 
 	// IsPhaseContext differentiates from other interfaces.
 	IsPhaseContext()
@@ -1323,10 +1306,6 @@ func (s *PhaseContext) PHASE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserPHASE, 0)
 }
 
-func (s *PhaseContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
 func (s *PhaseContext) LBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserLBRACE, 0)
 }
@@ -1349,6 +1328,14 @@ func (s *PhaseContext) PhaseBody() IPhaseBodyContext {
 
 func (s *PhaseContext) RBRACE() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserRBRACE, 0)
+}
+
+func (s *PhaseContext) IDENTIFIER() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserIDENTIFIER, 0)
+}
+
+func (s *PhaseContext) STRING() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, 0)
 }
 
 func (s *PhaseContext) GetRuleContext() antlr.RuleContext {
@@ -1374,9 +1361,11 @@ func (s *PhaseContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 	localctx = NewPhaseContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 14, GluDSLParserRULE_phase)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(65)
+		p.SetState(60)
 		p.Match(GluDSLParserPHASE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1384,15 +1373,18 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 		}
 	}
 	{
-		p.SetState(66)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(61)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(67)
+		p.SetState(62)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1400,11 +1392,11 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 		}
 	}
 	{
-		p.SetState(68)
+		p.SetState(63)
 		p.PhaseBody()
 	}
 	{
-		p.SetState(69)
+		p.SetState(64)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1436,6 +1428,8 @@ type IPhaseBodyContext interface {
 	SOURCE() antlr.TerminalNode
 	AllIDENTIFIER() []antlr.TerminalNode
 	IDENTIFIER(i int) antlr.TerminalNode
+	AllSTRING() []antlr.TerminalNode
+	STRING(i int) antlr.TerminalNode
 	PROMOTES_FROM() antlr.TerminalNode
 	Labels() ILabelsContext
 
@@ -1487,6 +1481,14 @@ func (s *PhaseBodyContext) IDENTIFIER(i int) antlr.TerminalNode {
 	return s.GetToken(GluDSLParserIDENTIFIER, i)
 }
 
+func (s *PhaseBodyContext) AllSTRING() []antlr.TerminalNode {
+	return s.GetTokens(GluDSLParserSTRING)
+}
+
+func (s *PhaseBodyContext) STRING(i int) antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, i)
+}
+
 func (s *PhaseBodyContext) PROMOTES_FROM() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserPROMOTES_FROM, 0)
 }
@@ -1534,7 +1536,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(71)
+		p.SetState(66)
 		p.Match(GluDSLParserSOURCE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1542,14 +1544,17 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 		}
 	}
 	{
-		p.SetState(72)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(67)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
-	p.SetState(75)
+	p.SetState(70)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1558,7 +1563,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	if _la == GluDSLParserPROMOTES_FROM {
 		{
-			p.SetState(73)
+			p.SetState(68)
 			p.Match(GluDSLParserPROMOTES_FROM)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1566,16 +1571,19 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 			}
 		}
 		{
-			p.SetState(74)
-			p.Match(GluDSLParserIDENTIFIER)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
+			p.SetState(69)
+			_la = p.GetTokenStream().LA(1)
+
+			if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+				p.GetErrorHandler().RecoverInline(p)
+			} else {
+				p.GetErrorHandler().ReportMatch(p)
+				p.Consume()
 			}
 		}
 
 	}
-	p.SetState(78)
+	p.SetState(73)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1584,7 +1592,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	if _la == GluDSLParserLABELS {
 		{
-			p.SetState(77)
+			p.SetState(72)
 			p.Labels()
 		}
 
@@ -1733,7 +1741,7 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(80)
+		p.SetState(75)
 		p.Match(GluDSLParserLABELS)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1741,27 +1749,27 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 		}
 	}
 	{
-		p.SetState(81)
+		p.SetState(76)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(85)
+	p.SetState(80)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
 	}
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == GluDSLParserIDENTIFIER {
+	for _la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER {
 		{
-			p.SetState(82)
+			p.SetState(77)
 			p.LabelPair()
 		}
 
-		p.SetState(87)
+		p.SetState(82)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1769,7 +1777,7 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(88)
+		p.SetState(83)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1798,9 +1806,10 @@ type ILabelPairContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	IDENTIFIER() antlr.TerminalNode
 	EQUALS() antlr.TerminalNode
-	STRING() antlr.TerminalNode
+	AllSTRING() []antlr.TerminalNode
+	STRING(i int) antlr.TerminalNode
+	IDENTIFIER() antlr.TerminalNode
 
 	// IsLabelPairContext differentiates from other interfaces.
 	IsLabelPairContext()
@@ -1838,16 +1847,20 @@ func NewLabelPairContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 
 func (s *LabelPairContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *LabelPairContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
 func (s *LabelPairContext) EQUALS() antlr.TerminalNode {
 	return s.GetToken(GluDSLParserEQUALS, 0)
 }
 
-func (s *LabelPairContext) STRING() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserSTRING, 0)
+func (s *LabelPairContext) AllSTRING() []antlr.TerminalNode {
+	return s.GetTokens(GluDSLParserSTRING)
+}
+
+func (s *LabelPairContext) STRING(i int) antlr.TerminalNode {
+	return s.GetToken(GluDSLParserSTRING, i)
+}
+
+func (s *LabelPairContext) IDENTIFIER() antlr.TerminalNode {
+	return s.GetToken(GluDSLParserIDENTIFIER, 0)
 }
 
 func (s *LabelPairContext) GetRuleContext() antlr.RuleContext {
@@ -1873,17 +1886,22 @@ func (s *LabelPairContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) LabelPair() (localctx ILabelPairContext) {
 	localctx = NewLabelPairContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 20, GluDSLParserRULE_labelPair)
+	var _la int
+
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(90)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
+		p.SetState(85)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
 		}
 	}
 	{
-		p.SetState(91)
+		p.SetState(86)
 		p.Match(GluDSLParserEQUALS)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1891,336 +1909,12 @@ func (p *GluDSLParser) LabelPair() (localctx ILabelPairContext) {
 		}
 	}
 	{
-		p.SetState(92)
+		p.SetState(87)
 		p.Match(GluDSLParserSTRING)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
-	}
-
-errorExit:
-	if p.HasError() {
-		v := p.GetError()
-		localctx.SetException(v)
-		p.GetErrorHandler().ReportError(p, v)
-		p.GetErrorHandler().Recover(p, v)
-		p.SetError(nil)
-	}
-	p.ExitRule()
-	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
-}
-
-// ITriggerContext is an interface to support dynamic dispatch.
-type ITriggerContext interface {
-	antlr.ParserRuleContext
-
-	// GetParser returns the parser.
-	GetParser() antlr.Parser
-
-	// Getter signatures
-	TRIGGER() antlr.TerminalNode
-	IDENTIFIER() antlr.TerminalNode
-	LBRACE() antlr.TerminalNode
-	TriggerBody() ITriggerBodyContext
-	RBRACE() antlr.TerminalNode
-
-	// IsTriggerContext differentiates from other interfaces.
-	IsTriggerContext()
-}
-
-type TriggerContext struct {
-	antlr.BaseParserRuleContext
-	parser antlr.Parser
-}
-
-func NewEmptyTriggerContext() *TriggerContext {
-	var p = new(TriggerContext)
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = GluDSLParserRULE_trigger
-	return p
-}
-
-func InitEmptyTriggerContext(p *TriggerContext) {
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = GluDSLParserRULE_trigger
-}
-
-func (*TriggerContext) IsTriggerContext() {}
-
-func NewTriggerContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TriggerContext {
-	var p = new(TriggerContext)
-
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
-
-	p.parser = parser
-	p.RuleIndex = GluDSLParserRULE_trigger
-
-	return p
-}
-
-func (s *TriggerContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *TriggerContext) TRIGGER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserTRIGGER, 0)
-}
-
-func (s *TriggerContext) IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, 0)
-}
-
-func (s *TriggerContext) LBRACE() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserLBRACE, 0)
-}
-
-func (s *TriggerContext) TriggerBody() ITriggerBodyContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ITriggerBodyContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(ITriggerBodyContext)
-}
-
-func (s *TriggerContext) RBRACE() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserRBRACE, 0)
-}
-
-func (s *TriggerContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *TriggerContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TriggerContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GluDSLListener); ok {
-		listenerT.EnterTrigger(s)
-	}
-}
-
-func (s *TriggerContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GluDSLListener); ok {
-		listenerT.ExitTrigger(s)
-	}
-}
-
-func (p *GluDSLParser) Trigger() (localctx ITriggerContext) {
-	localctx = NewTriggerContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 22, GluDSLParserRULE_trigger)
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(94)
-		p.Match(GluDSLParserTRIGGER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-	{
-		p.SetState(95)
-		p.Match(GluDSLParserIDENTIFIER)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-	{
-		p.SetState(96)
-		p.Match(GluDSLParserLBRACE)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-	{
-		p.SetState(97)
-		p.TriggerBody()
-	}
-	{
-		p.SetState(98)
-		p.Match(GluDSLParserRBRACE)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-
-errorExit:
-	if p.HasError() {
-		v := p.GetError()
-		localctx.SetException(v)
-		p.GetErrorHandler().ReportError(p, v)
-		p.GetErrorHandler().Recover(p, v)
-		p.SetError(nil)
-	}
-	p.ExitRule()
-	return localctx
-	goto errorExit // Trick to prevent compiler error if the label is not used
-}
-
-// ITriggerBodyContext is an interface to support dynamic dispatch.
-type ITriggerBodyContext interface {
-	antlr.ParserRuleContext
-
-	// GetParser returns the parser.
-	GetParser() antlr.Parser
-
-	// Getter signatures
-	INTERVAL() antlr.TerminalNode
-	STRING() antlr.TerminalNode
-	MATCHES_LABEL() antlr.TerminalNode
-	AllIDENTIFIER() []antlr.TerminalNode
-	IDENTIFIER(i int) antlr.TerminalNode
-
-	// IsTriggerBodyContext differentiates from other interfaces.
-	IsTriggerBodyContext()
-}
-
-type TriggerBodyContext struct {
-	antlr.BaseParserRuleContext
-	parser antlr.Parser
-}
-
-func NewEmptyTriggerBodyContext() *TriggerBodyContext {
-	var p = new(TriggerBodyContext)
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = GluDSLParserRULE_triggerBody
-	return p
-}
-
-func InitEmptyTriggerBodyContext(p *TriggerBodyContext) {
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, nil, -1)
-	p.RuleIndex = GluDSLParserRULE_triggerBody
-}
-
-func (*TriggerBodyContext) IsTriggerBodyContext() {}
-
-func NewTriggerBodyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TriggerBodyContext {
-	var p = new(TriggerBodyContext)
-
-	antlr.InitBaseParserRuleContext(&p.BaseParserRuleContext, parent, invokingState)
-
-	p.parser = parser
-	p.RuleIndex = GluDSLParserRULE_triggerBody
-
-	return p
-}
-
-func (s *TriggerBodyContext) GetParser() antlr.Parser { return s.parser }
-
-func (s *TriggerBodyContext) INTERVAL() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserINTERVAL, 0)
-}
-
-func (s *TriggerBodyContext) STRING() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserSTRING, 0)
-}
-
-func (s *TriggerBodyContext) MATCHES_LABEL() antlr.TerminalNode {
-	return s.GetToken(GluDSLParserMATCHES_LABEL, 0)
-}
-
-func (s *TriggerBodyContext) AllIDENTIFIER() []antlr.TerminalNode {
-	return s.GetTokens(GluDSLParserIDENTIFIER)
-}
-
-func (s *TriggerBodyContext) IDENTIFIER(i int) antlr.TerminalNode {
-	return s.GetToken(GluDSLParserIDENTIFIER, i)
-}
-
-func (s *TriggerBodyContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *TriggerBodyContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
-	return antlr.TreesStringTree(s, ruleNames, recog)
-}
-
-func (s *TriggerBodyContext) EnterRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GluDSLListener); ok {
-		listenerT.EnterTriggerBody(s)
-	}
-}
-
-func (s *TriggerBodyContext) ExitRule(listener antlr.ParseTreeListener) {
-	if listenerT, ok := listener.(GluDSLListener); ok {
-		listenerT.ExitTriggerBody(s)
-	}
-}
-
-func (p *GluDSLParser) TriggerBody() (localctx ITriggerBodyContext) {
-	localctx = NewTriggerBodyContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 24, GluDSLParserRULE_triggerBody)
-	var _la int
-
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(100)
-		p.Match(GluDSLParserINTERVAL)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-	{
-		p.SetState(101)
-		p.Match(GluDSLParserSTRING)
-		if p.HasError() {
-			// Recognition error - abort rule
-			goto errorExit
-		}
-	}
-	p.SetState(106)
-	p.GetErrorHandler().Sync(p)
-	if p.HasError() {
-		goto errorExit
-	}
-	_la = p.GetTokenStream().LA(1)
-
-	if _la == GluDSLParserMATCHES_LABEL {
-		{
-			p.SetState(102)
-			p.Match(GluDSLParserMATCHES_LABEL)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
-			}
-		}
-		{
-			p.SetState(103)
-			p.Match(GluDSLParserIDENTIFIER)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
-			}
-		}
-		{
-			p.SetState(104)
-			p.Match(GluDSLParserT__2)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
-			}
-		}
-		{
-			p.SetState(105)
-			p.Match(GluDSLParserIDENTIFIER)
-			if p.HasError() {
-				// Recognition error - abort rule
-				goto errorExit
-			}
-		}
-
 	}
 
 errorExit:

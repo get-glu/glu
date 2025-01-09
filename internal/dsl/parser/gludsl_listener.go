@@ -41,12 +41,6 @@ type GluDSLListener interface {
 	// EnterLabelPair is called when entering the labelPair production.
 	EnterLabelPair(c *LabelPairContext)
 
-	// EnterTrigger is called when entering the trigger production.
-	EnterTrigger(c *TriggerContext)
-
-	// EnterTriggerBody is called when entering the triggerBody production.
-	EnterTriggerBody(c *TriggerBodyContext)
-
 	// ExitProgram is called when exiting the program production.
 	ExitProgram(c *ProgramContext)
 
@@ -79,10 +73,4 @@ type GluDSLListener interface {
 
 	// ExitLabelPair is called when exiting the labelPair production.
 	ExitLabelPair(c *LabelPairContext)
-
-	// ExitTrigger is called when exiting the trigger production.
-	ExitTrigger(c *TriggerContext)
-
-	// ExitTriggerBody is called when exiting the triggerBody production.
-	ExitTriggerBody(c *TriggerBodyContext)
 }

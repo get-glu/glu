@@ -29,10 +29,5 @@ system "gitops-example" {
                 "url" = "http://0.0.0.0:30082"
             }
         }
-
-        trigger "schedule" {
-            interval "10s"
-            matches_label "env", "staging"
-        }
     }
 }
