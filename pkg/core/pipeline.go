@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"iter"
-	"strings"
 	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
@@ -16,15 +15,6 @@ import (
 type Phase interface {
 	Descriptor() Descriptor
 	Get(context.Context) (Resource, error)
-	History(context.Context, ...containers.Option[HistoryOptions]) ([]State, error)
-}
-
-// RollbackPhase is a phase which can be rolled back to a previous version.
-type RollbackPhase interface {
-	Phase
-	// Rollback performs a rollback operation to a previous state identified
-	// by a version uuid.
-	Rollback(context.Context, uuid.UUID) (*Result, error)
 }
 
 // State contains a snapshot of a resource version at a point in history
@@ -102,24 +92,8 @@ func (p *Pipeline) Phases(opts ...containers.Option[PhaseOptions]) iter.Seq[Phas
 // Edge represents an edge between two phases.
 // Edges have have their own kind which identifies their Perform behaviour.
 type Edge interface {
-	Kind() string
 	From() Descriptor
 	To() Descriptor
-	Perform(context.Context) (*Result, error)
-	CanPerform(context.Context) (bool, error)
-}
-
-// TriggerableEdge is an edge that has an additional method RunTriggers.
-// This method should schedule any necessary dependencies needed to automate
-// calling perform on the respectibe edge (e.g. start background schedules).
-type TriggerableEdge interface {
-	Edge
-	RunTriggers(context.Context) error
-}
-
-// Result is a type that carries annotations relating to the result of calling Perform on an edge.
-type Result struct {
-	Annotations map[string]string `json:"annotations"`
 }
 
 // AddEdge adds an edge to a Pipeline.
@@ -130,7 +104,7 @@ func (p *Pipeline) AddEdge(e Edge) error {
 		p.edges[e.From().Metadata.Name] = outgoing
 	}
 
-	if edge, ok := outgoing[e.To().Metadata.Name]; ok && e.Kind() == edge.Kind() {
+	if edge, ok := outgoing[e.To().Metadata.Name]; ok {
 		return fmt.Errorf("edge already exists with the same kind: from %q to %q", edge.From().Metadata.Name, edge.To().Metadata.Name)
 	}
 
@@ -145,30 +119,12 @@ func (p *Pipeline) EdgesFrom() map[string]map[string]Edge {
 	return p.edges
 }
 
-type EdgeOptions struct {
-	kind string
-}
-
-func WithKind(kind string) containers.Option[EdgeOptions] {
-	return func(eo *EdgeOptions) {
-		eo.kind = kind
-	}
-}
-
 // Edges returns all edges as a sequence
-func (p *Pipeline) Edges(o ...containers.Option[EdgeOptions]) iter.Seq[Edge] {
-	var opts EdgeOptions
-	containers.ApplyAll(&opts, o...)
+func (p *Pipeline) Edges() iter.Seq[Edge] {
 
 	return iter.Seq[Edge](func(yield func(Edge) bool) {
 		for _, out := range p.edges {
 			for _, edge := range out {
-				if opts.kind != "" {
-					if !strings.EqualFold(edge.Kind(), opts.kind) {
-						continue
-					}
-				}
-
 				if !yield(edge) {
 					return
 				}

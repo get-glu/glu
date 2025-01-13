@@ -10,12 +10,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -76,9 +74,6 @@ func (s *Server) setupRoutes() {
 			r.Get("/pipelines", s.listPipelines)
 			r.Get("/pipelines/{pipeline}", s.getPipeline)
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
-			r.Get("/pipelines/{pipeline}/phases/{phase}/history", s.phaseHistory)
-			r.Post("/pipelines/{pipeline}/from/{from}/to/{to}/perform", s.edgePerform)
-			r.Post("/pipelines/{pipeline}/phases/{phase}/rollback/{version}", s.phaseRollback)
 		})
 	})
 }
@@ -167,16 +162,9 @@ func (s *Server) createPipelineResponse(ctx context.Context, pipeline *core.Pipe
 	edges := make([]edgeResponse, 0)
 	for _, outgoing := range pipeline.EdgesFrom() {
 		for _, edge := range outgoing {
-			canPerform, err := edge.CanPerform(ctx)
-			if err != nil {
-				return pipelineResponse{}, err
-			}
-
 			edges = append(edges, edgeResponse{
-				Kind:       edge.Kind(),
-				From:       edge.From(),
-				To:         edge.To(),
-				CanPerform: canPerform,
+				From: edge.From(),
+				To:   edge.To(),
 			})
 		}
 	}
@@ -280,158 +268,6 @@ func (s *Server) getPhase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		slog.Error("encoding response", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Server) edgePerform(w http.ResponseWriter, r *http.Request) {
-	slog := slog.With("path", r.URL.Path)
-
-	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
-	if err != nil {
-		slog.Debug("resource not found", "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	var (
-		from = chi.URLParam(r, "from")
-		to   = chi.URLParam(r, "to")
-	)
-
-	outgoing, ok := pipeline.EdgesFrom()[from]
-	if !ok {
-		slog.Debug("edge not found", "path", err, "from", from)
-		http.Error(w, "edge not found", http.StatusNotFound)
-		return
-	}
-
-	edge, ok := outgoing[to]
-	if !ok {
-		slog.Debug("edge not found", "path", err, "from", from, "to", to)
-		http.Error(w, "edge not found", http.StatusNotFound)
-		return
-	}
-
-	result, err := edge.Perform(r.Context())
-	if err != nil {
-		if errors.Is(err, core.ErrNoChange) {
-			slog.Debug("no change occurred")
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		slog.Error("performing promotion", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		slog.Error("encoding response", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Server) phaseHistory(w http.ResponseWriter, r *http.Request) {
-	slog := slog.With("path", r.URL.Path)
-
-	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
-	if err != nil {
-		slog.Debug("resource not found", "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	phaseName := chi.URLParam(r, "phase")
-	phase, err := pipeline.PhaseByName(phaseName)
-	if err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, core.ErrNotFound) {
-			slog.Debug("resource not found", "error", err)
-			status = http.StatusNotFound
-		}
-
-		http.Error(w, err.Error(), status)
-		return
-	}
-
-	var (
-		opts       = []containers.Option[core.HistoryOptions]{}
-		startParam = r.URL.Query().Get("start")
-	)
-
-	if startParam != "" {
-		start, err := uuid.Parse(startParam)
-		if err != nil {
-			slog.Error("parsing start query param", "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		opts = append(opts, containers.Option[core.HistoryOptions](core.WithStart(start)))
-	}
-
-	history, err := phase.History(r.Context(), opts...)
-	if err != nil {
-		slog.Error("getting phase history", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(history); err != nil {
-		slog.Error("encoding response", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-func (s *Server) phaseRollback(w http.ResponseWriter, r *http.Request) {
-	slog := slog.With("path", r.URL.Path)
-
-	pipeline, err := s.system.GetPipeline(chi.URLParam(r, "pipeline"))
-	if err != nil {
-		slog.Debug("resource not found", "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	phaseName := chi.URLParam(r, "phase")
-	phase, err := pipeline.PhaseByName(phaseName)
-	if err != nil {
-		status := http.StatusInternalServerError
-		if errors.Is(err, core.ErrNotFound) {
-			slog.Debug("resource not found", "error", err)
-			status = http.StatusNotFound
-		}
-
-		http.Error(w, err.Error(), status)
-		return
-	}
-
-	rollback, ok := phase.(core.RollbackPhase)
-	if !ok {
-		http.Error(w, "operation not permitted on phase kind", http.StatusBadRequest)
-		return
-	}
-
-	version, err := uuid.Parse(chi.URLParam(r, "version"))
-	if err != nil {
-		slog.Error("parsing version", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	result, err := rollback.Rollback(r.Context(), version)
-	if err != nil {
-		slog.Error("rolling back phase", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := json.NewEncoder(w).Encode(result); err != nil {
 		slog.Error("encoding response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

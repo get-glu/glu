@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/get-glu/glu/pkg/cli"
 	"github.com/get-glu/glu/pkg/config"
 	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
@@ -194,10 +193,6 @@ func (s *System) Run() error {
 	ctx, cancel := signal.NotifyContext(s.ctx, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	if len(os.Args) > 1 {
-		return cli.Run(ctx, s, os.Args...)
-	}
-
 	sConf, err := s.Configuration()
 	if err != nil {
 		return err
@@ -289,35 +284,12 @@ func (s *System) Run() error {
 		return nil
 	})
 
-	group.Go(func() error {
-		return s.runTriggers(ctx)
-	})
-
 	return group.Wait()
 }
 
 // Pipelines is a type which can list a set of configured name/Pipeline pairs.
 type Pipelines interface {
 	Pipelines() iter.Seq2[string, *core.Pipeline]
-}
-
-func (s *System) runTriggers(ctx context.Context) error {
-	group, ctx := errgroup.WithContext(ctx)
-	for _, pipeline := range s.pipelines {
-		for edge := range pipeline.Edges() {
-			tedge, ok := edge.(core.TriggerableEdge)
-			if !ok {
-				slog.Debug("skipping non-triggerable edge", "kind", edge.Kind())
-				continue
-			}
-
-			group.Go(func() error {
-				return tedge.RunTriggers(ctx)
-			})
-		}
-	}
-
-	return group.Wait()
 }
 
 func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Reader, shutdownFunc, error) {
