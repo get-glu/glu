@@ -24,7 +24,7 @@ const router = createHashRouter([
 ]);
 
 export function App() {
-  let title = 'Glu'; // TODO: get system name from backend
+  const title = 'Glu'; // TODO: get system name from backend
 
   return (
     <>

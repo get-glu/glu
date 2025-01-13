@@ -158,7 +158,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
       type: 'phase',
       position: { x: 0, y: 0 },
       data: {
-        descriptor: phase.descriptor,
+        descriptor: phase.descriptor
       },
       extent: 'parent'
     };
@@ -173,7 +173,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
       data: {
         kind: e.kind,
         from: e.from,
-        to: e.to,
+        to: e.to
       }
     };
 

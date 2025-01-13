@@ -15,12 +15,8 @@ export const api = createApi({
     }),
     getPhase: builder.query<Phase, { pipeline: string; phase: string }>({
       query: ({ pipeline, phase }) => `/pipelines/${pipeline}/phases/${phase}`
-    }),
+    })
   })
 });
 
-export const {
-  useListPipelinesQuery,
-  useGetPipelineQuery,
-  useGetPhaseQuery,
-} = api;
+export const { useListPipelinesQuery, useGetPipelineQuery, useGetPhaseQuery } = api;

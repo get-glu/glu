@@ -12,7 +12,7 @@ BINARY_NAME=glu
 NPM=npm
 UI_DIR=ui
 
-.PHONY: all build test clean dev help fmt vet
+.PHONY: all build test clean dev help fmt lint
 
 all: test build
 
@@ -21,9 +21,11 @@ help:
 	@echo "  build       - Build the Go backend and UI"
 	@echo "  test        - Run Go tests"
 	@echo "  clean       - Clean build artifacts"
-	@echo "  fmt         - Format Go code"
-	@echo "  vet         - Run Go vet"
+	@echo "  fmt         - Format code"
+	@echo "  lint        - Run code linting"
 	@echo "  dev         - Run both backend and UI in development mode"
+	@echo "  init        - Initialize the project"
+	@echo "  check       - Run all checks"
 
 build:
 	cd $(UI_DIR) && $(NPM) run build
@@ -39,9 +41,11 @@ clean:
 
 fmt:
 	$(GOFMT) ./...
+	cd $(UI_DIR) && $(NPM) run format
 
-vet:
+lint:
 	$(GOVET) ./...
+	cd $(UI_DIR) && $(NPM) run lint
 
 # Run both backend and UI in development mode
 dev:
@@ -60,4 +64,4 @@ init:
 	cd $(UI_DIR) && $(NPM) install
 
 # Run all checks
-check: fmt vet test 
+check: fmt lint test 
