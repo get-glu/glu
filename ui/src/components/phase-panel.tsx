@@ -43,10 +43,6 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
               <span className="text-muted-foreground">Pipeline: </span>
               {descriptor.pipeline}
             </div>
-            <div className="text-sm">
-              <span className="text-muted-foreground">Digest: </span>
-              <span className="truncate font-mono text-xs">{node.data.resource.digest}</span>
-            </div>
           </div>
         </div>
 

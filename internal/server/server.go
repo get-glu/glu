@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	"github.com/get-glu/glu/ui"
 	"github.com/go-chi/chi/v5"
@@ -24,13 +25,19 @@ type Server struct {
 	ui     fs.FS
 }
 
-func New(system *core.System) *Server {
+func WithUI() containers.Option[Server] {
+	return func(s *Server) {
+		s.ui = ui.FS()
+	}
+}
+
+func New(system *core.System, opts ...containers.Option[Server]) *Server {
 	s := &Server{
 		system: system,
 		router: chi.NewRouter(),
-		ui:     ui.FS(),
 	}
 
+	containers.ApplyAll(s, opts...)
 	s.setupRoutes()
 	return s
 }

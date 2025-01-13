@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"iter"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/get-glu/glu/internal/parser"
 	"github.com/get-glu/glu/internal/server"
 	"github.com/get-glu/glu/pkg/config"
+	"github.com/get-glu/glu/pkg/containers"
 	"github.com/get-glu/glu/pkg/core"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
@@ -27,7 +29,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	dev = flag.Bool("dev", false, "run in development mode")
+)
+
 func main() {
+
 	if err := run(); err != nil {
 		slog.Error("error running glu", "error", err)
 		os.Exit(1)
@@ -42,6 +49,8 @@ type shutdownFunc func(context.Context) error
 // - The API is hosted on the configured port
 // - Triggers are setup (schedules etc.)
 func run() error {
+	flag.Parse()
+
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
@@ -66,7 +75,12 @@ func run() error {
 		return err
 	}
 
-	server := server.New(sys)
+	serverOpts := []containers.Option[server.Server]{}
+	if *dev {
+		serverOpts = append(serverOpts, server.WithUI())
+	}
+
+	server := server.New(sys, serverOpts...)
 
 	var (
 		srv = http.Server{

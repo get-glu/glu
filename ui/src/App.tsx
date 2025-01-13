@@ -4,10 +4,6 @@ import { ThemeProvider } from './components/theme-provider';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import Pipeline from './app/pipeline';
 import { Helmet } from 'react-helmet';
-import { useGetSystemQuery } from './services/api';
-import { toast } from 'sonner';
-import { useEffect } from 'react';
-import { getErrorMessage } from '@/lib/utils';
 
 const router = createHashRouter([
   {
@@ -28,18 +24,7 @@ const router = createHashRouter([
 ]);
 
 export function App() {
-  const { data: system, isError, error } = useGetSystemQuery();
-
-  useEffect(() => {
-    if (isError) {
-      toast.error(getErrorMessage(error));
-    }
-  }, [error, isError]);
-
-  let title = 'Glu';
-  if (system) {
-    title = `Glu - ${system.name}`;
-  }
+  let title = 'Glu'; // TODO: get system name from backend
 
   return (
     <>
