@@ -1,4 +1,4 @@
-package glu
+package server
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/ui"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -18,16 +19,16 @@ import (
 )
 
 type Server struct {
-	system *System
+	system *core.System
 	router *chi.Mux
 	ui     fs.FS
 }
 
-func newServer(system *System, ui fs.FS) *Server {
+func New(system *core.System) *Server {
 	s := &Server{
 		system: system,
 		router: chi.NewRouter(),
-		ui:     ui,
+		ui:     ui.FS(),
 	}
 
 	s.setupRoutes()
@@ -70,19 +71,11 @@ func (s *Server) setupRoutes() {
 
 		// API routes
 		r.Route("/api/v1", func(r chi.Router) {
-			r.Get("/", s.getRoot)
 			r.Get("/pipelines", s.listPipelines)
 			r.Get("/pipelines/{pipeline}", s.getPipeline)
 			r.Get("/pipelines/{pipeline}/phases/{phase}", s.getPhase)
 		})
 	})
-}
-
-func (s *Server) getRoot(w http.ResponseWriter, r *http.Request) {
-	if err := json.NewEncoder(w).Encode(s.system.meta); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 }
 
 type listPipelinesResponse struct {
@@ -97,44 +90,18 @@ type pipelineResponse struct {
 }
 
 type phaseResponse struct {
-	Descriptor core.Descriptor  `json:"descriptor,omitempty"`
-	Resource   resourceResponse `json:"resource,omitempty"`
+	Descriptor core.Descriptor `json:"descriptor,omitempty"`
 }
 
 type edgeResponse struct {
-	Kind       string          `json:"kind,omitempty"`
-	From       core.Descriptor `json:"from,omitempty"`
-	To         core.Descriptor `json:"to,omitempty"`
-	CanPerform bool            `json:"can_perform,omitempty"`
+	Kind string          `json:"kind,omitempty"`
+	From core.Descriptor `json:"from,omitempty"`
+	To   core.Descriptor `json:"to,omitempty"`
 }
 
-type resourceResponse struct {
-	Digest      string            `json:"digest,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase) (phaseResponse, error) {
-	v, err := phase.Get(ctx)
-	if err != nil {
-		return phaseResponse{}, err
-	}
-
-	var annotations map[string]string
-	if r, ok := v.(core.ResourceWithAnnotations); ok {
-		annotations = r.Annotations()
-	}
-
-	digest, err := v.Digest()
-	if err != nil {
-		return phaseResponse{}, err
-	}
-
+func (s *Server) createPhaseResponse(_ context.Context, phase core.Phase) (phaseResponse, error) {
 	return phaseResponse{
 		Descriptor: phase.Descriptor(),
-		Resource: resourceResponse{
-			Digest:      digest,
-			Annotations: annotations,
-		},
 	}, nil
 }
 
@@ -188,10 +155,10 @@ func (s *Server) listPipelines(w http.ResponseWriter, r *http.Request) {
 	var (
 		ctx               = r.Context()
 		slog              = slog.With("path", r.URL.Path)
-		pipelineResponses = make([]pipelineResponse, 0, len(s.system.pipelines))
+		pipelineResponses = make([]pipelineResponse, 0)
 	)
 
-	for _, pipeline := range s.system.pipelines {
+	for _, pipeline := range s.system.Pipelines() {
 		response, err := s.createPipelineResponse(ctx, pipeline)
 		if err != nil {
 			slog.Error("building pipeline response", "error", err)

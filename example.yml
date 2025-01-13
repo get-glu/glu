@@ -1,0 +1,47 @@
+pipelines:
+  - name: gitops-example-app
+    sources:
+      git:
+        kind: ci
+        scm: github
+        name: get-glu/gitops-example
+      
+      staging-k8s:
+        kind: kubernetes
+        name: staging
+        config:
+          namespace: staging
+          name: gitops-example-app
+          container: gitops-example-app
+      
+      production-k8s:
+        kind: kubernetes
+        name: production
+        config:
+          namespace: production
+          name: gitops-example-app
+          container: gitops-example-app
+      
+      oci:
+        kind: oci
+        name: app
+
+    phases:
+      ci:
+        source: git
+      
+      oci:
+        source: oci
+        depends_on: ci
+      
+      staging:
+        source: staging-k8s
+        depends_on: oci
+        labels:
+          url: http://0.0.0.0:30081
+      
+      production:
+        source: production-k8s
+        depends_on: staging
+        labels:
+          url: http://0.0.0.0:30082

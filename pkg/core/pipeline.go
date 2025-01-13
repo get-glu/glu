@@ -1,40 +1,38 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"iter"
-	"time"
 
 	"github.com/get-glu/glu/pkg/containers"
-	"github.com/google/uuid"
 )
 
 // Phase is the core interface for resource sourcing and management.
-// These types can be registered on pipelines and can depend upon on another for promotion.
+// These types can be registered on pipelines and can depend upon on another.
 type Phase interface {
 	Descriptor() Descriptor
-	Get(context.Context) (Resource, error)
 }
 
-// State contains a snapshot of a resource version at a point in history
-type State struct {
-	Version     uuid.UUID         `json:"version,omitempty"`
-	Resource    Resource          `json:"resource,omitempty"`
-	Digest      string            `json:"digest,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	RecordedAt  time.Time         `json:"recorded_at,omitempty"`
+type phase struct {
+	desc Descriptor
 }
 
-// Pipeline is a collection of phases for a given resource type R.
-// It implements the core.Phase interface and is scoped to a single Resource implementation.
+func (p *phase) Descriptor() Descriptor {
+	return p.desc
+}
+
+func NewPhase(desc Descriptor) Phase {
+	return &phase{desc: desc}
+}
+
+// Pipeline is a collection of phases.
 type Pipeline struct {
 	meta   Metadata
 	phases map[string]Phase
 	edges  map[string]map[string]Edge
 }
 
-// NewPipeline constructs and configures a new instance of *ResourcePipeline[R]
+// NewPipeline constructs and configures a new instance of *Pipeline
 func NewPipeline(meta Metadata) *Pipeline {
 	return &Pipeline{
 		meta:   meta,
@@ -96,19 +94,35 @@ type Edge interface {
 	To() Descriptor
 }
 
+type edge struct {
+	from Descriptor
+	to   Descriptor
+}
+
+func (e edge) From() Descriptor {
+	return e.from
+}
+
+func (e edge) To() Descriptor {
+	return e.to
+}
+
 // AddEdge adds an edge to a Pipeline.
-func (p *Pipeline) AddEdge(e Edge) error {
-	outgoing, ok := p.edges[e.From().Metadata.Name]
+func (p *Pipeline) AddEdge(from, to Descriptor) error {
+	outgoing, ok := p.edges[from.Metadata.Name]
 	if !ok {
 		outgoing = map[string]Edge{}
-		p.edges[e.From().Metadata.Name] = outgoing
+		p.edges[from.Metadata.Name] = outgoing
 	}
 
-	if edge, ok := outgoing[e.To().Metadata.Name]; ok {
-		return fmt.Errorf("edge already exists with the same kind: from %q to %q", edge.From().Metadata.Name, edge.To().Metadata.Name)
+	if edge, ok := outgoing[to.Metadata.Name]; ok {
+		return fmt.Errorf("edge already exists: from %q to %q", edge.From().Metadata.Name, edge.To().Metadata.Name)
 	}
 
-	outgoing[e.To().Metadata.Name] = e
+	outgoing[to.Metadata.Name] = edge{
+		from: from,
+		to:   to,
+	}
 
 	return nil
 }
@@ -131,19 +145,6 @@ func (p *Pipeline) Edges() iter.Seq[Edge] {
 			}
 		}
 	})
-}
-
-// HistoryOptions are options for filtering history entries.
-type HistoryOptions struct {
-	Start uuid.UUID
-}
-
-// WithStart returns a HistoryOption that filters history entries after the given
-// version uuid.
-func WithStart(u uuid.UUID) containers.Option[HistoryOptions] {
-	return func(opts *HistoryOptions) {
-		opts.Start = u
-	}
 }
 
 // PhaseOptions scopes a call to get phases from a pipeline.
@@ -170,20 +171,6 @@ func (p *PhaseOptions) Matches(phase Phase) bool {
 	}
 
 	return true
-}
-
-// IsPhase causes a call to Phases to list specifically the provided phase p.
-func IsPhase(p Phase) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		co.phase = p
-	}
-}
-
-// HasName causes a call to Phases to list any phase with the matching name.
-func HasName(name string) containers.Option[PhaseOptions] {
-	return func(co *PhaseOptions) {
-		co.name = name
-	}
 }
 
 // HasLabel causes a call to Phases to list any phase with the matching label paid k and v.

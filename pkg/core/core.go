@@ -11,8 +11,6 @@ var (
 	// ErrAlreadyExists is returned when an attempt is made to create a resource
 	// which already exists
 	ErrAlreadyExists = errors.New("already exists")
-	// ErrNoChange is returned when an update produced zero changes
-	ErrNoChange = errors.New("update produced no change")
 )
 
 // Metadata contains the unique information used to identify
@@ -23,17 +21,10 @@ type Metadata struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// Resource is an instance of a resource in a phase.
-// Primarilly, it exposes a Digest method used to produce
-// a hash digest of the resource instances current state.
-type Resource interface {
-	Digest() (string, error)
-}
-
-// ResourceWithAnnotations is a resource with additional annotations
-type ResourceWithAnnotations interface {
-	Resource
-	Annotations() map[string]string
+// Name is a utility for quickly creating an instance of Metadata
+// with a name (required).
+func Name(name string) Metadata {
+	return Metadata{Name: name, Labels: map[string]string{}, Annotations: map[string]string{}}
 }
 
 // Descriptor is a type which describes a Phase
