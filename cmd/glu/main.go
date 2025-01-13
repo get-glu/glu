@@ -44,10 +44,6 @@ func main() {
 type shutdownFunc func(context.Context) error
 
 // Run invokes or serves the entire system.
-// Given command-line arguments are provided then the system is run as a CLI.
-// Otherwise, the system runs in server mode, which means that:
-// - The API is hosted on the configured port
-// - Triggers are setup (schedules etc.)
 func run() error {
 	flag.Parse()
 
@@ -70,7 +66,7 @@ func run() error {
 		Level: level,
 	})))
 
-	sys, err := parser.Parse(ctx, "example.yml")
+	sys, err := parser.Parse(ctx, "example.yml") // TODO: get from CLI
 	if err != nil {
 		return err
 	}
