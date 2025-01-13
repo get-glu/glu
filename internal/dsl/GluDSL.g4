@@ -18,7 +18,7 @@ IDENTIFIER: [a-zA-Z_][a-zA-Z0-9_-]*;
 WS: [ \t\r\n]+ -> skip;
 
 // Parser Rules
-program: system;
+program: system | pipeline;
 
 system: SYSTEM (IDENTIFIER | STRING) LBRACE systemBody RBRACE;
 

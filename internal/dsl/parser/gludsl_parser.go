@@ -46,39 +46,41 @@ func gludslParserInit() {
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 14, 90, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 14, 92, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
-		10, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 5, 2, 32, 8,
-		2, 10, 2, 12, 2, 35, 9, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 4, 1,
-		4, 5, 4, 45, 8, 4, 10, 4, 12, 4, 48, 9, 4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5,
-		1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7,
-		1, 8, 1, 8, 1, 8, 1, 8, 3, 8, 71, 8, 8, 1, 8, 3, 8, 74, 8, 8, 1, 9, 1,
-		9, 1, 9, 5, 9, 79, 8, 9, 10, 9, 12, 9, 82, 9, 9, 1, 9, 1, 9, 1, 10, 1,
-		10, 1, 10, 1, 10, 1, 10, 0, 0, 11, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
-		0, 1, 1, 0, 12, 13, 84, 0, 22, 1, 0, 0, 0, 2, 24, 1, 0, 0, 0, 4, 33, 1,
-		0, 0, 0, 6, 36, 1, 0, 0, 0, 8, 46, 1, 0, 0, 0, 10, 49, 1, 0, 0, 0, 12,
-		55, 1, 0, 0, 0, 14, 60, 1, 0, 0, 0, 16, 66, 1, 0, 0, 0, 18, 75, 1, 0, 0,
-		0, 20, 85, 1, 0, 0, 0, 22, 23, 3, 2, 1, 0, 23, 1, 1, 0, 0, 0, 24, 25, 5,
-		3, 0, 0, 25, 26, 7, 0, 0, 0, 26, 27, 5, 9, 0, 0, 27, 28, 3, 4, 2, 0, 28,
-		29, 5, 10, 0, 0, 29, 3, 1, 0, 0, 0, 30, 32, 3, 6, 3, 0, 31, 30, 1, 0, 0,
-		0, 32, 35, 1, 0, 0, 0, 33, 31, 1, 0, 0, 0, 33, 34, 1, 0, 0, 0, 34, 5, 1,
-		0, 0, 0, 35, 33, 1, 0, 0, 0, 36, 37, 5, 4, 0, 0, 37, 38, 7, 0, 0, 0, 38,
-		39, 5, 9, 0, 0, 39, 40, 3, 8, 4, 0, 40, 41, 5, 10, 0, 0, 41, 7, 1, 0, 0,
-		0, 42, 45, 3, 10, 5, 0, 43, 45, 3, 14, 7, 0, 44, 42, 1, 0, 0, 0, 44, 43,
-		1, 0, 0, 0, 45, 48, 1, 0, 0, 0, 46, 44, 1, 0, 0, 0, 46, 47, 1, 0, 0, 0,
-		47, 9, 1, 0, 0, 0, 48, 46, 1, 0, 0, 0, 49, 50, 5, 5, 0, 0, 50, 51, 7, 0,
-		0, 0, 51, 52, 5, 9, 0, 0, 52, 53, 3, 12, 6, 0, 53, 54, 5, 10, 0, 0, 54,
-		11, 1, 0, 0, 0, 55, 56, 5, 1, 0, 0, 56, 57, 7, 0, 0, 0, 57, 58, 5, 2, 0,
-		0, 58, 59, 7, 0, 0, 0, 59, 13, 1, 0, 0, 0, 60, 61, 5, 6, 0, 0, 61, 62,
-		7, 0, 0, 0, 62, 63, 5, 9, 0, 0, 63, 64, 3, 16, 8, 0, 64, 65, 5, 10, 0,
-		0, 65, 15, 1, 0, 0, 0, 66, 67, 5, 5, 0, 0, 67, 70, 7, 0, 0, 0, 68, 69,
-		5, 8, 0, 0, 69, 71, 7, 0, 0, 0, 70, 68, 1, 0, 0, 0, 70, 71, 1, 0, 0, 0,
-		71, 73, 1, 0, 0, 0, 72, 74, 3, 18, 9, 0, 73, 72, 1, 0, 0, 0, 73, 74, 1,
-		0, 0, 0, 74, 17, 1, 0, 0, 0, 75, 76, 5, 7, 0, 0, 76, 80, 5, 9, 0, 0, 77,
-		79, 3, 20, 10, 0, 78, 77, 1, 0, 0, 0, 79, 82, 1, 0, 0, 0, 80, 78, 1, 0,
-		0, 0, 80, 81, 1, 0, 0, 0, 81, 83, 1, 0, 0, 0, 82, 80, 1, 0, 0, 0, 83, 84,
-		5, 10, 0, 0, 84, 19, 1, 0, 0, 0, 85, 86, 7, 0, 0, 0, 86, 87, 5, 11, 0,
-		0, 87, 88, 5, 12, 0, 0, 88, 21, 1, 0, 0, 0, 6, 33, 44, 46, 70, 73, 80,
+		10, 1, 0, 1, 0, 3, 0, 25, 8, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		2, 5, 2, 34, 8, 2, 10, 2, 12, 2, 37, 9, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3,
+		1, 3, 1, 4, 1, 4, 5, 4, 47, 8, 4, 10, 4, 12, 4, 50, 9, 4, 1, 5, 1, 5, 1,
+		5, 1, 5, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 7, 1, 7, 1, 7, 1,
+		7, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 1, 8, 3, 8, 73, 8, 8, 1, 8, 3, 8, 76,
+		8, 8, 1, 9, 1, 9, 1, 9, 5, 9, 81, 8, 9, 10, 9, 12, 9, 84, 9, 9, 1, 9, 1,
+		9, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 0, 0, 11, 0, 2, 4, 6, 8, 10, 12,
+		14, 16, 18, 20, 0, 1, 1, 0, 12, 13, 87, 0, 24, 1, 0, 0, 0, 2, 26, 1, 0,
+		0, 0, 4, 35, 1, 0, 0, 0, 6, 38, 1, 0, 0, 0, 8, 48, 1, 0, 0, 0, 10, 51,
+		1, 0, 0, 0, 12, 57, 1, 0, 0, 0, 14, 62, 1, 0, 0, 0, 16, 68, 1, 0, 0, 0,
+		18, 77, 1, 0, 0, 0, 20, 87, 1, 0, 0, 0, 22, 25, 3, 2, 1, 0, 23, 25, 3,
+		6, 3, 0, 24, 22, 1, 0, 0, 0, 24, 23, 1, 0, 0, 0, 25, 1, 1, 0, 0, 0, 26,
+		27, 5, 3, 0, 0, 27, 28, 7, 0, 0, 0, 28, 29, 5, 9, 0, 0, 29, 30, 3, 4, 2,
+		0, 30, 31, 5, 10, 0, 0, 31, 3, 1, 0, 0, 0, 32, 34, 3, 6, 3, 0, 33, 32,
+		1, 0, 0, 0, 34, 37, 1, 0, 0, 0, 35, 33, 1, 0, 0, 0, 35, 36, 1, 0, 0, 0,
+		36, 5, 1, 0, 0, 0, 37, 35, 1, 0, 0, 0, 38, 39, 5, 4, 0, 0, 39, 40, 7, 0,
+		0, 0, 40, 41, 5, 9, 0, 0, 41, 42, 3, 8, 4, 0, 42, 43, 5, 10, 0, 0, 43,
+		7, 1, 0, 0, 0, 44, 47, 3, 10, 5, 0, 45, 47, 3, 14, 7, 0, 46, 44, 1, 0,
+		0, 0, 46, 45, 1, 0, 0, 0, 47, 50, 1, 0, 0, 0, 48, 46, 1, 0, 0, 0, 48, 49,
+		1, 0, 0, 0, 49, 9, 1, 0, 0, 0, 50, 48, 1, 0, 0, 0, 51, 52, 5, 5, 0, 0,
+		52, 53, 7, 0, 0, 0, 53, 54, 5, 9, 0, 0, 54, 55, 3, 12, 6, 0, 55, 56, 5,
+		10, 0, 0, 56, 11, 1, 0, 0, 0, 57, 58, 5, 1, 0, 0, 58, 59, 7, 0, 0, 0, 59,
+		60, 5, 2, 0, 0, 60, 61, 7, 0, 0, 0, 61, 13, 1, 0, 0, 0, 62, 63, 5, 6, 0,
+		0, 63, 64, 7, 0, 0, 0, 64, 65, 5, 9, 0, 0, 65, 66, 3, 16, 8, 0, 66, 67,
+		5, 10, 0, 0, 67, 15, 1, 0, 0, 0, 68, 69, 5, 5, 0, 0, 69, 72, 7, 0, 0, 0,
+		70, 71, 5, 8, 0, 0, 71, 73, 7, 0, 0, 0, 72, 70, 1, 0, 0, 0, 72, 73, 1,
+		0, 0, 0, 73, 75, 1, 0, 0, 0, 74, 76, 3, 18, 9, 0, 75, 74, 1, 0, 0, 0, 75,
+		76, 1, 0, 0, 0, 76, 17, 1, 0, 0, 0, 77, 78, 5, 7, 0, 0, 78, 82, 5, 9, 0,
+		0, 79, 81, 3, 20, 10, 0, 80, 79, 1, 0, 0, 0, 81, 84, 1, 0, 0, 0, 82, 80,
+		1, 0, 0, 0, 82, 83, 1, 0, 0, 0, 83, 85, 1, 0, 0, 0, 84, 82, 1, 0, 0, 0,
+		85, 86, 5, 10, 0, 0, 86, 19, 1, 0, 0, 0, 87, 88, 7, 0, 0, 0, 88, 89, 5,
+		11, 0, 0, 89, 90, 5, 12, 0, 0, 90, 21, 1, 0, 0, 0, 7, 24, 35, 46, 48, 72,
+		75, 82,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -157,6 +159,7 @@ type IProgramContext interface {
 
 	// Getter signatures
 	System() ISystemContext
+	Pipeline() IPipelineContext
 
 	// IsProgramContext differentiates from other interfaces.
 	IsProgramContext()
@@ -210,6 +213,22 @@ func (s *ProgramContext) System() ISystemContext {
 	return t.(ISystemContext)
 }
 
+func (s *ProgramContext) Pipeline() IPipelineContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IPipelineContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IPipelineContext)
+}
+
 func (s *ProgramContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -233,10 +252,30 @@ func (s *ProgramContext) ExitRule(listener antlr.ParseTreeListener) {
 func (p *GluDSLParser) Program() (localctx IProgramContext) {
 	localctx = NewProgramContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 0, GluDSLParserRULE_program)
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(22)
-		p.System()
+	p.SetState(24)
+	p.GetErrorHandler().Sync(p)
+	if p.HasError() {
+		goto errorExit
+	}
+
+	switch p.GetTokenStream().LA(1) {
+	case GluDSLParserSYSTEM:
+		p.EnterOuterAlt(localctx, 1)
+		{
+			p.SetState(22)
+			p.System()
+		}
+
+	case GluDSLParserPIPELINE:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(23)
+			p.Pipeline()
+		}
+
+	default:
+		p.SetError(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		goto errorExit
 	}
 
 errorExit:
@@ -366,7 +405,7 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(24)
+		p.SetState(26)
 		p.Match(GluDSLParserSYSTEM)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -374,7 +413,7 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 		}
 	}
 	{
-		p.SetState(25)
+		p.SetState(27)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -385,7 +424,7 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 		}
 	}
 	{
-		p.SetState(26)
+		p.SetState(28)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -393,11 +432,11 @@ func (p *GluDSLParser) System() (localctx ISystemContext) {
 		}
 	}
 	{
-		p.SetState(27)
+		p.SetState(29)
 		p.SystemBody()
 	}
 	{
-		p.SetState(28)
+		p.SetState(30)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -532,7 +571,7 @@ func (p *GluDSLParser) SystemBody() (localctx ISystemBodyContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(33)
+	p.SetState(35)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -541,11 +580,11 @@ func (p *GluDSLParser) SystemBody() (localctx ISystemBodyContext) {
 
 	for _la == GluDSLParserPIPELINE {
 		{
-			p.SetState(30)
+			p.SetState(32)
 			p.Pipeline()
 		}
 
-		p.SetState(35)
+		p.SetState(37)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -680,7 +719,7 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(36)
+		p.SetState(38)
 		p.Match(GluDSLParserPIPELINE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -688,7 +727,7 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 		}
 	}
 	{
-		p.SetState(37)
+		p.SetState(39)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -699,7 +738,7 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 		}
 	}
 	{
-		p.SetState(38)
+		p.SetState(40)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -707,11 +746,11 @@ func (p *GluDSLParser) Pipeline() (localctx IPipelineContext) {
 		}
 	}
 	{
-		p.SetState(39)
+		p.SetState(41)
 		p.PipelineBody()
 	}
 	{
-		p.SetState(40)
+		p.SetState(42)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -889,7 +928,7 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 	var _la int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(46)
+	p.SetState(48)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -897,7 +936,7 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == GluDSLParserSOURCE || _la == GluDSLParserPHASE {
-		p.SetState(44)
+		p.SetState(46)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -906,13 +945,13 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 		switch p.GetTokenStream().LA(1) {
 		case GluDSLParserSOURCE:
 			{
-				p.SetState(42)
+				p.SetState(44)
 				p.Source()
 			}
 
 		case GluDSLParserPHASE:
 			{
-				p.SetState(43)
+				p.SetState(45)
 				p.Phase()
 			}
 
@@ -921,7 +960,7 @@ func (p *GluDSLParser) PipelineBody() (localctx IPipelineBodyContext) {
 			goto errorExit
 		}
 
-		p.SetState(48)
+		p.SetState(50)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1056,7 +1095,7 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(49)
+		p.SetState(51)
 		p.Match(GluDSLParserSOURCE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1064,7 +1103,7 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 		}
 	}
 	{
-		p.SetState(50)
+		p.SetState(52)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1075,7 +1114,7 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 		}
 	}
 	{
-		p.SetState(51)
+		p.SetState(53)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1083,11 +1122,11 @@ func (p *GluDSLParser) Source() (localctx ISourceContext) {
 		}
 	}
 	{
-		p.SetState(52)
+		p.SetState(54)
 		p.SourceBody()
 	}
 	{
-		p.SetState(53)
+		p.SetState(55)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1200,7 +1239,7 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(55)
+		p.SetState(57)
 		p.Match(GluDSLParserT__0)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1208,7 +1247,7 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 		}
 	}
 	{
-		p.SetState(56)
+		p.SetState(58)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1219,7 +1258,7 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 		}
 	}
 	{
-		p.SetState(57)
+		p.SetState(59)
 		p.Match(GluDSLParserT__1)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1227,7 +1266,7 @@ func (p *GluDSLParser) SourceBody() (localctx ISourceBodyContext) {
 		}
 	}
 	{
-		p.SetState(58)
+		p.SetState(60)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1365,7 +1404,7 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(60)
+		p.SetState(62)
 		p.Match(GluDSLParserPHASE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1373,7 +1412,7 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 		}
 	}
 	{
-		p.SetState(61)
+		p.SetState(63)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1384,7 +1423,7 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 		}
 	}
 	{
-		p.SetState(62)
+		p.SetState(64)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1392,11 +1431,11 @@ func (p *GluDSLParser) Phase() (localctx IPhaseContext) {
 		}
 	}
 	{
-		p.SetState(63)
+		p.SetState(65)
 		p.PhaseBody()
 	}
 	{
-		p.SetState(64)
+		p.SetState(66)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1536,7 +1575,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(66)
+		p.SetState(68)
 		p.Match(GluDSLParserSOURCE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1544,7 +1583,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 		}
 	}
 	{
-		p.SetState(67)
+		p.SetState(69)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1554,7 +1593,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 			p.Consume()
 		}
 	}
-	p.SetState(70)
+	p.SetState(72)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1563,7 +1602,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	if _la == GluDSLParserPROMOTES_FROM {
 		{
-			p.SetState(68)
+			p.SetState(70)
 			p.Match(GluDSLParserPROMOTES_FROM)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -1571,7 +1610,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 			}
 		}
 		{
-			p.SetState(69)
+			p.SetState(71)
 			_la = p.GetTokenStream().LA(1)
 
 			if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1583,7 +1622,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 		}
 
 	}
-	p.SetState(73)
+	p.SetState(75)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1592,7 +1631,7 @@ func (p *GluDSLParser) PhaseBody() (localctx IPhaseBodyContext) {
 
 	if _la == GluDSLParserLABELS {
 		{
-			p.SetState(72)
+			p.SetState(74)
 			p.Labels()
 		}
 
@@ -1741,7 +1780,7 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(75)
+		p.SetState(77)
 		p.Match(GluDSLParserLABELS)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1749,14 +1788,14 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 		}
 	}
 	{
-		p.SetState(76)
+		p.SetState(78)
 		p.Match(GluDSLParserLBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
 			goto errorExit
 		}
 	}
-	p.SetState(80)
+	p.SetState(82)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -1765,11 +1804,11 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 
 	for _la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER {
 		{
-			p.SetState(77)
+			p.SetState(79)
 			p.LabelPair()
 		}
 
-		p.SetState(82)
+		p.SetState(84)
 		p.GetErrorHandler().Sync(p)
 		if p.HasError() {
 			goto errorExit
@@ -1777,7 +1816,7 @@ func (p *GluDSLParser) Labels() (localctx ILabelsContext) {
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(83)
+		p.SetState(85)
 		p.Match(GluDSLParserRBRACE)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1890,7 +1929,7 @@ func (p *GluDSLParser) LabelPair() (localctx ILabelPairContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(85)
+		p.SetState(87)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == GluDSLParserSTRING || _la == GluDSLParserIDENTIFIER) {
@@ -1901,7 +1940,7 @@ func (p *GluDSLParser) LabelPair() (localctx ILabelPairContext) {
 		}
 	}
 	{
-		p.SetState(86)
+		p.SetState(88)
 		p.Match(GluDSLParserEQUALS)
 		if p.HasError() {
 			// Recognition error - abort rule
@@ -1909,7 +1948,7 @@ func (p *GluDSLParser) LabelPair() (localctx ILabelPairContext) {
 		}
 	}
 	{
-		p.SetState(87)
+		p.SetState(89)
 		p.Match(GluDSLParserSTRING)
 		if p.HasError() {
 			// Recognition error - abort rule

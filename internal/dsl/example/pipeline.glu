@@ -1,0 +1,57 @@
+pipeline "gitops-example-app" {
+    source "git" {
+        type "ci"
+        scm "github"
+        name "get-glu/gitops-example"
+    }
+
+    source "staging-k8s" {
+        type "kubernetes"
+        name "staging"
+        config {
+            "namespace" = "staging"
+            "name" = "gitops-example-app"
+            "container" = "gitops-example-app"
+        }
+    }
+
+    source "production-k8s" {
+        type "kubernetes"
+        name "production"
+        config {
+            "namespace" = "production"
+            "name" = "gitops-example-app"
+            "container" = "gitops-example-app"
+        }
+    }
+
+    source "oci" {
+        type "oci"
+        name "app"
+    }
+
+    phase "ci" {
+        source "ci"
+    }
+
+    phase "oci" {
+        source "oci"
+        depends_on "ci"
+    }
+
+    phase "staging" {
+        source "staging-k8s"
+        depends_on "oci"
+        labels {
+            "url" = "http://0.0.0.0:30081"
+        }
+    }
+
+    phase "production" {
+        source "production-k8s"
+        depends_on "staging"
+        labels {
+            "url" = "http://0.0.0.0:30082"
+        }
+    }
+}
