@@ -26,7 +26,6 @@ type PipelineConfig struct {
 type SourceConfig struct {
 	Kind   string                 `yaml:"kind"`
 	Name   string                 `yaml:"name"`
-	SCM    string                 `yaml:"scm,omitempty"`
 	Config map[string]interface{} `yaml:"config,omitempty"`
 }
 
@@ -70,8 +69,13 @@ func parsePipeline(_ context.Context, cfg PipelineConfig) (*core.Pipeline, error
 
 		// Create phase descriptor
 		desc := core.Descriptor{
-			Kind:     sourceConfig.Kind,
+			Pipeline: cfg.Name,
 			Metadata: phaseMeta,
+			Source: core.Source{
+				Kind:   sourceConfig.Kind,
+				Name:   sourceConfig.Name,
+				Config: sourceConfig.Config,
+			},
 		}
 
 		// Create the phase

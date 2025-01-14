@@ -3,8 +3,9 @@ pipelines:
     sources:
       git:
         kind: ci
-        scm: github
         name: get-glu/gitops-example
+        config:
+          scm: github
       
       staging-k8s:
         kind: kubernetes
