@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/get-glu/glu/internal/config"
+	"github.com/get-glu/glu/internal/containers"
+	"github.com/get-glu/glu/internal/core"
 	"github.com/get-glu/glu/internal/parser"
 	"github.com/get-glu/glu/internal/server"
-	"github.com/get-glu/glu/pkg/config"
-	"github.com/get-glu/glu/pkg/containers"
-	"github.com/get-glu/glu/pkg/core"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -29,12 +29,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	dev = flag.Bool("dev", false, "run in development mode")
-)
+var dev = flag.Bool("dev", false, "run in development mode")
 
 func main() {
-
 	if err := run(); err != nil {
 		slog.Error("error running glu", "error", err)
 		os.Exit(1)

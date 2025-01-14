@@ -9,7 +9,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/internal/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -137,7 +137,6 @@ func (n emptyReader) Read(p []byte) (_ int, err error) {
 	return 0, io.EOF
 }
 
-// TODO: Make this logic generic and merge with the config package
 type encoding func([]byte, any) error
 
 type decoder struct {
