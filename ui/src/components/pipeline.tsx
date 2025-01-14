@@ -17,15 +17,10 @@ import { PhaseNode as PhaseNodeComponent } from '@/components/phase-node';
 import { Pipeline as PipelineType } from '@/types/pipeline';
 import { FlowPipeline, PipelineEdge, PhaseNode } from '@/types/flow';
 import Dagre from '@dagrejs/dagre';
-import { ButtonEdge } from './button-edge';
 import { useGetPipelineQuery } from '@/services/api';
 
 const nodeTypes = {
   phase: PhaseNodeComponent
-};
-
-const edgeTypes = {
-  button: ButtonEdge
 };
 
 export function Pipeline({ pipelineId }: { pipelineId: string }) {
@@ -77,7 +72,6 @@ export function Pipeline({ pipelineId }: { pipelineId: string }) {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
@@ -164,8 +158,7 @@ function getElements(pipeline: PipelineType): FlowPipeline {
       type: 'phase',
       position: { x: 0, y: 0 },
       data: {
-        descriptor: phase.descriptor,
-        resource: phase.resource
+        descriptor: phase.descriptor
       },
       extent: 'parent'
     };
@@ -175,14 +168,12 @@ function getElements(pipeline: PipelineType): FlowPipeline {
   pipeline.edges.forEach((e) => {
     const edge: PipelineEdge = {
       id: `edge-${e.from.metadata.name}-${e.to.metadata.name}`,
-      type: 'button',
       source: e.from.metadata.name,
       target: e.to.metadata.name,
       data: {
         kind: e.kind,
         from: e.from,
-        to: e.to,
-        can_perform: e.can_perform ?? false
+        to: e.to
       }
     };
 

@@ -15,5 +15,4 @@ export type PipelineEdge = Edge<{
   kind: string;
   from: Descriptor;
   to: Descriptor;
-  can_perform: boolean;
 }>;

@@ -2,7 +2,5 @@ go 1.23.0
 
 use (
 	.
-	./examples/fakedata
-	./examples/oci-and-git
 	./ui
 )

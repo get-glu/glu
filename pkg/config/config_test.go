@@ -232,29 +232,6 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		{
-			path: "testdata/history/file/default",
-			expected: &Config{
-				Log: Log{Level: "info"},
-				History: History{
-					File: FileDBs{
-						"default": &FileDB{
-							Name: "default",
-							Path: "history.db",
-						},
-					},
-				},
-				Server: Server{
-					Port:     8080,
-					Host:     "0.0.0.0",
-					Protocol: "http",
-				},
-				Metrics: Metrics{
-					Enabled:  true,
-					Exporter: MetricsExporterPrometheus,
-				},
-			},
-		},
-		{
 			path: "testdata/json",
 			expected: &Config{
 				Log: Log{Level: "info"},

@@ -3,7 +3,6 @@ import { Package, GitBranch } from 'lucide-react';
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
-import { PhaseHistory } from './phase-history';
 
 const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
@@ -24,17 +23,6 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
           {getIcon()}
           <span className="truncate text-sm font-medium">{phase.descriptor.metadata.name}</span>
         </div>
-        <PhaseHistory
-          pipelineId={phase.descriptor.pipeline}
-          phaseId={phase.descriptor.metadata.name}
-        />
-      </div>
-
-      <div className="mt-2 flex items-center gap-2 text-xs">
-        <span>Digest:</span>
-        <span className="font-mono text-xs text-muted-foreground">
-          {phase.resource.digest?.slice(0, 12)}
-        </span>
       </div>
 
       {phase.descriptor.metadata.annotations?.[ANNOTATION_OCI_IMAGE_URL] && (
