@@ -44,6 +44,11 @@ func Parse(ctx context.Context, file string) (*core.System, error) {
 	return sys, nil
 }
 
+// parse is a helper function for testing
+func parse(ctx context.Context, decoder *decoder) (*core.System, error) {
+	return readFrom(ctx, decoder)
+}
+
 // parsePipeline converts a PipelineConfig into a glu.Pipeline
 func parsePipeline(_ context.Context, cfg PipelineConfig) (*core.Pipeline, error) {
 	pipeline := core.NewPipeline(core.Name(cfg.Name))

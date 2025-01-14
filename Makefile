@@ -32,7 +32,7 @@ build:
 	$(GOBUILD) -o bin/$(BINARY_NAME) ./cmd/glu
 
 test:
-	$(GOTEST) -v ./...
+	$(GOTEST) -v -race ./...
 
 clean:
 	rm -f bin/$(BINARY_NAME)
