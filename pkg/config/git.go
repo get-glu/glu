@@ -34,11 +34,10 @@ func (r GitSources) setDefaults() error {
 }
 
 type GitRepository struct {
-	Name          string     `glu:"name"`
-	Path          string     `glu:"path"`
-	DefaultBranch string     `glu:"default_branch"`
-	Remote        *Remote    `glu:"remote"`
-	Proposals     *Proposals `glu:"proposals"`
+	Name          string  `glu:"name"`
+	Path          string  `glu:"path"`
+	DefaultBranch string  `glu:"default_branch"`
+	Remote        *Remote `glu:"remote"`
 }
 
 func (r *GitRepository) validate() error {
@@ -90,8 +89,4 @@ type Remote struct {
 	URL        string        `glu:"url"`
 	Credential string        `glu:"credential"`
 	Interval   time.Duration `glu:"interval"`
-}
-
-type Proposals struct {
-	Credential string `glu:"credential"`
 }

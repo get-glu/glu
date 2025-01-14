@@ -19,7 +19,6 @@ type Config struct {
 	Sources     Sources     `glu:"sources"`
 	Server      Server      `glu:"server"`
 	Metrics     Metrics     `glu:"metrics"`
-	History     History     `glu:"history"`
 }
 
 type Sources struct {

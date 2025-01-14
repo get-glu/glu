@@ -2,13 +2,11 @@ import { ThemeToggle } from './theme-toggle';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SidebarTrigger } from './ui/sidebar';
-import { useGetSystemQuery } from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
 import { getSelectedPipeline } from '@/store/pipelinesSlice';
 
 export function Header({ className }: { className?: string }) {
   const pipelineId = useAppSelector(getSelectedPipeline);
-  const { data: system, isLoading } = useGetSystemQuery();
 
   return (
     <div className={cn('h-18 border-b bg-background p-4', className)}>
@@ -16,7 +14,7 @@ export function Header({ className }: { className?: string }) {
         <SidebarTrigger className="-ml-1" />
         <div className="flex w-full justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold">{isLoading ? 'Loading...' : system?.name}</span>
+            <span className="text-lg font-bold">Glu</span>
             {pipelineId && (
               <>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
