@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -176,79 +175,9 @@ func TestConfig(t *testing.T) {
 		expected *Config
 	}{
 		{
-			path: "testdata/git/default",
-			expected: &Config{
-				Log: Log{Level: "info"},
-				Sources: Sources{
-					Git: GitSources{
-						"default": &GitRepository{
-							Remote: &Remote{
-								Name:     "upstream",
-								URL:      "https://corp-repos/default.git",
-								Interval: 10 * time.Second,
-							},
-							DefaultBranch: "main",
-						},
-					},
-				},
-				Server: Server{
-					Port:     8080,
-					Host:     "0.0.0.0",
-					Protocol: "http",
-				},
-				Metrics: Metrics{
-					Enabled:  true,
-					Exporter: MetricsExporterPrometheus,
-				},
-			},
-		},
-		{
-			path: "testdata/git/custom",
-			expected: &Config{
-				Log: Log{Level: "info"},
-				Sources: Sources{
-					Git: GitSources{
-						"custom": &GitRepository{
-							Remote: &Remote{
-								Name:       "origin",
-								URL:        "https://corp-repos/custom",
-								Credential: "vault",
-								Interval:   time.Minute,
-							},
-							Path:          "v1",
-							DefaultBranch: "release-v1",
-						},
-					},
-				},
-				Server: Server{
-					Port:     8080,
-					Host:     "0.0.0.0",
-					Protocol: "http",
-				},
-				Metrics: Metrics{
-					Enabled:  true,
-					Exporter: MetricsExporterPrometheus,
-				},
-			},
-		},
-		{
 			path: "testdata/json",
 			expected: &Config{
 				Log: Log{Level: "info"},
-				Sources: Sources{
-					Git: GitSources{
-						"custom": &GitRepository{
-							Remote: &Remote{
-								Name:       "origin",
-								URL:        "https://corp-repos/custom",
-								Credential: "vault",
-								Interval:   time.Minute,
-							},
-							Path:          "v1",
-							DefaultBranch: "release-v1",
-						},
-					},
-				},
 				Server: Server{
 					Port:     8080,
 					Host:     "0.0.0.0",

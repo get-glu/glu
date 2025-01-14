@@ -6,7 +6,7 @@ import (
 	"iter"
 	"maps"
 
-	"github.com/get-glu/glu/pkg/containers"
+	"github.com/get-glu/glu/internal/containers"
 )
 
 // System is the primary entrypoint for build a set of Glu pipelines.
