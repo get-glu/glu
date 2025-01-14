@@ -1,132 +1,150 @@
 package config
 
 import (
-	"fmt"
+	"encoding/json"
+	"errors"
 	"io"
-	"os"
+	"io/fs"
+	"log/slog"
+	"path"
 	"reflect"
-	"strconv"
-	"strings"
 
-	"github.com/mitchellh/mapstructure"
+	"gopkg.in/yaml.v3"
 )
 
-type Encoding func([]byte, any) error
-
-type Decoder[C any] struct {
-	rd      io.Reader
-	enc     Encoding
-	tagName string
+type Config struct {
+	Log     Log     `glu:"log"`
+	Server  Server  `glu:"server"`
+	Metrics Metrics `glu:"metrics"`
 }
 
-func NewDecoder[C any](rd io.Reader, enc Encoding) *Decoder[C] {
-	return &Decoder[C]{
-		rd:      rd,
-		enc:     enc,
-		tagName: "glu",
-	}
+type defaulter interface {
+	setDefaults() error
 }
 
-func (d *Decoder[C]) Decode(c *C) error {
-	data, err := io.ReadAll(d.rd)
-	if err != nil {
-		return err
-	}
-
-	m := map[string]any{}
-	if err := d.enc(data, &m); err != nil {
-		return fmt.Errorf("unmarshalling configuration: %w", err)
-	}
-
-	d.parseEnvInto(m)
-
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		TagName: d.tagName,
-		Result:  c,
-		MatchName: func(mapKey, fieldName string) bool {
-			stripUnderscore := func(s string) string {
-				return strings.ReplaceAll(s, "_", "")
-			}
-
-			return strings.EqualFold(stripUnderscore(mapKey), stripUnderscore(fieldName))
-		},
-		DecodeHook: mapstructure.ComposeDecodeHookFunc(
-			mapstructure.StringToTimeDurationHookFunc(),
-			mapstructure.DecodeHookFuncType(func(from, to reflect.Type, i interface{}) (interface{}, error) {
-				if from.Kind() != reflect.String {
-					return i, nil
-				}
-
-				if to.Kind() == reflect.Int {
-					val, err := strconv.Atoi(i.(string))
-					return val, err
-				}
-
-				if to.Kind() == reflect.Int64 {
-					return strconv.ParseInt(i.(string), 10, 64)
-				}
-
-				return i, nil
-			}),
-		),
+func (c *Config) SetDefaults() error {
+	return processValue(reflect.ValueOf(c).Elem(), func(d defaulter) error {
+		return d.setDefaults()
 	})
+}
 
-	if err != nil {
-		return fmt.Errorf("creating decoder: %w", err)
-	}
+type validater interface {
+	validate() error
+}
 
-	if err := decoder.Decode(m); err != nil {
-		return fmt.Errorf("decoding configuration: %w", err)
+func (c *Config) Validate() error {
+	return processValue(reflect.ValueOf(c).Elem(), func(v validater) error {
+		return v.validate()
+	})
+}
+
+func processValue[T any](val reflect.Value, method func(T) error) error {
+	switch val.Kind() {
+	case reflect.Struct:
+		// Need to get addressable value for pointer receiver methods
+		if val.CanAddr() {
+			if impl, ok := val.Addr().Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Recursively process only struct fields
+		for i := 0; i < val.NumField(); i++ {
+			if err := processValue(val.Field(i), method); err != nil {
+				return err
+			}
+		}
+
+	case reflect.Ptr:
+		if !val.IsNil() {
+			// Try to use the pointer directly first
+			if impl, ok := val.Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
+			// Then recurse into the element for both structs and maps
+			elemKind := val.Elem().Kind()
+			if elemKind == reflect.Struct || elemKind == reflect.Map {
+				return processValue(val.Elem(), method)
+			}
+		}
+	case reflect.Map:
+		if !val.IsNil() {
+			if impl, ok := val.Addr().Interface().(T); ok {
+				if err := method(impl); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	return nil
 }
 
-func (d *Decoder[C]) parseEnvInto(m map[string]any) {
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) < 2 {
-			continue
-		}
-
-		key := strings.TrimPrefix(parts[0], strings.ToUpper(d.tagName+"_"))
-		if parts[0] == key {
-			// key does not have env prefix
-			continue
-		}
-
-		addKV(m, strings.Split(strings.ToLower(key), "_"), parts[1])
+func ReadFromFS(filesystem fs.FS) (_ *Config, err error) {
+	statfs, ok := filesystem.(fs.StatFS)
+	if !ok {
+		return nil, errors.New("filesystem provided does not support opening directories")
 	}
+
+	files := []string{"glu.yaml", "glu.yml", "glu.json"}
+	for _, path := range files {
+		if _, err := statfs.Stat(path); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		slog.Debug("configuration found", "path", path)
+
+		return readFromPath(filesystem, path)
+	}
+
+	slog.Debug("could not locate glu configuration file", "attempted", files)
+
+	return readFrom(NewDecoder[Config](&emptyReader{}, yaml.Unmarshal))
 }
 
-func addKV(m map[string]any, parts []string, value string) {
-	if len(parts) == 0 {
-		return
+func readFromPath(fs fs.FS, configPath string) (_ *Config, err error) {
+	fi, err := fs.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer fi.Close()
+
+	encoding := json.Unmarshal
+	switch path.Ext(configPath) {
+	case ".yaml", ".yml":
+		encoding = yaml.Unmarshal
 	}
 
-	if len(parts) == 1 {
-		v, ok := m[parts[0]]
-		if !ok {
-			m[parts[0]] = value
-			return
-		}
+	return readFrom(NewDecoder[Config](fi, encoding))
+}
 
-		switch v.(type) {
-		case map[string]any:
-			// we've already set a deaper structure for the key
-		default:
-			m[parts[0]] = value
-			return
-		}
-		return
+func readFrom(decoder *Decoder[Config]) (_ *Config, err error) {
+	var conf Config
+	if err := decoder.Decode(&conf); err != nil {
+		return nil, err
 	}
 
-	n, ok := m[parts[0]].(map[string]any)
-	if !ok {
-		n = map[string]any{}
+	if err := conf.SetDefaults(); err != nil {
+		return nil, err
 	}
 
-	addKV(n, parts[1:], value)
+	if err := conf.Validate(); err != nil {
+		return nil, err
+	}
 
-	m[parts[0]] = n
+	return &conf, nil
+}
+
+type emptyReader struct{}
+
+func (n emptyReader) Read(p []byte) (_ int, err error) {
+	return 0, io.EOF
 }

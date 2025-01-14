@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"iter"
 
-	"github.com/get-glu/glu/pkg/containers"
+	"github.com/get-glu/glu/internal/containers"
 )
 
 // Phase is the core interface for resource sourcing and management.

@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/get-glu/glu/pkg/containers"
-	"github.com/get-glu/glu/pkg/core"
+	"github.com/get-glu/glu/internal/containers"
+	"github.com/get-glu/glu/internal/core"
 	"github.com/get-glu/glu/ui"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
