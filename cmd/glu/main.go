@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"iter"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -16,9 +15,13 @@ import (
 
 	"github.com/get-glu/glu/internal/config"
 	"github.com/get-glu/glu/internal/containers"
-	"github.com/get-glu/glu/internal/core"
 	"github.com/get-glu/glu/internal/parser"
 	"github.com/get-glu/glu/internal/server"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/confmap"
+	envprovider "go.opentelemetry.io/collector/confmap/provider/envprovider"
+	fileprovider "go.opentelemetry.io/collector/confmap/provider/fileprovider"
+	"go.opentelemetry.io/collector/otelcol"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -40,7 +43,6 @@ func main() {
 
 type shutdownFunc func(context.Context) error
 
-// Run invokes or serves the entire system.
 func run() error {
 	flag.Parse()
 
@@ -126,6 +128,40 @@ func run() error {
 		}
 	}
 
+	var serveFunc = srv.ListenAndServe
+	if conf.Server.Protocol == config.ProtocolHTTPS {
+		serveFunc = func() error {
+			return srv.ListenAndServeTLS(conf.Server.CertFile, conf.Server.KeyFile)
+		}
+	}
+
+	col, err := collector()
+	if err != nil {
+		return err
+	}
+
+	shutdownFuncs = append(shutdownFuncs, func(_ context.Context) error {
+		slog.Info("shutting down collector")
+		col.Shutdown()
+		return nil
+	})
+
+	var group errgroup.Group
+	group.Go(func() error {
+		slog.Info("starting collector")
+		return col.Run(ctx)
+	})
+
+	group.Go(func() error {
+		slog.Info("starting server", "addr", fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port))
+		if err := serveFunc(); err != nil && err != http.ErrServerClosed {
+			return err
+		}
+
+		slog.Debug("shutting down")
+		return nil
+	})
+
 	go func() {
 		<-ctx.Done()
 
@@ -140,30 +176,35 @@ func run() error {
 		}
 	}()
 
-	var serveFunc = srv.ListenAndServe
-	if conf.Server.Protocol == config.ProtocolHTTPS {
-		serveFunc = func() error {
-			return srv.ListenAndServeTLS(conf.Server.CertFile, conf.Server.KeyFile)
-		}
-	}
-
-	var group errgroup.Group
-	group.Go(func() error {
-		slog.Info("starting server", "addr", fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port))
-		if err := serveFunc(); err != nil && err != http.ErrServerClosed {
-			return err
-		}
-
-		slog.Debug("shutting down")
-		return nil
-	})
-
 	return group.Wait()
 }
 
-// Pipelines is a type which can list a set of configured name/Pipeline pairs.
-type Pipelines interface {
-	Pipelines() iter.Seq2[string, *core.Pipeline]
+func collector() (*otelcol.Collector, error) {
+	info := component.BuildInfo{
+		Command:     "glu",
+		Description: "Ingestion pipeline for CI/CD telemetry.",
+		Version:     "",
+	}
+
+	set := otelcol.CollectorSettings{
+		BuildInfo: info,
+		Factories: components,
+		ConfigProviderSettings: otelcol.ConfigProviderSettings{
+			ResolverSettings: confmap.ResolverSettings{
+				ProviderFactories: []confmap.ProviderFactory{
+					envprovider.NewFactory(),
+					fileprovider.NewFactory(),
+				},
+			},
+		},
+	}
+
+	col, err := otelcol.NewCollector(set)
+	if err != nil {
+		return nil, err
+	}
+
+	return col, nil
 }
 
 func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Reader, shutdownFunc, error) {
