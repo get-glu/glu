@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,7 +33,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var dev = flag.Bool("dev", false, "run in development mode")
+var (
+	dev          = flag.Bool("dev", false, "run in development mode")
+	collectorCfg = flag.String("collector-config", "", "path to collector config file")
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -44,7 +48,21 @@ func main() {
 type shutdownFunc func(context.Context) error
 
 func run() error {
+
 	flag.Parse()
+	args := flag.Args()
+
+	if len(args) < 1 {
+		return fmt.Errorf("missing path to glu.yml file")
+	}
+
+	if *collectorCfg == "" {
+		return fmt.Errorf("missing path to collector config file")
+	}
+
+	if !strings.HasPrefix(*collectorCfg, "file:") {
+		*collectorCfg = "file:" + *collectorCfg
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -65,20 +83,19 @@ func run() error {
 		Level: level,
 	})))
 
-	sys, err := parser.Parse(ctx, "example.yml") // TODO: get from CLI
+	sys, err := parser.Parse(ctx, args[0])
 	if err != nil {
 		return err
 	}
 
 	serverOpts := []containers.Option[server.Server]{}
-	if *dev {
+	if !*dev {
 		serverOpts = append(serverOpts, server.WithUI())
 	}
 
-	server := server.New(sys, serverOpts...)
-
 	var (
-		srv = http.Server{
+		server = server.New(sys, serverOpts...)
+		srv    = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
 			Handler: server,
 		}
@@ -135,7 +152,7 @@ func run() error {
 		}
 	}
 
-	col, err := collector()
+	col, err := getCollector(*collectorCfg)
 	if err != nil {
 		return err
 	}
@@ -149,24 +166,27 @@ func run() error {
 	var group errgroup.Group
 	group.Go(func() error {
 		slog.Info("starting collector")
-		return col.Run(ctx)
+		err := col.Run(ctx)
+		if err != nil {
+			cancel()
+		}
+		return err
 	})
 
 	group.Go(func() error {
 		slog.Info("starting server", "addr", fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port))
 		if err := serveFunc(); err != nil && err != http.ErrServerClosed {
+			cancel()
 			return err
 		}
-
-		slog.Debug("shutting down")
 		return nil
 	})
 
-	go func() {
+	group.Go(func() error {
 		<-ctx.Done()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer shutdownCancel()
 
 		// call in reverse order to emulate pop semantics of a stack
 		for _, fn := range slices.Backward(shutdownFuncs) {
@@ -174,12 +194,13 @@ func run() error {
 				slog.Error("shutting down", "error", err)
 			}
 		}
-	}()
+		return nil
+	})
 
 	return group.Wait()
 }
 
-func collector() (*otelcol.Collector, error) {
+func getCollector(configPath string) (*otelcol.Collector, error) {
 	info := component.BuildInfo{
 		Command:     "glu",
 		Description: "Ingestion pipeline for CI/CD telemetry.",
@@ -199,9 +220,11 @@ func collector() (*otelcol.Collector, error) {
 		},
 	}
 
+	set.ConfigProviderSettings.ResolverSettings.URIs = []string{configPath}
+
 	col, err := otelcol.NewCollector(set)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating collector: %w", err)
 	}
 
 	return col, nil
@@ -219,7 +242,7 @@ func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Read
 		// exporter registers itself on the prom client DefaultRegistrar
 		metricExp, err = prometheus.New()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("creating prometheus metrics exporter: %w", err)
 		}
 
 	case config.MetricsExporterOTLP:
