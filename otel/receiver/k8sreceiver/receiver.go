@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/get-glu/glu/otel/internal/ids"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -35,11 +33,11 @@ type k8sReceiver struct {
 	ctx    context.Context
 	cancel func()
 
-	logsConsumer       consumer.Logs
-	factory            informers.SharedInformerFactory
-	deploymentInformer cache.SharedInformer
-	replicasetInformer cache.SharedInformer
-	podsInformer       cache.SharedInformer
+	logsConsumer        consumer.Logs
+	factory             informers.SharedInformerFactory
+	podsInformer        cache.SharedInformer
+	replicasetInformer  cache.SharedInformer
+	deploymentsInformer cache.SharedInformer
 
 	states sync.Map
 }
@@ -65,42 +63,43 @@ func (k *k8sReceiver) Start(ctx context.Context, host component.Host) error {
 
 	k.factory = informers.NewSharedInformerFactory(clientset, 0)
 
-	// deployments
-	dInformer := apps.New(k.factory, "", func(lo *metav1.ListOptions) {}).V1().Deployments().Informer()
-	k.deploymentInformer = dInformer
+	// wait for cache sync so that we have replicasets before observing pods
+	deploymentsInformer := apps.New(k.factory, "", func(lo *metav1.ListOptions) {}).V1().Deployments().Informer()
+	k.deploymentsInformer = deploymentsInformer
+
+	_, err = deploymentsInformer.AddEventHandler(TypedEventHandler[*appsv1.Deployment]{
+		logger:     k.logger,
+		AddFunc:    k.onAddDeployment,
+		UpdateFunc: k.onUpdateDeployment,
+		DeleteFunc: k.onDeleteDeployment,
+	})
+	if err != nil {
+		return err
+	}
+
 	k.logger.Info("Starting deployments informer")
+	go deploymentsInformer.Run(k.ctx.Done())
 
-	go dInformer.Run(k.ctx.Done())
+	k.logger.Debug("Waiting for cache sync")
+	k.factory.WaitForCacheSync(ctx.Done())
 
-	// replicasets
 	rsInformer := apps.New(k.factory, "", func(lo *metav1.ListOptions) {}).V1().ReplicaSets().Informer()
 	k.replicasetInformer = rsInformer
 
 	k.logger.Info("Starting replicasets informer")
-
 	go rsInformer.Run(k.ctx.Done())
 
-	// wait for cache sync so that we have replicasets before observing pods
-	k.logger.Debug("Waiting for cache sync")
-
-	k.factory.WaitForCacheSync(ctx.Done())
-
-	// pods
 	podsInformer := core.New(k.factory, "", func(lo *metav1.ListOptions) {}).V1().Pods().Informer()
 	k.podsInformer = podsInformer
-
 	_, err = podsInformer.AddEventHandler(TypedEventHandler[*corev1.Pod]{
 		logger:     k.logger,
-		AddFunc:    k.onAddPod,
 		UpdateFunc: k.onUpdatePod,
-		DeleteFunc: k.onDeletePod,
 	})
 	if err != nil {
 		return err
 	}
 
 	k.logger.Info("Starting pods informer")
-
 	go podsInformer.Run(k.ctx.Done())
 
 	return nil
@@ -130,32 +129,30 @@ func (k *k8sReceiver) Shutdown(ctx context.Context) error {
 }
 
 type deploymentContainer struct {
-	Namespace string
-	Name      string
-	Container string
+	namespace string
+	name      string
+	container string
 }
 
-type containerState struct {
-	ImageID   string
-	State     string
-	StartedAt time.Time
+type deploymentContainerState struct {
+	isUpdating bool
+	image      string
+	digest     string
 }
 
-func (k *k8sReceiver) onAddPod(pod *corev1.Pod) {
-	logger := k.logger.With(zap.String("namespace", pod.Namespace), zap.String("name", pod.Name))
+func (k *k8sReceiver) onAddDeployment(deployment *appsv1.Deployment) {
+	_ = k.logger.With(zap.String("namespace", deployment.Namespace), zap.String("name", deployment.Name))
 
-	deployment, ok := k.getDeployment(logger, pod.Namespace, pod.OwnerReferences...)
-	if !ok {
-		logger.Debug("Could not get pods owning deployment")
-		return
+	meta := deployment.ObjectMeta
+	for _, c := range deployment.Spec.Template.Spec.Containers {
+		k.updateState(meta.Namespace, meta.Name, c.Name, c.Image)
 	}
+}
 
-	for _, status := range pod.Status.ContainerStatuses {
-		k.storeDeploymentContainersState(
-			deploymentContainer{Namespace: deployment.Namespace, Name: deployment.Name, Container: status.Name},
-			containerState{},
-			&status,
-		)
+func (k *k8sReceiver) onUpdateDeployment(oldD, newD *appsv1.Deployment) {
+	meta := newD.ObjectMeta
+	for _, c := range newD.Spec.Template.Spec.Containers {
+		k.updateState(meta.Namespace, meta.Name, c.Name, c.Image)
 	}
 }
 
@@ -164,29 +161,30 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 
 	deployment, ok := k.getDeployment(logger, newP.Namespace, newP.OwnerReferences...)
 	if !ok {
-		logger.Debug("Could not get pods owning deployment")
+		logger.Warn("Could not find deployment state ")
 		return
 	}
 
 	for _, status := range newP.Status.ContainerStatuses {
-		var (
-			key = deploymentContainer{Namespace: deployment.Namespace, Name: deployment.Name, Container: status.Name}
-		)
-
-		previous, ok := k.states.Load(key)
+		key := deploymentContainer{deployment.Namespace, deployment.Name, status.Name}
+		v, ok := k.states.Load(key)
 		if !ok {
-			k.storeDeploymentContainersState(key, containerState{}, &status)
+			logger.Warn("Deployment for pod not found")
 			continue
 		}
 
-		state, ok := previous.(containerState)
+		existing, ok := v.(deploymentContainerState)
 		if !ok {
-			logger.Error("Unexpected container state type")
+			logger.Error("Unexpected deployment state type")
 			continue
 		}
 
 		// if new image ID observed
-		if status.ImageID != "" && state.ImageID != status.ImageID {
+		if status.ImageID != "" && existing.isUpdating {
+			existing.isUpdating = false
+			existing.digest = status.ImageID
+			k.states.Store(key, existing)
+
 			ociAttrs, err := fetchOCIAttributes(k.ctx, status.ImageID)
 			if err != nil {
 				logger.Warn("Error fetching OCI attributes", zap.Error(err))
@@ -221,7 +219,7 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 			scopeLog := scopeLogs.LogRecords().AppendEmpty()
 			scopeLog.SetSeverityNumber(plog.SeverityNumberInfo)
 			scopeLog.SetSeverityText(plog.SeverityNumberInfo.String())
-			scopeLog.SetTimestamp(pcommon.NewTimestampFromTime(state.StartedAt))
+			scopeLog.SetTimestamp(pcommon.NewTimestampFromTime(status.State.Running.StartedAt.Time))
 			scopeLog.SetTraceID(traceID)
 			scopeLog.Body().SetStr("New Image Observed")
 
@@ -229,45 +227,36 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 				logger.Error("attempting to consume log", zap.Error(err))
 			}
 		}
-
-		// set state for container
-		k.storeDeploymentContainersState(key, state, &status)
 	}
 }
 
-func (k *k8sReceiver) storeDeploymentContainersState(key deploymentContainer, value containerState, status *corev1.ContainerStatus) {
-	if status.ImageID != "" {
-		value.ImageID = status.ImageID
+func (k *k8sReceiver) onDeleteDeployment(deployment *appsv1.Deployment) {
+	for _, c := range deployment.Spec.Template.Spec.Containers {
+		k.states.Delete(deploymentContainer{deployment.Namespace, deployment.Name, c.Name})
 	}
-
-	if waiting := status.State.Waiting; waiting != nil {
-		value.State = "waiting"
-	} else if terminated := status.State.Terminated; terminated != nil {
-		value.State = "terminated"
-		if (value.StartedAt == time.Time{} || value.StartedAt.After(terminated.StartedAt.Time)) {
-			value.StartedAt = terminated.StartedAt.Time
-		}
-	} else if running := status.State.Running; running != nil {
-		value.State = "running"
-		if (value.StartedAt == time.Time{} || value.StartedAt.After(running.StartedAt.Time)) {
-			value.StartedAt = running.StartedAt.Time
-		}
-	}
-
-	k.states.Store(key, value)
 }
 
-func (k *k8sReceiver) onDeletePod(pod *corev1.Pod) {
-	k.logPod(pod, "pod deleted")
-}
+func (k *k8sReceiver) updateState(namespace, name, container, image string) {
+	logger := k.logger.With(zap.String("namespace", namespace), zap.String("name", name))
 
-func (k *k8sReceiver) logPod(pod *corev1.Pod, message string) {
-	attrs := []zap.Field{
-		zap.Any("conditions", pod.Status.Conditions),
-		zap.Any("container_statuses", pod.Status.ContainerStatuses),
+	key := deploymentContainer{namespace, name, container}
+	v, ok := k.states.LoadOrStore(key, deploymentContainerState{image: image})
+	if !ok {
+		logger.Debug("New deployment observed")
+		return
 	}
 
-	k.logger.Debug(message, append(attrs, zap.String("namespace", pod.Namespace), zap.String("name", pod.Name))...)
+	existing, ok := v.(deploymentContainerState)
+	if !ok {
+		logger.Error("Unexpected container state type")
+		return
+	}
+
+	existing.isUpdating = existing.isUpdating || existing.image != image
+	existing.image = image
+	k.states.Store(key, existing)
+
+	logger.Debug("Container state updated", zap.String("image", image), zap.Bool("isUpdating", existing.isUpdating))
 }
 
 func (k *k8sReceiver) getDeployment(logger *zap.Logger, namespace string, refs ...metav1.OwnerReference) (*appsv1.Deployment, bool) {
@@ -303,7 +292,7 @@ func (k *k8sReceiver) getDeployment(logger *zap.Logger, namespace string, refs .
 			// descend into replicaset
 			return k.getDeployment(logger, namespace, replicaset.OwnerReferences...)
 		case "Deployment":
-			obj, exists, err := k.deploymentInformer.GetStore().Get(&appsv1.Deployment{
+			obj, exists, err := k.deploymentsInformer.GetStore().Get(&appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,
 					Name:      ref.Name,
