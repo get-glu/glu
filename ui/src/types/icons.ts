@@ -1,6 +1,6 @@
-import { type LucideIcon } from "lucide-react";
+import { type LucideIcon } from 'lucide-react';
 import { Package, GitBranch, Container, Hexagon, Github, Gitlab } from 'lucide-react';
-import { Source } from "./descriptor";
+import { Source } from './descriptor';
 
 export type Icon = LucideIcon;
 

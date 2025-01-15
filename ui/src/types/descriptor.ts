@@ -1,5 +1,5 @@
 import { Metadata } from './metadata';
-import { Package, GitBranch, Container, Hexagon, Github, Gitlab } from 'lucide-react';
+
 export type Descriptor = {
   pipeline: string;
   metadata: Metadata;
