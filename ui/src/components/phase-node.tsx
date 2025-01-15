@@ -1,16 +1,28 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { Package, GitBranch } from 'lucide-react';
+import { Package, GitBranch, Container, Hexagon, Github, Gitlab } from 'lucide-react';
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
 
 const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
   const getIcon = () => {
-    switch (phase.descriptor.kind ?? '') {
+    switch (phase.descriptor.source.kind ?? '') {
+      case 'kubernetes':
+      case 'k8s':
+        return <Container className="h-4 w-4" />;
       case 'oci':
         return <Package className="h-4 w-4" />;
-      default:
+      case 'ci':
+        if (phase.descriptor.source.config?.scm === 'github') {
+          return <Github className="h-4 w-4" />;
+        } else if (phase.descriptor.source.config?.scm === 'gitlab') {
+          return <Gitlab className="h-4 w-4" />;
+        }
         return <GitBranch className="h-4 w-4" />;
+      case 'git':
+        return <GitBranch className="h-4 w-4" />;
+      default:
+        return <Hexagon className="h-4 w-4" />;
     }
   };
 
