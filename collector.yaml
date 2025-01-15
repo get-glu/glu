@@ -1,0 +1,58 @@
+receivers:
+  github:
+    endpoint: 0.0.0.0:3000
+  k8s:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 100000
+
+exporters:
+  debug:
+  clickhouse:
+    async_insert: true
+    compress: zstd
+    create_schema: true
+    database: otel
+    endpoint: tcp://127.0.0.1:9000?dial_timeout=10s
+    logs_table_name: otel_logs
+    traces_table_name: otel_traces
+    metrics_tables:
+      gauge: 
+        name: "otel_metrics_gauge"
+      sum: 
+        name: "otel_metrics_sum"
+      summary: 
+        name: "otel_metrics_summary"
+      histogram: 
+        name: "otel_metrics_histogram"
+      exponential_histogram: 
+        name: "otel_metrics_exp_histogram"
+    timeout: 5s
+    ttl: 72h
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_elapsed_time: 300s
+      max_interval: 30s
+
+service:
+  # telemetry:
+  #   logs:
+  #     level: "DEBUG"
+  #     development: true
+  #     encoding: "json"
+  pipelines:
+    logs:
+      receivers: [otlp, k8s]
+      processors: [batch]
+      exporters: [debug, clickhouse]
+    traces:
+      receivers: [otlp, github]
+      processors: [batch]
+      exporters: [debug, clickhouse]

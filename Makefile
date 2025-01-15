@@ -29,10 +29,10 @@ help:
 
 build:
 	cd $(UI_DIR) && $(NPM) run build
-	$(GOBUILD) -o bin/$(BINARY_NAME) ./cmd/glu
+	$(GOBUILD) -o bin/$(BINARY_NAME) -tags ui ./cmd/glu
 
 test:
-	$(GOTEST) -v ./...
+	$(GOTEST) -v -race ./...
 
 clean:
 	rm -f bin/$(BINARY_NAME)
