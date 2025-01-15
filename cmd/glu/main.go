@@ -4,21 +4,25 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"iter"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/get-glu/glu/internal/config"
 	"github.com/get-glu/glu/internal/containers"
-	"github.com/get-glu/glu/internal/core"
 	"github.com/get-glu/glu/internal/parser"
 	"github.com/get-glu/glu/internal/server"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/confmap"
+	envprovider "go.opentelemetry.io/collector/confmap/provider/envprovider"
+	fileprovider "go.opentelemetry.io/collector/confmap/provider/fileprovider"
+	"go.opentelemetry.io/collector/otelcol"
 	otlpruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -29,7 +33,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var dev = flag.Bool("dev", false, "run in development mode")
+var (
+	dev          = flag.Bool("dev", false, "run in development mode")
+	collectorCfg = flag.String("collector-config", "", "path to collector config file")
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -40,9 +47,22 @@ func main() {
 
 type shutdownFunc func(context.Context) error
 
-// Run invokes or serves the entire system.
 func run() error {
+
 	flag.Parse()
+	args := flag.Args()
+
+	if len(args) < 1 {
+		return fmt.Errorf("missing path to glu.yml file")
+	}
+
+	if *collectorCfg == "" {
+		return fmt.Errorf("missing path to collector config file")
+	}
+
+	if !strings.HasPrefix(*collectorCfg, "file:") {
+		*collectorCfg = "file:" + *collectorCfg
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -63,20 +83,19 @@ func run() error {
 		Level: level,
 	})))
 
-	sys, err := parser.Parse(ctx, "example.yml") // TODO: get from CLI
+	sys, err := parser.Parse(ctx, args[0])
 	if err != nil {
 		return err
 	}
 
 	serverOpts := []containers.Option[server.Server]{}
-	if *dev {
+	if !*dev {
 		serverOpts = append(serverOpts, server.WithUI())
 	}
 
-	server := server.New(sys, serverOpts...)
-
 	var (
-		srv = http.Server{
+		server = server.New(sys, serverOpts...)
+		srv    = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
 			Handler: server,
 		}
@@ -126,20 +145,6 @@ func run() error {
 		}
 	}
 
-	go func() {
-		<-ctx.Done()
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-
-		// call in reverse order to emulate pop semantics of a stack
-		for _, fn := range slices.Backward(shutdownFuncs) {
-			if err := fn(shutdownCtx); err != nil {
-				slog.Error("shutting down", "error", err)
-			}
-		}
-	}()
-
 	var serveFunc = srv.ListenAndServe
 	if conf.Server.Protocol == config.ProtocolHTTPS {
 		serveFunc = func() error {
@@ -147,23 +152,82 @@ func run() error {
 		}
 	}
 
+	col, err := getCollector(*collectorCfg)
+	if err != nil {
+		return err
+	}
+
+	shutdownFuncs = append(shutdownFuncs, func(_ context.Context) error {
+		slog.Info("shutting down collector")
+		col.Shutdown()
+		return nil
+	})
+
 	var group errgroup.Group
+	group.Go(func() error {
+		slog.Info("starting collector")
+		err := col.Run(ctx)
+		if err != nil {
+			cancel()
+		}
+		return err
+	})
+
 	group.Go(func() error {
 		slog.Info("starting server", "addr", fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port))
 		if err := serveFunc(); err != nil && err != http.ErrServerClosed {
+			cancel()
 			return err
 		}
+		return nil
+	})
 
-		slog.Debug("shutting down")
+	group.Go(func() error {
+		<-ctx.Done()
+
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer shutdownCancel()
+
+		// call in reverse order to emulate pop semantics of a stack
+		for _, fn := range slices.Backward(shutdownFuncs) {
+			if err := fn(shutdownCtx); err != nil {
+				slog.Error("shutting down", "error", err)
+			}
+		}
 		return nil
 	})
 
 	return group.Wait()
 }
 
-// Pipelines is a type which can list a set of configured name/Pipeline pairs.
-type Pipelines interface {
-	Pipelines() iter.Seq2[string, *core.Pipeline]
+func getCollector(configPath string) (*otelcol.Collector, error) {
+	info := component.BuildInfo{
+		Command:     "glu",
+		Description: "Ingestion pipeline for CI/CD telemetry.",
+		Version:     "",
+	}
+
+	set := otelcol.CollectorSettings{
+		BuildInfo: info,
+		Factories: components,
+		ConfigProviderSettings: otelcol.ConfigProviderSettings{
+			ResolverSettings: confmap.ResolverSettings{
+				ProviderFactories: []confmap.ProviderFactory{
+					envprovider.NewFactory(),
+					fileprovider.NewFactory(),
+				},
+			},
+		},
+	}
+
+	set.ConfigProviderSettings.ResolverSettings.URIs = []string{configPath}
+
+	col, err := otelcol.NewCollector(set)
+	if err != nil {
+		return nil, fmt.Errorf("creating collector: %w", err)
+	}
+
+	return col, nil
 }
 
 func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Reader, shutdownFunc, error) {
@@ -178,7 +242,7 @@ func getMetricsExporter(ctx context.Context, cfg config.Metrics) (metricsdk.Read
 		// exporter registers itself on the prom client DefaultRegistrar
 		metricExp, err = prometheus.New()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("creating prometheus metrics exporter: %w", err)
 		}
 
 	case config.MetricsExporterOTLP:

@@ -1,0 +1,11 @@
+type: k8s
+status:
+  class: receiver
+  stability:
+    alpha: [logs]
+  codeowners:
+    active: [georgemac]
+
+tests:
+  config:
+  skip_lifecycle: true
