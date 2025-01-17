@@ -2,6 +2,7 @@ receivers:
   github:
     endpoint: 0.0.0.0:3000
   k8s:
+    cluster_name: "staging"
   otlp:
     protocols:
       http:
