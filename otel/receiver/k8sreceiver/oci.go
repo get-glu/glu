@@ -10,11 +10,28 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 )
 
-func fetchOCIAttributes(ctx context.Context, ref string) (map[string]string, error) {
+type ociOptions struct {
+	PlainHTTP bool
+}
+
+type ociOptionsFunc func(opts *ociOptions)
+
+func WithPlainHTTP(opts *ociOptions) {
+	opts.PlainHTTP = true
+}
+
+func fetchOCIAttributes(ctx context.Context, ref string, opts ...ociOptionsFunc) (map[string]string, error) {
 	repo, err := remote.NewRepository(ref)
 	if err != nil {
 		return nil, err
 	}
+
+	ociOpts := &ociOptions{}
+	for _, opt := range opts {
+		opt(ociOpts)
+	}
+
+	repo.PlainHTTP = ociOpts.PlainHTTP
 
 	desc, reader, err := repo.FetchReference(ctx, ref)
 	if err != nil {

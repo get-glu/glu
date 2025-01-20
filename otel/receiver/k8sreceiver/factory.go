@@ -30,6 +30,7 @@ const (
 type Config struct {
 	ClusterName string   `mapstructure:"cluster_name"`
 	AuthType    AuthType `mapstructure:"auth_type"`
+	PlainHTTP   bool     `mapstructure:"plain_http"`
 }
 
 func (cfg *Config) Validate() error {
@@ -42,7 +43,8 @@ func (cfg *Config) Validate() error {
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		AuthType: AuthTypeKubeConfig,
+		AuthType:  AuthTypeKubeConfig,
+		PlainHTTP: false,
 	}
 }
 

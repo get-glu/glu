@@ -186,7 +186,12 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 			existing.digest = status.ImageID
 			k.states.Store(key, existing)
 
-			ociAttrs, err := fetchOCIAttributes(k.ctx, status.ImageID)
+			ociOpts := []ociOptionsFunc{}
+			if k.cfg.PlainHTTP {
+				ociOpts = append(ociOpts, WithPlainHTTP)
+			}
+
+			ociAttrs, err := fetchOCIAttributes(k.ctx, status.ImageID, ociOpts...)
 			if err != nil {
 				logger.Warn("Error fetching OCI attributes", zap.Error(err))
 				// here we simply leave the map as unassigned so that it

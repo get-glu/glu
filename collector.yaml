@@ -3,6 +3,7 @@ receivers:
     endpoint: 0.0.0.0:3000
   k8s:
     cluster_name: "staging"
+    plain_http: true
   otlp:
     protocols:
       http:
