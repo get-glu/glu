@@ -187,6 +187,14 @@ func TestConfig(t *testing.T) {
 					Enabled:  true,
 					Exporter: MetricsExporterPrometheus,
 				},
+				Storage: Storage{
+					Type: "clickhouse",
+					ClickHouse: &StorageClickHouse{
+						Address:  "127.0.0.1:9000",
+						Database: "default",
+						Username: "default",
+					},
+				},
 			},
 		},
 	}
