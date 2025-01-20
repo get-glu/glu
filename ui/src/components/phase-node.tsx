@@ -1,30 +1,12 @@
 import { Handle, NodeProps, Position } from '@xyflow/react';
-import { Package, GitBranch, Container, Hexagon, Github, Gitlab } from 'lucide-react';
+
 import { PhaseNode as PhaseNodeType } from '@/types/flow';
 import { ANNOTATION_OCI_IMAGE_URL } from '@/types/metadata';
 import { Label } from './label';
+import { getSourceIcon } from '@/types/icons';
 
 const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
-  const getIcon = () => {
-    switch (phase.descriptor.source.kind ?? '') {
-      case 'kubernetes':
-      case 'k8s':
-        return <Container className="h-4 w-4" />;
-      case 'oci':
-        return <Package className="h-4 w-4" />;
-      case 'ci':
-        if (phase.descriptor.source.config?.scm === 'github') {
-          return <Github className="h-4 w-4" />;
-        } else if (phase.descriptor.source.config?.scm === 'gitlab') {
-          return <Gitlab className="h-4 w-4" />;
-        }
-        return <GitBranch className="h-4 w-4" />;
-      case 'git':
-        return <GitBranch className="h-4 w-4" />;
-      default:
-        return <Hexagon className="h-4 w-4" />;
-    }
-  };
+  const Icon = getSourceIcon(phase.descriptor.source);
 
   return (
     <div className="relative min-h-[80px] min-w-[120px] cursor-pointer rounded-lg border bg-background p-4 shadow-lg">
@@ -32,7 +14,7 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
 
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {getIcon()}
+          <Icon className="h-4 w-4" />
           <span className="truncate text-sm font-medium">{phase.descriptor.metadata.name}</span>
         </div>
       </div>
