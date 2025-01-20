@@ -2,6 +2,8 @@
 package k8sreceiver
 
 import (
+	"errors"
+
 	"github.com/get-glu/glu/otel/internal/sharedcomponent"
 	"github.com/get-glu/glu/otel/receiver/k8sreceiver/internal/metadata"
 
@@ -26,16 +28,23 @@ const (
 )
 
 type Config struct {
-	AuthType AuthType `mapstructure:"auth_type"`
+	ClusterName string   `mapstructure:"cluster_name"`
+	AuthType    AuthType `mapstructure:"auth_type"`
+	PlainHTTP   bool     `mapstructure:"plain_http"`
 }
 
 func (cfg *Config) Validate() error {
+	if cfg.ClusterName == "" {
+		return errors.New("cluster name cannot be empty")
+	}
+
 	return nil
 }
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		AuthType: AuthTypeKubeConfig,
+		AuthType:  AuthTypeKubeConfig,
+		PlainHTTP: false,
 	}
 }
 

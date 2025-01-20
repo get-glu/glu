@@ -18,6 +18,7 @@ import (
 	"github.com/get-glu/glu/internal/containers"
 	"github.com/get-glu/glu/internal/parser"
 	"github.com/get-glu/glu/internal/server"
+	"github.com/get-glu/glu/internal/storage/clickhouse"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	envprovider "go.opentelemetry.io/collector/confmap/provider/envprovider"
@@ -48,12 +49,11 @@ func main() {
 type shutdownFunc func(context.Context) error
 
 func run() error {
-
 	flag.Parse()
 	args := flag.Args()
 
 	if len(args) < 1 {
-		return fmt.Errorf("missing path to glu.yml file")
+		return fmt.Errorf("missing path to glu pipeline configuration")
 	}
 
 	if *collectorCfg == "" {
@@ -88,13 +88,22 @@ func run() error {
 		return err
 	}
 
+	var storage server.Storage
+	switch conf.Storage.Type {
+	case config.StorageTypeClickHouse:
+		storage, err = clickhouse.New(conf.Storage.ClickHouse)
+		if err != nil {
+			return fmt.Errorf("configuration ClickHouse storage: %w", err)
+		}
+	}
+
 	serverOpts := []containers.Option[server.Server]{}
 	if !*dev {
 		serverOpts = append(serverOpts, server.WithUI())
 	}
 
 	var (
-		server = server.New(sys, serverOpts...)
+		server = server.New(storage, sys, serverOpts...)
 		srv    = http.Server{
 			Addr:    fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port),
 			Handler: server,

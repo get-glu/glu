@@ -17,12 +17,12 @@ type phase struct {
 	desc Descriptor
 }
 
-func (p *phase) Descriptor() Descriptor {
-	return p.desc
-}
-
 func NewPhase(desc Descriptor) Phase {
 	return &phase{desc: desc}
+}
+
+func (p *phase) Descriptor() Descriptor {
+	return p.desc
 }
 
 // Pipeline is a collection of phases.

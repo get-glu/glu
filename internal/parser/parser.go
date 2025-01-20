@@ -18,21 +18,20 @@ type SystemConfig struct {
 }
 
 type PipelineConfig struct {
-	Name    string                  `yaml:"name"`
-	Sources map[string]SourceConfig `yaml:"sources"`
-	Phases  map[string]PhaseConfig  `yaml:"phases"`
-}
-
-type SourceConfig struct {
-	Kind   string                 `yaml:"kind"`
 	Name   string                 `yaml:"name"`
-	Config map[string]interface{} `yaml:"config,omitempty"`
+	Phases map[string]PhaseConfig `yaml:"phases"`
 }
 
 type PhaseConfig struct {
-	Source    string            `yaml:"source"`
 	DependsOn string            `yaml:"depends_on,omitempty"`
+	Source    SourceConfig      `yaml:"source"`
 	Labels    map[string]string `yaml:"labels,omitempty"`
+	Config    map[string]any    `yaml:"config,omitempty"`
+}
+
+type SourceConfig struct {
+	Kind string `yaml:"kind"`
+	Name string `yaml:"name"`
 }
 
 func Parse(ctx context.Context, file string) (*core.System, error) {
@@ -58,12 +57,6 @@ func parsePipeline(_ context.Context, cfg PipelineConfig) (*core.Pipeline, error
 
 	// First create all phases
 	for phaseName, phaseConfig := range cfg.Phases {
-		// Find the associated source
-		sourceConfig, ok := cfg.Sources[phaseConfig.Source]
-		if !ok {
-			return nil, fmt.Errorf("phase %s references unknown source %s", phaseName, phaseConfig.Source)
-		}
-
 		// Create phase metadata
 		phaseMeta := core.Name(phaseName)
 		if phaseConfig.Labels != nil {
@@ -76,11 +69,11 @@ func parsePipeline(_ context.Context, cfg PipelineConfig) (*core.Pipeline, error
 		desc := core.Descriptor{
 			Pipeline: cfg.Name,
 			Metadata: phaseMeta,
-			Source: core.Source{
-				Kind:   sourceConfig.Kind,
-				Name:   sourceConfig.Name,
-				Config: sourceConfig.Config,
+			Source: core.SourceDescriptor{
+				Kind: phaseConfig.Source.Kind,
+				Name: phaseConfig.Source.Name,
 			},
+			Config: phaseConfig.Config,
 		}
 
 		// Create the phase

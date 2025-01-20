@@ -20,9 +20,10 @@ import (
 )
 
 type Server struct {
-	system *core.System
-	router *chi.Mux
-	ui     fs.FS
+	storage Storage
+	system  *core.System
+	router  *chi.Mux
+	ui      fs.FS
 }
 
 func WithUI() containers.Option[Server] {
@@ -31,10 +32,17 @@ func WithUI() containers.Option[Server] {
 	}
 }
 
-func New(system *core.System, opts ...containers.Option[Server]) *Server {
+type Status map[string]string
+
+type Storage interface {
+	Status(context.Context, core.Descriptor) (Status, error)
+}
+
+func New(storage Storage, system *core.System, opts ...containers.Option[Server]) *Server {
 	s := &Server{
-		system: system,
-		router: chi.NewRouter(),
+		storage: storage,
+		system:  system,
+		router:  chi.NewRouter(),
 	}
 
 	containers.ApplyAll(s, opts...)
@@ -98,6 +106,7 @@ type pipelineResponse struct {
 
 type phaseResponse struct {
 	Descriptor core.Descriptor `json:"descriptor,omitempty"`
+	Status     Status          `json:"status,omitempty"`
 }
 
 type edgeResponse struct {
@@ -106,9 +115,15 @@ type edgeResponse struct {
 	To   core.Descriptor `json:"to,omitempty"`
 }
 
-func (s *Server) createPhaseResponse(_ context.Context, phase core.Phase) (phaseResponse, error) {
+func (s *Server) createPhaseResponse(ctx context.Context, phase core.Phase) (phaseResponse, error) {
+	status, err := s.storage.Status(ctx, phase.Descriptor())
+	if err != nil {
+		return phaseResponse{}, err
+	}
+
 	return phaseResponse{
 		Descriptor: phase.Descriptor(),
+		Status:     status,
 	}, nil
 }
 

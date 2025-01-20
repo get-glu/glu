@@ -16,6 +16,7 @@ type Config struct {
 	Log     Log     `glu:"log"`
 	Server  Server  `glu:"server"`
 	Metrics Metrics `glu:"metrics"`
+	Storage Storage `glu:"storage"`
 }
 
 type defaulter interface {

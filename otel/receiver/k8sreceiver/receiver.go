@@ -180,12 +180,18 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 		}
 
 		// if new image ID observed
+		logger.Info("Pod Update", zap.String("image", status.ImageID), zap.Bool("isUpdating", existing.isUpdating))
 		if status.ImageID != "" && existing.isUpdating {
 			existing.isUpdating = false
 			existing.digest = status.ImageID
 			k.states.Store(key, existing)
 
-			ociAttrs, err := fetchOCIAttributes(k.ctx, status.ImageID)
+			ociOpts := []ociOptionsFunc{}
+			if k.cfg.PlainHTTP {
+				ociOpts = append(ociOpts, WithPlainHTTP)
+			}
+
+			ociAttrs, err := fetchOCIAttributes(k.ctx, status.ImageID, ociOpts...)
 			if err != nil {
 				logger.Warn("Error fetching OCI attributes", zap.Error(err))
 				// here we simply leave the map as unassigned so that it
@@ -212,7 +218,10 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 			log := logs.ResourceLogs().AppendEmpty()
 
 			attrs := log.Resource().Attributes()
-			attrs.PutStr(string(semconv.ServiceNameKey), fmt.Sprintf("deployments/%s/%s/%s", deployment.Namespace, deployment.Name, status.Name))
+			attrs.PutStr(string(semconv.ServiceNameKey), fmt.Sprintf("kubernetes/%s", k.cfg.ClusterName))
+			attrs.PutStr(string(semconv.K8SNamespaceNameKey), deployment.Namespace)
+			attrs.PutStr(string(semconv.K8SDeploymentNameKey), deployment.Name)
+			attrs.PutStr(string(semconv.K8SContainerNameKey), status.Name)
 			attrs.PutStr(string(semconv.OciManifestDigestKey), status.ImageID)
 
 			scopeLogs := log.ScopeLogs().AppendEmpty()
