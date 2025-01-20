@@ -115,7 +115,7 @@ func (r *githubReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	traces, err := eventToTraces(r.cfg, event)
+	traces, err := eventToTraces(event)
 	if err != nil {
 		logger.Error("Failed to convert event to traces", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
