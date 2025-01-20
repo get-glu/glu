@@ -29,16 +29,16 @@ func Name(name string) Metadata {
 
 // Descriptor is a type which describes a Phase
 type Descriptor struct {
-	Pipeline string   `json:"pipeline"`
-	Metadata Metadata `json:"metadata"`
-	Source   Source   `json:"source"`
+	Pipeline string           `json:"pipeline"`
+	Metadata Metadata         `json:"metadata"`
+	Source   SourceDescriptor `json:"source"`
+	Config   map[string]any   `json:"config"`
 }
 
-// Source is a type which describes a source of a phase
-type Source struct {
-	Kind   string         `json:"kind"`
-	Name   string         `json:"name"`
-	Config map[string]any `json:"config"`
+// SourceDescriptor is a type which describes a source of a phase
+type SourceDescriptor struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
 }
 
 func (d Descriptor) String() string {

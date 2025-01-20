@@ -10,6 +10,7 @@ export interface Pipeline {
 
 export interface Phase {
   descriptor: Descriptor;
+  status: Record<string, string>;
 }
 
 export interface Edge {
