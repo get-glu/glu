@@ -13,7 +13,7 @@ interface PhasePanelProps {
 }
 
 export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
-  const descriptor = node.data.descriptor;
+  const { descriptor, status } = node.data;
   const Icon = getSourceIcon(descriptor.source);
 
   return (
@@ -30,7 +30,7 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
 
       <div
         className={cn(
-          'grid grid-cols-2 gap-4 overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out',
+          'grid grid-cols-2 grid-rows-2 overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out',
           isExpanded ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'
         )}
       >
@@ -44,7 +44,7 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
           </div>
         </div>
 
-        <div className="h-[200px] p-4">
+        <div className="h-[150px] p-4">
           {descriptor.metadata.labels && Object.keys(descriptor.metadata.labels).length > 0 && (
             <>
               <h3 className="text-sm font-medium">Labels</h3>
@@ -53,6 +53,28 @@ export function PhasePanel({ node, isExpanded, onToggle }: PhasePanelProps) {
                   {Object.entries(descriptor.metadata.labels).map(([key, value]) => (
                     <Label key={key} labelKey={key} value={value} className="cursor-default" />
                   ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </div>
+
+        <div className="h-[150px] p-4">
+          {status && Object.keys(status).length > 0 && (
+            <>
+              <h3 className="text-sm font-medium">Status</h3>
+              <ScrollArea className="mt-2 h-[150px]">
+                <div className="mt-2">
+                  <div className="text-sm">
+                    {Object.entries(status).map(([key, value]) => (
+                      <div key={key} className="mt-2 block">
+                        <span className="mr-2 inline-block text-muted-foreground">{key}: </span>
+                        <span className="inline-block max-w-[600px] overflow-x-clip whitespace-nowrap">
+                          {value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </ScrollArea>
             </>
