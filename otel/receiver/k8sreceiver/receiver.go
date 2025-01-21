@@ -218,7 +218,7 @@ func (k *k8sReceiver) onUpdatePod(oldP, newP *corev1.Pod) {
 			log := logs.ResourceLogs().AppendEmpty()
 
 			attrs := log.Resource().Attributes()
-			attrs.PutStr(string(semconv.ServiceNameKey), fmt.Sprintf("kubernetes/%s", k.cfg.ClusterName))
+			attrs.PutStr(string(semconv.ServiceNameKey), ids.ServiceName("kubernetes", k.cfg.ClusterName))
 			attrs.PutStr(string(semconv.K8SNamespaceNameKey), deployment.Namespace)
 			attrs.PutStr(string(semconv.K8SDeploymentNameKey), deployment.Name)
 			attrs.PutStr(string(semconv.K8SContainerNameKey), status.Name)
