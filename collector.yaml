@@ -12,7 +12,7 @@ receivers:
 processors:
   batch:
     timeout: 5s
-    send_batch_size: 100000
+    send_batch_size: 1000
 
 exporters:
   debug:
@@ -44,11 +44,10 @@ exporters:
       max_interval: 30s
 
 service:
-  # telemetry:
-  #   logs:
-  #     level: "DEBUG"
-  #     development: true
-  #     encoding: "json"
+  telemetry:
+    logs:
+      level: debug
+      development: true
   pipelines:
     logs:
       receivers: [otlp, k8s]

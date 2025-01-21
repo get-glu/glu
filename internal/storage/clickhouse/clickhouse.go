@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -26,26 +27,83 @@ func New(cfg *config.StorageClickHouse) (*Storage, error) {
 	return &Storage{conn: conn}, nil
 }
 
+func conf(desc core.Descriptor, name string) string {
+	value, _ := desc.Config[name].(string)
+	return value
+}
+
 func (s *Storage) Status(ctx context.Context, desc core.Descriptor) (server.Status, error) {
 	switch desc.Source.Kind {
 	case "kubernetes":
-		conf := func(name string) string {
-			value, _ := desc.Config[name].(string)
-			return value
+		return s.statusKubernetes(ctx, desc)
+	case "ci":
+		scm := conf(desc, "scm")
+		switch scm {
+		case "github":
+			return s.statusGitHub(ctx, desc)
+		default:
+			return nil, fmt.Errorf("unexpected scm: %q", scm)
 		}
 
-		return s.statusKubernetes(ctx, desc.Source.Name, conf("namespace"), conf("name"), conf("container"))
-	case "oci", "ci":
+	case "oci":
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected source kind: %q", desc.Source.Kind)
 	}
 }
 
-func (s *Storage) statusKubernetes(ctx context.Context, cluster, namespace, name, container string) (server.Status, error) {
-	serviceName := fmt.Sprintf("kubernetes/%s", cluster)
+func (s *Storage) statusGitHub(ctx context.Context, desc core.Descriptor) (server.Status, error) {
+	var (
+		repository = conf(desc, "repository")
+		branch     = conf(desc, "branch")
+	)
+
+	if branch == "" {
+		branch = "main"
+	}
+
+	serviceName := ServiceName("github", repository)
 	row := s.conn.QueryRow(ctx,
-		`select ResourceAttributes['oci.manifest.digest'] from otel.otel_logs where ServiceName = ? AND ResourceAttributes['k8s.namespace.name'] = ? AND ResourceAttributes['k8s.deployment.name'] = ? AND ResourceAttributes['k8s.container.name'] = ? order by Timestamp desc limit 1;`,
+		`SELECT LogAttributes['vcs.repository.ref.revision'], LogAttributes['cicd.pipeline.name'],
+		LogAttributes['cicd.pipeline.run.id'] FROM otel.otel_logs WHERE ServiceName = ? AND LogAttributes['vcs.repository.ref.name'] = ? ORDER BY Timestamp DESC LIMIT 1;`,
+		serviceName,
+		branch,
+	)
+	if err := row.Err(); err != nil {
+		return nil, err
+	}
+
+	var (
+		sha  string
+		name string
+		id   string
+	)
+	if err := row.Scan(&sha, &name, &id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return map[string]string{
+		"sha":      sha,
+		"pipeline": name,
+		"run_id":   id,
+	}, nil
+}
+
+func (s *Storage) statusKubernetes(ctx context.Context, desc core.Descriptor) (server.Status, error) {
+	var (
+		cluster   = desc.Source.Name
+		namespace = conf(desc, "namespace")
+		name      = conf(desc, "name")
+		container = conf(desc, "container")
+	)
+
+	serviceName := ServiceName("kubernetes", cluster)
+	row := s.conn.QueryRow(ctx,
+		`SELECT ResourceAttributes['oci.manifest.digest'] FROM otel.otel_logs WHERE ServiceName = ? AND ResourceAttributes['k8s.namespace.name'] = ? AND ResourceAttributes['k8s.deployment.name'] = ? AND ResourceAttributes['k8s.container.name'] = ? ORDER BY Timestamp DESC LIMIT 1;`,
 		serviceName,
 		namespace,
 		name,
@@ -65,7 +123,7 @@ func (s *Storage) statusKubernetes(ctx context.Context, cluster, namespace, name
 	}
 
 	return map[string]string{
-		"Digest": digest,
+		"digest": digest,
 	}, nil
 }
 
@@ -105,4 +163,10 @@ func connect(cfg *config.StorageClickHouse) (driver.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+// TODO: move to package accessible by here and otel package
+func ServiceName(prefix, name string) string {
+	formattedName := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(name, "/", "-"), "_", "-"))
+	return fmt.Sprintf("%s/%s", prefix, formattedName)
 }

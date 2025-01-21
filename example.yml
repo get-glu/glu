@@ -1,12 +1,13 @@
 pipelines:
-  - name: gitops-example-app
+  - name: example-app
     phases:
       ci:
         source:
           kind: ci
-          name: get-glu/gitops-example
+          name: get-glu/example-app
         config:
           scm: github
+          repository: get-glu/example-app
       
       oci:
         source:
@@ -35,5 +36,5 @@ pipelines:
           url: http://0.0.0.0:30082
         config:
           namespace: production
-          name: gitops-example-app
-          container: gitops-example-app
+          name: example-app
+          container: example-app

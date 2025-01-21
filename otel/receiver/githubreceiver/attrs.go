@@ -52,7 +52,7 @@ const (
 	SCMGitPullRequestsURLKey = "scm.git.pull_requests.url"
 )
 
-func eventToTraces(config *Config, event any) (ptrace.Traces, error) {
+func eventToTraces(event any) (ptrace.Traces, error) {
 	var (
 		traces        = ptrace.NewTraces()
 		resourceSpans = traces.ResourceSpans().AppendEmpty()
@@ -62,9 +62,7 @@ func eventToTraces(config *Config, event any) (ptrace.Traces, error) {
 	switch e := event.(type) {
 	case *github.WorkflowJobEvent:
 		// semconv
-		serviceName := generateServiceName(config, e.GetRepo().GetFullName())
-
-		attrs.PutStr(string(semconv.ServiceNameKey), serviceName)
+		attrs.PutStr(string(semconv.ServiceNameKey), ids.ServiceName("github", e.GetRepo().GetFullName()))
 
 		// traceID is the SHA of the head commit
 		traceID, err := ids.TraceFromString(e.GetWorkflowJob().GetHeadSHA())
@@ -128,9 +126,7 @@ func eventToTraces(config *Config, event any) (ptrace.Traces, error) {
 
 	case *github.WorkflowRunEvent:
 		// semconv
-		serviceName := generateServiceName(config, e.GetRepo().GetFullName())
-
-		attrs.PutStr(string(semconv.ServiceNameKey), serviceName)
+		attrs.PutStr(string(semconv.ServiceNameKey), ids.ServiceName("github", e.GetRepo().GetFullName()))
 
 		// traceID is the SHA of the head commit
 		traceID, err := ids.TraceFromString(e.GetWorkflowRun().GetHeadSHA())
@@ -210,14 +206,6 @@ func eventToTraces(config *Config, event any) (ptrace.Traces, error) {
 	}
 
 	return traces, nil
-}
-
-func generateServiceName(config *Config, fullName string) string {
-	if config.CustomServiceName != "" {
-		return config.CustomServiceName
-	}
-	formattedName := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(fullName, "/", "-"), "_", "-"))
-	return fmt.Sprintf("%s%s%s", config.ServiceNamePrefix, formattedName, config.ServiceNameSuffix)
 }
 
 func generateSpanID(parts ...string) (pcommon.SpanID, error) {

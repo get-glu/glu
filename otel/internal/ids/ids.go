@@ -5,9 +5,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 )
+
+func ServiceName(prefix, name string) string {
+	formattedName := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(name, "/", "-"), "_", "-"))
+	return fmt.Sprintf("%s/%s", prefix, formattedName)
+}
 
 func TraceFromString(id string) (pcommon.TraceID, error) {
 	var (
