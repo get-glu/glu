@@ -45,6 +45,20 @@ const PhaseNode = ({ data: phase }: NodeProps<PhaseNodeType>) => {
             ))}
       </div>
 
+      {phase.status && Object.keys(phase.status).length > 0 && (
+        <div className="mt-4 flex w-full flex-wrap border border-muted p-2">
+          <div className="relative -top-[22px] left-0 w-0">
+            <span className="text-xs">status:</span>
+          </div>
+          {Object.entries(phase.status).map(([key, value]) => (
+            <div key={`status-${key}-${value}`} className="mt-2 flex text-xs">
+              <span className="mr-2 text-muted-foreground">{key}: </span>
+              <span className="max-w-[150px] overflow-x-scroll whitespace-nowrap">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <Handle type="target" position={Position.Left} style={{ left: -8 }} />
     </div>
   );
