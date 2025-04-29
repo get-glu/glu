@@ -15,7 +15,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
-	github.com/prometheus/client_golang v1.21.1
+	github.com/prometheus/client_golang v1.22.0
 	github.com/stretchr/testify v1.10.0
 	github.com/whilp/git-urls v1.0.0
 	go.etcd.io/bbolt v1.4.0
@@ -54,7 +54,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -74,6 +73,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20241202173237-19429a94021a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a // indirect
 	google.golang.org/grpc v1.68.1 // indirect
-	google.golang.org/protobuf v1.36.3 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
